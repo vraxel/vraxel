@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Pre-commit hook: type-check UI if any .ts/.tsx files changed,
+# and enforce the layer-leak guard when Go files under pkg/apis change.
+# Install: make setup-hooks  (sets core.hooksPath = .githooks)
+
+set -e
+
+staged=$(git diff --cached --name-only)
+
+if echo "$staged" | grep -qE '\.tsx?$'; then
+  echo "Running TypeScript type check..."
+  # Use `pnpm typecheck` (= `tsc -b --noEmit`) so the project-references
+  # walk applies the same strictness CI uses (`pnpm build` -> `tsc -b`).
+  # Plain `tsc --noEmit -p tsconfig.app.json` is more permissive and let
+  # a Record-to-struct cast bug slip into main once already (US-1).
+  (cd ui && pnpm typecheck)
+  echo "TypeScript check passed."
+fi
+
+if echo "$staged" | grep -qE '^pkg/apis/.*\.go$'; then
+  echo "Running layer-leak guard (full-tree)..."
+  ./scripts/check-layer-leak.sh
+fi

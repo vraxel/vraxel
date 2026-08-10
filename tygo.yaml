@@ -1,0 +1,28 @@
+# Go -> TypeScript type generation for the frontend (W2, plan.md D4).
+# pkg/apis/<module>/types*.go (json tags) are the single source of truth;
+# the generated files under ui/src/generated/ are committed and checked
+# for drift in CI. Regenerate with: make ts-types
+#
+# Conventions:
+#   time.Time / *time.Time  -> string (RFC3339 on the wire)
+#   json.RawMessage         -> unknown
+#   types.ObjectMeta        -> ObjectMeta (generated in meta.ts)
+#   runtime.TypeMeta        -> TypeMeta; the embedded field is inlined to
+#                              `apiVersion?/kind?` by a post-process step in
+#                              the make target (Go flattens embedded structs
+#                              in JSON; tygo emits them as a named field).
+packages:
+  - path: "vraxel.io/vraxel/lib/api/types"
+    output_path: "ui/src/generated/meta.ts"
+    include_files:
+      - "meta.go"
+    frontmatter: |
+      // Wire envelope for every API object. Go embeds TypeMeta (flattened
+      // by encoding/json), so generated types inline apiVersion?/kind?.
+      export interface TypeMeta {
+        apiVersion?: string
+        kind?: string
+      }
+    type_mappings:
+      "time.Time": "string"
+      "*time.Time": "string"

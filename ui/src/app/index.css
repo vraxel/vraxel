@@ -1,0 +1,142 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --font-sans: "Inter Variable", "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace;
+  --radius: 0.625rem;
+
+  --color-background: oklch(1 0 0);
+  --color-foreground: oklch(0.145 0.004 285.823);
+
+  --color-card: oklch(1 0 0);
+  --color-card-foreground: oklch(0.145 0.004 285.823);
+
+  --color-popover: oklch(1 0 0);
+  --color-popover-foreground: oklch(0.145 0.004 285.823);
+
+  --color-primary: oklch(0.205 0.006 285.885);
+  --color-primary-foreground: oklch(0.985 0.001 106.423);
+
+  --color-secondary: oklch(0.97 0.001 286.375);
+  --color-secondary-foreground: oklch(0.205 0.006 285.885);
+
+  --color-muted: oklch(0.97 0.001 286.375);
+  --color-muted-foreground: oklch(0.556 0.005 286.286);
+
+  --color-accent: oklch(0.97 0.001 286.375);
+  --color-accent-foreground: oklch(0.205 0.006 285.885);
+
+  --color-destructive: oklch(0.577 0.245 27.325);
+  --color-destructive-foreground: oklch(0.577 0.245 27.325);
+
+  --color-border: oklch(0.922 0.004 286.32);
+  --color-input: oklch(0.922 0.004 286.32);
+  --color-ring: oklch(0.87 0.006 286.277);
+
+  --color-chart-1: oklch(0.646 0.222 41.116);
+  --color-chart-2: oklch(0.6 0.118 184.704);
+  --color-chart-3: oklch(0.398 0.07 227.392);
+  --color-chart-4: oklch(0.828 0.189 84.429);
+  --color-chart-5: oklch(0.769 0.188 70.08);
+
+  --color-sidebar: oklch(0.985 0.001 286.375);
+  --color-sidebar-foreground: oklch(0.145 0.004 285.823);
+  --color-sidebar-primary: oklch(0.205 0.006 285.885);
+  --color-sidebar-primary-foreground: oklch(0.985 0.001 106.423);
+  --color-sidebar-accent: oklch(0.97 0.001 286.375);
+  --color-sidebar-accent-foreground: oklch(0.205 0.006 285.885);
+  --color-sidebar-border: oklch(0.922 0.004 286.32);
+  --color-sidebar-ring: oklch(0.87 0.006 286.277);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  /* recharts: tooltip wrapper has no z-index, so when it overflows the plot
+     area the absolutely-positioned legend wrapper paints over it. Lift all
+     chart tooltips above sibling layers, and restyle the default tooltip to
+     match the popover theme (recharts sets its style inline, hence !important). */
+  .recharts-tooltip-wrapper {
+    z-index: 10;
+  }
+  .recharts-default-tooltip {
+    background-color: var(--color-popover) !important;
+    border: 1px solid var(--color-border) !important;
+    border-radius: calc(var(--radius) - 2px);
+    box-shadow: 0 4px 12px rgb(0 0 0 / 0.1);
+  }
+  .recharts-default-tooltip .recharts-tooltip-label {
+    color: var(--color-popover-foreground);
+  }
+  html {
+    font-size: 14px;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+.dark {
+  --color-background: oklch(0.145 0.004 285.823);
+  --color-foreground: oklch(0.985 0.001 106.423);
+
+  --color-card: oklch(0.145 0.004 285.823);
+  --color-card-foreground: oklch(0.985 0.001 106.423);
+
+  --color-popover: oklch(0.145 0.004 285.823);
+  --color-popover-foreground: oklch(0.985 0.001 106.423);
+
+  --color-primary: oklch(0.985 0.001 106.423);
+  --color-primary-foreground: oklch(0.205 0.006 285.885);
+
+  --color-secondary: oklch(0.269 0.006 285.885);
+  --color-secondary-foreground: oklch(0.985 0.001 106.423);
+
+  --color-muted: oklch(0.269 0.006 285.885);
+  --color-muted-foreground: oklch(0.711 0.007 286.286);
+
+  --color-accent: oklch(0.269 0.006 285.885);
+  --color-accent-foreground: oklch(0.985 0.001 106.423);
+
+  --color-destructive: oklch(0.396 0.141 25.723);
+  --color-destructive-foreground: oklch(0.637 0.237 25.331);
+
+  --color-border: oklch(0.269 0.006 285.885);
+  --color-input: oklch(0.269 0.006 285.885);
+  --color-ring: oklch(0.439 0.01 286.286);
+
+  --color-chart-1: oklch(0.488 0.243 264.376);
+  --color-chart-2: oklch(0.696 0.17 162.48);
+  --color-chart-3: oklch(0.769 0.188 70.08);
+  --color-chart-4: oklch(0.627 0.265 303.9);
+  --color-chart-5: oklch(0.645 0.246 16.439);
+
+  --color-sidebar: oklch(0.205 0.006 285.885);
+  --color-sidebar-foreground: oklch(0.985 0.001 106.423);
+  --color-sidebar-primary: oklch(0.488 0.243 264.376);
+  --color-sidebar-primary-foreground: oklch(0.985 0.001 106.423);
+  --color-sidebar-accent: oklch(0.269 0.006 285.885);
+  --color-sidebar-accent-foreground: oklch(0.985 0.001 106.423);
+  --color-sidebar-border: oklch(0.269 0.006 285.885);
+  --color-sidebar-ring: oklch(0.439 0.01 286.286);
+}
+
+/* Toast close button: sonner's default translate(-35%, -35%) pushes the
+   button outside the toast boundary. When the toast has overflow clipping
+   (for long scrollable content), the button gets cropped. Fix: let the
+   toast shell overflow visibly and confine scrolling to [data-content]. */
+[data-sonner-toast][data-styled="true"] {
+  overflow: visible !important;
+}
+[data-sonner-toast][data-styled="true"] [data-content] {
+  overflow-y: auto;
+  min-height: 0;
+  max-height: calc(40vh - 32px);
+}

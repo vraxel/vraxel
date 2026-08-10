@@ -1,0 +1,10 @@
+{
+  "name": "vraxel-monorepo",
+  "private": true,
+  "packageManager": "pnpm@11.0.8",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

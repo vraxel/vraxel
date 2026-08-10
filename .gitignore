@@ -30,3 +30,12 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# --- vraxel ---
+bin/
+node_modules/
+ui/dist/*
+!ui/dist/.gitkeep
+.DS_Store
+app/vraxel-server/config.dev.yaml
+docs/*

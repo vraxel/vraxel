@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#eef2f7"/>
+    </linearGradient>
+
+    <!-- Flowing shape gradients -->
+    <linearGradient id="flow1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#c7d2de"/>
+      <stop offset="100%" stop-color="#dfe6ee"/>
+    </linearGradient>
+    <linearGradient id="flow2" x1="0" y1="0" x2="0.8" y2="1">
+      <stop offset="0%" stop-color="#b4c4d4"/>
+      <stop offset="100%" stop-color="#cdd7e2"/>
+    </linearGradient>
+    <linearGradient id="flow3" x1="0.2" y1="0" x2="1" y2="0.8">
+      <stop offset="0%" stop-color="#d6dee6"/>
+      <stop offset="100%" stop-color="#e8edf2"/>
+    </linearGradient>
+
+    <!-- Accent gradient (subtle cool blue) -->
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#94a8be"/>
+      <stop offset="100%" stop-color="#b0c0d0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- Large flowing organic form — bottom right      -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <path d="M 1920 1080 L 1920 420
+           C 1860 380, 1720 350, 1600 420
+           C 1440 520, 1380 640, 1300 720
+           C 1200 820, 1050 860, 920 1080 Z"
+        fill="url(#flow1)" opacity="0.5"/>
+
+  <!-- Mid-layer flowing form -->
+  <path d="M 1920 1080 L 1920 560
+           C 1840 520, 1740 540, 1620 600
+           C 1460 680, 1380 780, 1280 840
+           C 1160 920, 1080 960, 1020 1080 Z"
+        fill="url(#flow2)" opacity="0.4"/>
+
+  <!-- Front flowing form -->
+  <path d="M 1920 1080 L 1920 700
+           C 1820 680, 1720 720, 1600 780
+           C 1460 860, 1360 920, 1200 1000
+           C 1120 1040, 1080 1060, 1060 1080 Z"
+        fill="url(#flow3)" opacity="0.45"/>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- Top-left soft shape                            -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <path d="M 0 0 L 480 0
+           C 440 60, 360 140, 260 180
+           C 140 230, 60 200, 0 260 Z"
+        fill="#dce3eb" opacity="0.4"/>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- Geometric accents                              -->
+  <!-- ═══════════════════════════════════════════════ -->
+
+  <!-- Accent line — diagonal, elegant -->
+  <line x1="1140" y1="0" x2="1680" y2="1080"
+        stroke="#b4c4d4" stroke-width="0.8" opacity="0.18"/>
+
+  <!-- Second accent line -->
+  <line x1="1260" y1="0" x2="1800" y2="1080"
+        stroke="#c0cdd8" stroke-width="0.6" opacity="0.14"/>
+
+  <!-- Small circle cluster — upper right -->
+  <circle cx="1680" cy="200" r="6" fill="#a8b8c8" opacity="0.25"/>
+  <circle cx="1710" cy="220" r="4" fill="#a8b8c8" opacity="0.20"/>
+  <circle cx="1660" cy="230" r="3" fill="#a8b8c8" opacity="0.18"/>
+
+  <!-- Subtle dot grid — right area, sparse -->
+  <g fill="#a8b8c8" opacity="0.12">
+    <circle cx="1340" cy="280" r="1.5"/>
+    <circle cx="1380" cy="280" r="1.5"/>
+    <circle cx="1420" cy="280" r="1.5"/>
+    <circle cx="1460" cy="280" r="1.5"/>
+    <circle cx="1340" cy="320" r="1.5"/>
+    <circle cx="1380" cy="320" r="1.5"/>
+    <circle cx="1420" cy="320" r="1.5"/>
+    <circle cx="1460" cy="320" r="1.5"/>
+    <circle cx="1340" cy="360" r="1.5"/>
+    <circle cx="1380" cy="360" r="1.5"/>
+    <circle cx="1420" cy="360" r="1.5"/>
+    <circle cx="1460" cy="360" r="1.5"/>
+  </g>
+</svg>

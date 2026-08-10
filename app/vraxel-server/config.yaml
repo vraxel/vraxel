@@ -1,0 +1,49 @@
+# vraxel-server configuration file
+#
+# Priority order: command-line flags > environment variables > this file > defaults
+#
+# On SIGHUP, this file is re-read and merged with environment variables.
+# Command-line flags are NOT overridden by a reload.
+
+server:
+  externalUrl: "http://localhost:8088"   # env: SERVER_EXTERNAL_URL -- externally accessible URL
+  name: "vraxel"                         # env: SERVER_NAME -- unique identifier of this deployment
+                                         # (emitted as the `server` label on metrics & logs).
+                                         # Multi-deployment setups MUST set distinct values
+                                         # (e.g. "vraxel-dev" / "vraxel-test" / "vraxel-prod").
+                                         # Allowed: [a-zA-Z0-9_-]{1,32}. Once set, do NOT change it.
+
+database:
+  host: "localhost"       # env: DB_HOST
+  port: 5432              # env: DB_PORT
+  user: "vraxel"          # env: DB_USER
+  password: "vraxel"      # env: DB_PASSWORD
+  dbName: "vraxel"        # env: DB_NAME
+  sslMode: "disable"      # env: DB_SSL_MODE
+  maxConns: 10            # env: DB_MAX_CONNS
+
+logger:
+  level: "INFO"           # Possible values: INFO, WARN, ERROR, FATAL, PANIC
+  format: "default"       # Possible values: default, json
+
+oidc:
+  issuer: "http://localhost:8088"
+  algorithm: "EdDSA"
+  accessTokenTTL: "1h"
+  refreshTokenTTL: "168h"
+  authCodeTTL: "5m"
+  loginUrl: "/login"
+  clients:
+    - id: "vraxel-ui"
+      public: true
+      redirectUris:
+        - "http://localhost:5173/auth/callback"   # vite dev server
+        - "http://localhost:8088/auth/callback"   # embedded frontend
+      scopes: ["openid", "profile", "email", "phone"]
+
+admin:
+  username: "admin"
+  password: "Admin123!"
+  email: "admin@vraxel.io"
+  phone: "13800000000"
+  displayName: "Admin"
