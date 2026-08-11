@@ -40,5 +40,8 @@ ui/dist/*
 app/vraxel-server/config.dev.yaml
 docs/*
 
+# git worktrees created for feature work
+.worktrees/
+
 # JetBrains
 .idea/
