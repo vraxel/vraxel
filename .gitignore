@@ -39,3 +39,6 @@ ui/dist/*
 .DS_Store
 app/vraxel-server/config.dev.yaml
 docs/*
+
+# JetBrains
+.idea/

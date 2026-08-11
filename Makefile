@@ -1,96 +1,74 @@
 PKG_PREFIX := vraxel.io/vraxel
-APP_NAME := vraxel-server
-DATE_INFO_TAG ?= $(shell date -u +'%Y%m%d-%H%M%S')
-BUILD_INFO_TAG ?= $(shell echo $$(git describe --long --all | tr '/' '-')$$( \
-	      git diff-index --quiet HEAD -- || echo '-dirty-'$$(git diff-index -u HEAD | openssl sha1 | cut -d' ' -f2 | cut -c 1-8)))
-RACE ?= -race
-EXTRA_GO_BUILD_TAGS ?=
-GO_BUILD_INFO = -X '$(PKG_PREFIX)/lib/buildinfo.Version=$(APP_NAME)-$(DATE_INFO_TAG)-$(BUILD_INFO_TAG)'
+APP_NAME   := vraxel-server
 
-.PHONY: vraxel-server vraxel-server-prod build sqlc-generate openapi-gen ts-types test lint lint-layers fmt vet clean ui-install ui-dev ui-build ui-lint ui-test dev init-admin new-migration setup-hooks
+# Stamped into lib/buildinfo.Version; "dev" outside a git tree.
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+LDFLAGS := -X '$(PKG_PREFIX)/lib/buildinfo.Version=$(APP_NAME)-$(VERSION)'
 
-setup-hooks:
-	git config core.hooksPath .githooks
-	@echo "Git hooks configured (pre-commit: TypeScript type check + layer-leak guard)"
+# The gitignored per-developer overlay wins when present; otherwise the
+# committed config, whose defaults boot against localhost PG with
+# authentication on.
+CONFIG := $(if $(wildcard app/$(APP_NAME)/config.dev.yaml),app/$(APP_NAME)/config.dev.yaml,app/$(APP_NAME)/config.yaml)
 
-lint-layers:
-	@./scripts/check-layer-leak.sh
+.DEFAULT_GOAL := help
+.PHONY: help dev build generate check fmt clean new-migration setup-hooks
 
-vraxel-server:
-	CGO_ENABLED=1 go build $(RACE) -ldflags "$(GO_BUILD_INFO)" -tags "$(EXTRA_GO_BUILD_TAGS)" -o bin/$(APP_NAME)$(RACE) $(PKG_PREFIX)/app/$(APP_NAME)
+help: ## List available commands
+	@awk 'BEGIN{FS=":.*## "} /^[a-z][a-z-]*:.*## /{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-vraxel-server-prod:
-	CGO_ENABLED=0 go build -ldflags "$(GO_BUILD_INFO)" -tags "$(EXTRA_GO_BUILD_TAGS)" -o bin/$(APP_NAME) $(PKG_PREFIX)/app/$(APP_NAME)
+dev: ## Run vraxel-server (:8088) + vite (:5173) with HMR
+	@trap 'kill 0' EXIT; \
+	go run $(PKG_PREFIX)/app/$(APP_NAME) -config ./$(CONFIG) & \
+	(cd ui && pnpm dev) & \
+	wait
 
-# ./bin/vraxel-server -config ./app/vraxel-server/config.yaml
-build: openapi-gen ui-build vraxel-server-prod
+build: ## Build the frontend and link the release binary into bin/
+	cd ui && pnpm build
+	CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o bin/$(APP_NAME) $(PKG_PREFIX)/app/$(APP_NAME)
 
-# YYYYMMDDHHMMSS prefix (not YYYYMMDD): two migrations authored the same
-# day would otherwise collide on the version number and Migrate() rejects
-# duplicates. Never hand-create the file.
-new-migration:
-ifndef NAME
-	$(error Usage: make new-migration NAME=description_here)
-endif
-	@echo "pkg/db/migrations/$$(date -u +'%Y%m%d%H%M%S')_$(NAME).up.sql" && \
-	touch "pkg/db/migrations/$$(date -u +'%Y%m%d%H%M%S')_$(NAME).up.sql"
-
-sqlc-generate:
+# Refreshes the three committed artifact sets, in dependency order:
+#   pkg/db/query/*.sql          -> pkg/db/generated/            (sqlc)
+#   pkg/apis registrations      -> app/*/apis/openapi.{json,yaml}
+#   pkg/apis Go types           -> ui/src/generated/            (tygo)
+# The perl steps exist because encoding/json flattens embedded structs
+# while tygo emits them as a named field: inline TypeMeta to
+# apiVersion?/kind?, and un-optionalize the ObjectMeta fields the server
+# always sends. Generated code is committed -- `build` never regenerates.
+generate: ## Regenerate committed sqlc / OpenAPI / TS artifacts (commit the result)
 	cd pkg/db && sqlc generate
-
-# Generate TypeScript types for the frontend from pkg/apis Go types
-# (tygo, config in tygo.yaml). Output committed under ui/src/generated/.
-# The perl step inlines embedded TypeMeta fields to apiVersion?/kind?
-# (encoding/json flattens embedded structs).
-ts-types:
+	go run $(PKG_PREFIX)/cmd/openapi-gen -apis-dir pkg/apis -output app/$(APP_NAME)/apis/openapi.json -format json
+	go run $(PKG_PREFIX)/cmd/openapi-gen -apis-dir pkg/apis -output app/$(APP_NAME)/apis/openapi.yaml -format yaml
 	go tool tygo generate
 	perl -0pi -e 's/^([ \t]*)TypeMeta: TypeMeta;\n/$$1apiVersion?: string;\n$$1kind?: string;\n/gm' ui/src/generated/*.ts
 	perl -0pi -e 's/^  (id|name|createdAt|updatedAt)\?: string;/  $$1: string;/mg' ui/src/generated/meta.ts
 
-openapi-gen:
-	go run $(PKG_PREFIX)/cmd/openapi-gen -apis-dir pkg/apis -output app/vraxel-server/apis/openapi.json -format json
-	go run $(PKG_PREFIX)/cmd/openapi-gen -apis-dir pkg/apis -output app/vraxel-server/apis/openapi.yaml -format yaml
-
-test:
-	go test ./...
-
-vet:
+# Everything that must pass before a commit. `go test -race ./...` is the
+# deeper pass (~10x slower); run it when touching concurrent code.
+check: ## Run all gates: gofmt, vet, layer guard, Go tests, UI typecheck/lint/tests
+	@out=$$(gofmt -l -s .); if [ -n "$$out" ]; then echo "gofmt -s needed:"; echo "$$out"; exit 1; fi
 	go vet ./...
+	./scripts/check-layer-leak.sh
+	go test ./...
+	cd ui && pnpm typecheck && pnpm lint && pnpm test
 
-lint:
-	golangci-lint run ./...
-
-fmt:
+# The writing counterpart of `check`'s formatting gates (gofmt -l -s on the
+# Go side, prettier --check inside `pnpm lint` on the UI side).
+fmt: ## Format Go (gofmt -s) and the UI (prettier)
 	gofmt -w -s .
+	cd ui && pnpm format
 
-init-admin:
-	go run $(PKG_PREFIX)/cmd/init-admin
+# YYYYMMDDHHMMSS prefix, not YYYYMMDD: two migrations authored the same day
+# would collide on the version number and Migrate() rejects duplicates.
+# Never hand-create the file.
+new-migration: ## Create a timestamped migration (NAME=add_widgets)
+ifndef NAME
+	$(error Usage: make new-migration NAME=description_here)
+endif
+	@f="pkg/db/migrations/$$(date -u +'%Y%m%d%H%M%S')_$(NAME).up.sql"; touch "$$f"; echo "$$f"
 
-clean:
+setup-hooks: ## Point git at .githooks (pre-commit: UI typecheck + layer guard)
+	git config core.hooksPath .githooks
+	@echo "core.hooksPath = .githooks"
+
+clean: ## Remove build output
 	rm -rf bin/
-
-ui-install:
-	cd ui && pnpm install
-
-ui-dev:
-	cd ui && pnpm dev
-
-ui-build:
-	cd ui && pnpm build
-
-ui-lint:
-	cd ui && pnpm lint
-
-ui-test:
-	cd ui && pnpm test
-
-# Prefers the gitignored per-developer overlay (config.dev.yaml) when it
-# exists; otherwise the committed config.yaml, whose defaults boot
-# against localhost PG with auth on.
-DEV_CONFIG := $(if $(wildcard app/$(APP_NAME)/config.dev.yaml),app/$(APP_NAME)/config.dev.yaml,app/$(APP_NAME)/config.yaml)
-
-dev:
-	@trap 'kill 0' EXIT; \
-	go run $(PKG_PREFIX)/app/$(APP_NAME) -config ./$(DEV_CONFIG) & \
-	cd ui && pnpm dev & \
-	wait

@@ -33,9 +33,10 @@ ui/src/modules/      per-module pages/api/defs (iam, audit)
 ## Quick start
 
 ```bash
-createdb vraxel                      # or point DB_* env vars at an existing PG
-pnpm install && make ui-build        # build the embedded frontend
-go run ./app/vraxel-server -config ./app/vraxel-server/config.yaml
+createdb vraxel        # or point DB_* env vars at an existing PG
+pnpm install
+make build             # frontend + release binary into bin/
+./bin/vraxel-server -config ./app/vraxel-server/config.yaml
 ```
 
 Boot is self-provisioning: migrations run, the admin user is seeded from
@@ -63,15 +64,23 @@ present, else the committed `config.yaml`.
 
 ## Common tasks
 
-```bash
-make test lint-layers        # go test + pkg/apis layer guard
-make ui-test ui-lint         # vitest + eslint/jsx/boundary lints
-make new-migration NAME=add_widgets
-make sqlc-generate           # regenerate pkg/db/generated from query/*.sql
-make openapi-gen             # regenerate the served OpenAPI spec
-make ts-types                # regenerate ui/src/generated from Go types
-make setup-hooks             # pre-commit: typecheck + layer guard
+`make` with no target lists everything:
+
 ```
+dev             Run vraxel-server (:8088) + vite (:5173) with HMR
+build           Build the frontend and link the release binary into bin/
+generate        Regenerate committed sqlc / OpenAPI / TS artifacts (commit the result)
+check           Run all gates: gofmt, vet, layer guard, Go tests, UI typecheck/lint/tests
+fmt             Format Go (gofmt -s) and the UI (prettier)
+new-migration   Create a timestamped migration (NAME=add_widgets)
+setup-hooks     Point git at .githooks (pre-commit: UI typecheck + layer guard)
+clean           Remove build output
+```
+
+`make check` is the pre-commit gate. `make generate` must be run and its
+output committed after changing `pkg/db/query/*.sql`, a resource
+registration, or a Go API type -- `build` compiles committed sources and
+never regenerates.
 
 ## API E2E
 
@@ -93,7 +102,7 @@ and hook the module into `pkg/apis/install.go`. URL paths
 (`/api/{group}/{version}/{resource}`) and permission codes
 (`{module}:{resource}:{verb}`) are derived from the registration — never
 hand-written. RBAC scope (platform / workspace / namespace) follows
-registration depth. Run `make lint-layers` before committing.
+registration depth. Run `make check` before committing.
 
 On the frontend, mirror it: `ui/src/modules/<mod>/{defs.ts,api/,pages/}`,
 add the routes to `ui/src/app/routes.tsx`, the nav entries to
