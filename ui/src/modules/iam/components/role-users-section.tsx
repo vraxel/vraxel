@@ -21,6 +21,7 @@ import { ConfirmDialog } from "@/shared/components/confirm-dialog"
 import { TruncateText } from "@/shared/components/truncate-text"
 import { RowActionsCell, RowActionsHead } from "@/shared/components/row-actions"
 import { useApiQuery } from "@/core/query/hooks"
+import { useListState } from "@/frameworks/list/use-list-state"
 import { useQueryClient } from "@tanstack/react-query"
 import { showApiError } from "@/core/api/client"
 import { useTranslation } from "@/i18n"
@@ -62,8 +63,11 @@ export function RoleUsersSection({ config }: { config: RoleUsersConfig }) {
   const { t } = useTranslation()
   const qc = useQueryClient()
 
-  const [page, setPage] = useState(1)
-  const [search, setSearch] = useState("")
+  // Shared list state: debounced search (300ms) + page reset on search,
+  // the same behavior every other list in the app has.
+  const { page, setPage, searchInput, setSearchInput, search } = useListState({
+    defaultPageSize: PAGE_SIZE,
+  })
   const [addOpen, setAddOpen] = useState(false)
   const [revokeTarget, setRevokeTarget] = useState<RoleBinding | null>(null)
 
@@ -121,11 +125,8 @@ export function RoleUsersSection({ config }: { config: RoleUsersConfig }) {
             <Input
               name="role-user-search"
               placeholder={t("user.searchPlaceholder")}
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value)
-                setPage(1)
-              }}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               className="pl-9"
             />
           </div>
