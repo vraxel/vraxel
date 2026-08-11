@@ -12,6 +12,9 @@ server:
                                          # Multi-deployment setups MUST set distinct values
                                          # (e.g. "vraxel-dev" / "vraxel-test" / "vraxel-prod").
                                          # Allowed: [a-zA-Z0-9_-]{1,32}. Once set, do NOT change it.
+  # trustedProxies:                      # Peers allowed to set X-Forwarded-For / X-Real-IP.
+  #   - "10.0.0.0/8"                     # Leave unset when directly exposed: the client IP keys
+  #   - "172.16.0.0/12"                  # the login brute-force throttle and headers are forgeable.
 
 database:
   host: "localhost"       # env: DB_HOST

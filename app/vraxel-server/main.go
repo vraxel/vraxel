@@ -187,8 +187,21 @@ func loadConfig() *config.Config {
 		logger.Fatalf("invalid server config: %v", err)
 	}
 	config.Set(cfg)
+	applyTrustedProxies(cfg)
 	logger.Infof("configuration loaded from %q", *configPath)
 	return cfg
+}
+
+// applyTrustedProxies pushes server.trustedProxies into the client-IP
+// resolver. Validate() already rejected unparseable entries, so an error
+// here is impossible; log rather than fatal on reload paths.
+func applyTrustedProxies(cfg *config.Config) {
+	prefixes, err := cfg.Server.ParseTrustedProxies()
+	if err != nil {
+		logger.Errorf("invalid server.trustedProxies: %v", err)
+		return
+	}
+	libaudit.SetTrustedProxies(prefixes)
 }
 
 var cliFlags map[string]string
@@ -240,6 +253,7 @@ func watchSIGHUP() {
 			continue
 		}
 		config.Set(newCfg)
+		applyTrustedProxies(newCfg)
 		logger.Infof("configuration reloaded successfully")
 	}
 }

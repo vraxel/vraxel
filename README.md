@@ -124,6 +124,11 @@ add the routes to `ui/src/app/routes.tsx`, the nav entries to
   all instances): 5 failures per username or 20 per client IP within
   15 minutes lock the key for the rest of the window (HTTP 429 +
   Retry-After). A success clears the username counter only.
+- The client IP behind that throttle comes from the socket peer unless
+  `server.trustedProxies` lists the ingress range. X-Forwarded-For is
+  forgeable, so it is ignored by default -- set the CIDRs when running
+  behind a load balancer, or every per-IP control keys on a value the
+  attacker chooses.
 - `/debug/pprof/*` is disabled unless `-pprofAuthKey` or `-httpAuth.*`
   is configured -- it exposes heap contents and the command line, and
   this server fronts the edge. `/metrics` stays open (Prometheus

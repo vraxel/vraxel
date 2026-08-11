@@ -64,3 +64,26 @@ func TestServerNameValidate(t *testing.T) {
 		t.Fatalf("valid name rejected: %v", err)
 	}
 }
+
+func TestParseTrustedProxies(t *testing.T) {
+	c := &ServerConfig{Name: "vraxel", TrustedProxies: []string{"10.0.0.0/8", " 192.168.1.7 ", ""}}
+	got, err := c.ParseTrustedProxies()
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("got %d prefixes, want 2 (blank entries skipped)", len(got))
+	}
+	// A bare IP must become a host route, not a wildcard.
+	if got[1].String() != "192.168.1.7/32" {
+		t.Fatalf("bare IP became %q", got[1])
+	}
+	if err := c.Validate(); err != nil {
+		t.Fatalf("Validate: %v", err)
+	}
+
+	bad := &ServerConfig{Name: "vraxel", TrustedProxies: []string{"not-an-ip"}}
+	if err := bad.Validate(); err == nil {
+		t.Fatal("Validate must reject an unparseable entry at boot")
+	}
+}

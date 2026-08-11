@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/netip"
 	"os"
 	"regexp"
 	"strconv"
@@ -34,6 +35,37 @@ type ServerConfig struct {
 	// "vraxel-prod"). Once set it should not be changed - changing it
 	// disconnects historical series and log streams from the new ones.
 	Name string `yaml:"name"`
+	// TrustedProxies lists the peer CIDRs (or bare IPs) allowed to set
+	// X-Forwarded-For / X-Real-IP. Empty (the default) makes the server
+	// ignore those headers and use the socket peer address.
+	//
+	// This is a security control, not a convenience: the client IP keys
+	// the login brute-force throttle, and any client can forge a header.
+	// Set this to your ingress / load-balancer range when running behind
+	// one, and to nothing when the server is directly exposed.
+	TrustedProxies []string `yaml:"trustedProxies"`
+}
+
+// ParseTrustedProxies converts the configured CIDRs (bare IPs allowed)
+// into prefixes.
+func (c *ServerConfig) ParseTrustedProxies() ([]netip.Prefix, error) {
+	out := make([]netip.Prefix, 0, len(c.TrustedProxies))
+	for _, raw := range c.TrustedProxies {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			continue
+		}
+		if p, err := netip.ParsePrefix(raw); err == nil {
+			out = append(out, p)
+			continue
+		}
+		addr, err := netip.ParseAddr(raw)
+		if err != nil {
+			return nil, fmt.Errorf("server.trustedProxies %q: not an IP or CIDR", raw)
+		}
+		out = append(out, netip.PrefixFrom(addr, addr.BitLen()))
+	}
+	return out, nil
 }
 
 // serverNamePattern restricts Name to characters that are safe in
@@ -44,6 +76,9 @@ var serverNamePattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,32}$`)
 func (c *ServerConfig) Validate() error {
 	if !serverNamePattern.MatchString(c.Name) {
 		return fmt.Errorf("server.name %q invalid: must match %s", c.Name, serverNamePattern.String())
+	}
+	if _, err := c.ParseTrustedProxies(); err != nil {
+		return err
 	}
 	return nil
 }
