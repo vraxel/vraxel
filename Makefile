@@ -17,6 +17,7 @@ help: ## List available commands
 	@awk 'BEGIN{FS=":.*## "} /^[a-z][a-z-]*:.*## /{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 dev: ## Run vraxel-server (:8088) + vite (:5173) with HMR
+	@echo "config: $(CONFIG)"
 	@trap 'kill 0' EXIT; \
 	go run $(PKG_PREFIX)/app/$(APP_NAME) -config ./$(CONFIG) & \
 	(cd ui && pnpm dev) & \

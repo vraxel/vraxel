@@ -59,8 +59,21 @@ For frontend work run both halves with HMR:
 make dev     # vraxel-server :8088 + vite :5173 (proxies /api, /oidc, /docs)
 ```
 
-`make dev` uses the gitignored `app/vraxel-server/config.dev.yaml` when
-present, else the committed `config.yaml`.
+`make dev` prints and uses the gitignored
+`app/vraxel-server/config.dev.yaml` when present, else the committed
+`config.yaml`. The overlay only needs the handful of values that differ
+from the defaults -- typically `server.externalUrl`, `server.name` and
+`database.host`; the OIDC issuer and both callback URLs (embedded
+frontend + vite on :5173) are derived from `externalUrl`, so no `oidc:`
+section is needed for local work:
+
+```yaml
+server:
+  externalUrl: "http://localhost:8088"
+  name: "vraxel-dev"
+database:
+  host: "db.internal.example" # omit entirely for a local PostgreSQL
+```
 
 ## Common tasks
 
