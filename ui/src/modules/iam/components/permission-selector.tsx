@@ -518,6 +518,7 @@ function TreeNode({
           )}
         </button>
         <Checkbox
+          name={`perm-node-${node.key}`}
           checked={checked}
           disabled={readOnly || locked}
           onCheckedChange={
@@ -575,6 +576,7 @@ function TreeNode({
                     }
                   >
                     <Checkbox
+                      name={`perm-group-${node.key}-${group.key}`}
                       className="h-3.5 w-3.5"
                       checked={groupChecked}
                       disabled={readOnly || groupLocked}
@@ -603,6 +605,7 @@ function TreeNode({
                     title={readOnly ? undefined : perm.code}
                   >
                     <Checkbox
+                      name={`perm-code-${perm.code}`}
                       className="h-3.5 w-3.5"
                       checked={permChecked}
                       disabled={readOnly || permLocked}
