@@ -12,11 +12,7 @@ import {
   DialogDescription,
 } from "@/shared/ui/dialog"
 import { Separator } from "@/shared/ui/separator"
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "@/shared/ui/popover"
+import { Popover, PopoverTrigger, PopoverContent } from "@/shared/ui/popover"
 import { DateRangePicker } from "@/shared/ui/date-range-picker"
 import { auditLogsApi, type AuditLogRow } from "@/modules/audit/api/logs"
 import { auditLogsDef } from "@/modules/audit/defs"
@@ -113,16 +109,26 @@ export default function AuditLogListPage() {
   })
 
   const columns: ColumnDef<AuditLogRow>[] = [
-    { key: "username", header: t("audit.username"), sortable: true, truncate: true, className: "font-medium",
-      cell: (log) => log.spec.username || log.spec.clientIp || "-" },
-    { key: "eventType", header: t("audit.eventType"),
+    {
+      key: "username",
+      header: t("audit.username"),
+      sortable: true,
+      truncate: true,
+      className: "font-medium",
+      cell: (log) => log.spec.username || log.spec.clientIp || "-",
+    },
+    {
+      key: "eventType",
+      header: t("audit.eventType"),
       filter: [
         { value: "all", label: t("common.all") },
         { value: "api_operation", label: t("audit.eventType.api_operation") },
         { value: "authentication", label: t("audit.eventType.authentication") },
       ],
-      cell: (log) => t(`audit.eventType.${log.spec.eventType}`) },
-    { key: "resource_type",
+      cell: (log) => t(`audit.eventType.${log.spec.eventType}`),
+    },
+    {
+      key: "resource_type",
       // Free-text filter + separate sort trigger; not expressible via the
       // ColumnDef filter (dropdown) so the header is hand-built like the
       // pre-migration page.
@@ -132,7 +138,9 @@ export default function AuditLogListPage() {
             <PopoverTrigger asChild>
               <button className="inline-flex items-center gap-1 select-none">
                 {t("audit.resourceType")}
-                <Filter className={`h-3 w-3 ${resourceTypeFilter ? "text-primary" : "opacity-40"}`} />
+                <Filter
+                  className={`h-3 w-3 ${resourceTypeFilter ? "text-primary" : "opacity-40"}`}
+                />
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-64 p-3" align="start">
@@ -167,12 +175,16 @@ export default function AuditLogListPage() {
               </div>
               {resourceTypeFilter && (
                 <p className="text-muted-foreground mt-2 text-xs">
-                  {t("common.current")}: <code className="text-foreground">{resourceTypeFilter}</code>
+                  {t("common.current")}:{" "}
+                  <code className="text-foreground">{resourceTypeFilter}</code>
                 </p>
               )}
             </PopoverContent>
           </Popover>
-          <button className="cursor-pointer select-none" onClick={() => query.handleSort("resource_type")}>
+          <button
+            className="cursor-pointer select-none"
+            onClick={() => query.handleSort("resource_type")}
+          >
             <SortIcon field="resource_type" sortBy={query.sortBy} sortOrder={query.sortOrder} />
           </button>
         </div>
@@ -181,20 +193,31 @@ export default function AuditLogListPage() {
       cell: (log) =>
         log.spec.resourceType
           ? `${log.spec.resourceType}${log.spec.resourceId ? `/${log.spec.resourceId}` : ""}`
-          : "-" },
-    { key: "action", header: t("audit.action"),
+          : "-",
+    },
+    {
+      key: "action",
+      header: t("audit.action"),
       filter: [
         { value: "all", label: t("common.all") },
         ...AUDIT_ACTIONS.map((a) => ({ value: a, label: t(`audit.action.${a}`) })),
       ],
-      cell: (log) => t(`audit.action.${log.spec.action}`) },
-    { key: "module", header: t("audit.module"), sortable: true, truncate: true,
+      cell: (log) => t(`audit.action.${log.spec.action}`),
+    },
+    {
+      key: "module",
+      header: t("audit.module"),
+      sortable: true,
+      truncate: true,
       filter: [
         { value: "all", label: t("common.all") },
         ...AUDIT_MODULES.map((m) => ({ value: m, label: m })),
       ],
-      cell: (log) => log.spec.module || "-" },
-    { key: "success", header: t("audit.success"),
+      cell: (log) => log.spec.module || "-",
+    },
+    {
+      key: "success",
+      header: t("audit.success"),
       filter: [
         { value: "all", label: t("common.all") },
         { value: "true", label: t("audit.success.true") },
@@ -204,14 +227,27 @@ export default function AuditLogListPage() {
         <Badge variant={log.spec.success ? "default" : "destructive"}>
           {log.spec.success ? t("audit.success.true") : t("audit.success.false")}
         </Badge>
-      ) },
-    { key: "status_code", header: t("audit.statusCode"), sortable: true,
-      cell: (log) => log.spec.statusCode ?? "-" },
-    { key: "duration_ms", header: t("audit.duration"), sortable: true,
-      cell: (log) => (log.spec.durationMs != null ? `${log.spec.durationMs}ms` : "-") },
-    { key: "created_at", header: t("audit.createdAt"), sortable: true,
+      ),
+    },
+    {
+      key: "status_code",
+      header: t("audit.statusCode"),
+      sortable: true,
+      cell: (log) => log.spec.statusCode ?? "-",
+    },
+    {
+      key: "duration_ms",
+      header: t("audit.duration"),
+      sortable: true,
+      cell: (log) => (log.spec.durationMs != null ? `${log.spec.durationMs}ms` : "-"),
+    },
+    {
+      key: "created_at",
+      header: t("audit.createdAt"),
+      sortable: true,
       className: "text-muted-foreground text-sm whitespace-nowrap",
-      cell: (log) => new Date(log.spec.createdAt).toLocaleString() },
+      cell: (log) => new Date(log.spec.createdAt).toLocaleString(),
+    },
   ]
 
   return (
@@ -226,7 +262,10 @@ export default function AuditLogListPage() {
       toolbarExtra={
         <DateRangePicker
           value={dateRange}
-          onChange={(v) => { setDateRange(v); query.setPage(1) }}
+          onChange={(v) => {
+            setDateRange(v)
+            query.setPage(1)
+          }}
           placeholder={t("audit.filter.dateRange")}
           resetLabel={t("common.reset")}
           className="h-9 w-auto"
@@ -247,14 +286,19 @@ export default function AuditLogListPage() {
       )}
     >
       {/* detail dialog */}
-      <Dialog open={!!selectedLog} onOpenChange={(v) => { if (!v) setSelectedLog(null) }}>
-        <DialogContent className="max-h-[85vh] flex flex-col overflow-hidden sm:max-w-4xl">
+      <Dialog
+        open={!!selectedLog}
+        onOpenChange={(v) => {
+          if (!v) setSelectedLog(null)
+        }}
+      >
+        <DialogContent className="flex max-h-[85vh] flex-col overflow-hidden sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>{t("audit.detail")}</DialogTitle>
             <DialogDescription>ID: {selectedLog?.spec.id}</DialogDescription>
           </DialogHeader>
           {selectedLog && (
-            <div className="space-y-5 overflow-y-auto flex-1 min-h-0 -mx-1 px-1">
+            <div className="-mx-1 min-h-0 flex-1 space-y-5 overflow-y-auto px-1">
               {/* Two-column: Basic + Resource */}
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 {/* Basic */}
@@ -272,7 +316,9 @@ export default function AuditLogListPage() {
                     <dt className="text-muted-foreground">{t("audit.success")}</dt>
                     <dd>
                       <Badge variant={selectedLog.spec.success ? "default" : "destructive"}>
-                        {selectedLog.spec.success ? t("audit.success.true") : t("audit.success.false")}
+                        {selectedLog.spec.success
+                          ? t("audit.success.true")
+                          : t("audit.success.false")}
                       </Badge>
                     </dd>
                     <dt className="text-muted-foreground">{t("audit.createdAt")}</dt>
@@ -313,20 +359,28 @@ export default function AuditLogListPage() {
                   <div className="grid grid-cols-[auto_1fr] gap-x-4">
                     <dt className="text-muted-foreground">{t("audit.statusCode")}</dt>
                     <dd>
-                      <span className={
-                        (selectedLog.spec.statusCode ?? 0) < 400 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
-                      }>
+                      <span
+                        className={
+                          (selectedLog.spec.statusCode ?? 0) < 400
+                            ? "text-green-600 dark:text-green-400"
+                            : "text-red-600 dark:text-red-400"
+                        }
+                      >
                         {selectedLog.spec.statusCode ?? "-"}
                       </span>
                     </dd>
                   </div>
                   <div className="col-span-full grid grid-cols-[auto_1fr] gap-x-4">
                     <dt className="text-muted-foreground">{t("audit.httpPath")}</dt>
-                    <dd className="break-all font-mono">{selectedLog.spec.httpPath || "-"}</dd>
+                    <dd className="font-mono break-all">{selectedLog.spec.httpPath || "-"}</dd>
                   </div>
                   <div className="grid grid-cols-[auto_1fr] gap-x-4">
                     <dt className="text-muted-foreground">{t("audit.duration")}</dt>
-                    <dd>{selectedLog.spec.durationMs != null ? `${selectedLog.spec.durationMs}ms` : "-"}</dd>
+                    <dd>
+                      {selectedLog.spec.durationMs != null
+                        ? `${selectedLog.spec.durationMs}ms`
+                        : "-"}
+                    </dd>
                   </div>
                   <div className="grid grid-cols-[auto_1fr] gap-x-4">
                     <dt className="text-muted-foreground">{t("audit.clientIp")}</dt>
@@ -345,7 +399,7 @@ export default function AuditLogListPage() {
                   <Separator />
                   <div className="space-y-3">
                     <h3 className="text-sm font-semibold">{t("audit.detail.field")}</h3>
-                    <pre className="max-h-80 overflow-auto rounded-md border bg-muted/50 p-4 font-mono text-xs leading-relaxed">
+                    <pre className="bg-muted/50 max-h-80 overflow-auto rounded-md border p-4 font-mono text-xs leading-relaxed">
                       {formatJsonDetail(selectedLog.spec.detail)}
                     </pre>
                   </div>
@@ -358,7 +412,7 @@ export default function AuditLogListPage() {
                   <Separator />
                   <div className="space-y-3">
                     <h3 className="text-sm font-semibold">{t("audit.responseDetail.field")}</h3>
-                    <pre className="max-h-80 overflow-auto rounded-md border bg-muted/50 p-4 font-mono text-xs leading-relaxed">
+                    <pre className="bg-muted/50 max-h-80 overflow-auto rounded-md border p-4 font-mono text-xs leading-relaxed">
                       {formatJsonDetail(selectedLog.spec.responseDetail)}
                     </pre>
                   </div>

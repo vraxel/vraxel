@@ -9,16 +9,20 @@ interface Call {
 const calls: Call[] = []
 
 vi.mock("../client", () => {
-  const mk =
-    (method: string) =>
-    (url: string, opts?: Call["opts"]) => {
-      calls.push({ method, url, opts })
-      // Mirror real backend delete/action semantics: 204 with an empty
-      // body (text ""), so jsonOrEmpty's empty-body path is exercised.
-      return { json: async () => ({ mocked: true }), text: async () => "" }
-    }
+  const mk = (method: string) => (url: string, opts?: Call["opts"]) => {
+    calls.push({ method, url, opts })
+    // Mirror real backend delete/action semantics: 204 with an empty
+    // body (text ""), so jsonOrEmpty's empty-body path is exercised.
+    return { json: async () => ({ mocked: true }), text: async () => "" }
+  }
   return {
-    api: { get: mk("get"), post: mk("post"), put: mk("put"), patch: mk("patch"), delete: mk("delete") },
+    api: {
+      get: mk("get"),
+      post: mk("post"),
+      put: mk("put"),
+      patch: mk("patch"),
+      delete: mk("delete"),
+    },
     apiRequest: (p: Promise<unknown>) => p,
   }
 })
@@ -73,7 +77,10 @@ describe("action / verb / sub", () => {
   it("defineAction posts to /{id}/{action}", async () => {
     const reboot = defineAction(hostsDef, "reboot")
     await reboot({ ws: "3" }, 7)
-    expect(calls[0]).toMatchObject({ method: "post", url: "compute/v1/workspaces/3/hosts/7/reboot" })
+    expect(calls[0]).toMatchObject({
+      method: "post",
+      url: "compute/v1/workspaces/3/hosts/7/reboot",
+    })
   })
 
   it("defineVerb gets the colon form /{id}:{verb}", async () => {

@@ -1,7 +1,5 @@
 import { useRef, useState, useCallback, useLayoutEffect } from "react"
-import {
-  Tooltip, TooltipTrigger, TooltipContent,
-} from "@/shared/ui/tooltip"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/ui/tooltip"
 
 /**
  * A text element that shows a tooltip when its inner text is truncated.
@@ -36,9 +34,7 @@ export function TruncateText({
     const el = spanRef.current
     if (!el) return
     const measure = () => {
-      const overflows = lines
-        ? el.scrollHeight > el.clientHeight
-        : el.scrollWidth > el.clientWidth
+      const overflows = lines ? el.scrollHeight > el.clientHeight : el.scrollWidth > el.clientWidth
       setTruncated(overflows)
     }
     measure()
@@ -47,9 +43,12 @@ export function TruncateText({
     return () => ro.disconnect()
   }, [children, text, lines])
 
-  const handleOpenChange = useCallback((next: boolean) => {
-    setOpen(next && truncated)
-  }, [truncated])
+  const handleOpenChange = useCallback(
+    (next: boolean) => {
+      setOpen(next && truncated)
+    },
+    [truncated],
+  )
 
   const clampClass = lines ? `line-clamp-${lines} break-all` : "truncate"
 
@@ -63,7 +62,7 @@ export function TruncateText({
           // hides the inner span from hover events. Force auto here so the
           // tooltip can still open on hover; click events bubble regardless of
           // pointer-events, so the trigger button still opens on click.
-          className={`block pointer-events-auto ${clampClass} ${className ?? ""}`}
+          className={`pointer-events-auto block ${clampClass} ${className ?? ""}`}
         >
           {children}
         </span>

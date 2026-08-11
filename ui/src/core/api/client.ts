@@ -1,6 +1,11 @@
 import ky, { HTTPError, TimeoutError } from "ky"
 import { toast } from "sonner"
-import { clearLocalAuthState, getCSRFToken, refreshAccessToken, startAuthFlow } from "@/core/auth/auth"
+import {
+  clearLocalAuthState,
+  getCSRFToken,
+  refreshAccessToken,
+  startAuthFlow,
+} from "@/core/auth/auth"
 import { useScopeStore } from "@/core/scope/scope-store"
 import type { StatusResponse, StatusResponseDetail } from "./types"
 
@@ -12,7 +17,8 @@ export class ApiError extends Error {
   constructor(response: StatusResponse) {
     super(response.message)
     this.name = "ApiError"
-    this.status = typeof response.status === "number" ? response.status : parseInt(String(response.status), 10)
+    this.status =
+      typeof response.status === "number" ? response.status : parseInt(String(response.status), 10)
     this.reason = response.reason
     this.details = response.details
   }
@@ -70,7 +76,7 @@ export const api = ky.create({
         if (error instanceof HTTPError) {
           const body = error.data as StatusResponse | undefined
           if (body && body.reason) {
-            (error as HTTPError & { _apiBody: StatusResponse })._apiBody = body
+            ;(error as HTTPError & { _apiBody: StatusResponse })._apiBody = body
           }
         }
         return error
@@ -85,7 +91,9 @@ export const api = ky.create({
             // Use the pre-fetch clone saved in beforeRequest; the
             // original request's body stream was consumed by fetch().
             const saved = (request as Request & { _retryClone?: Request })._retryClone
-            const retryRequest = saved ? new Request(saved) : new Request(request.url, { method: request.method, headers: request.headers })
+            const retryRequest = saved
+              ? new Request(saved)
+              : new Request(request.url, { method: request.method, headers: request.headers })
             retryRequest.headers.set("X-Retry", "true")
             if (!isSafeMethod(retryRequest.method)) {
               const csrf = getCSRFToken()
@@ -250,8 +258,7 @@ export function translateDetailMessage(message: string): string {
 // Substring matches: for backend messages whose variable part precedes
 // the recognisable text. Empty today; add entries alongside the backend
 // message they mirror.
-const messageContainsMap: Record<string, string> = {
-}
+const messageContainsMap: Record<string, string> = {}
 
 export function translateApiError(err: ApiError): string {
   if (messageMap[err.message]) return messageMap[err.message]
@@ -291,7 +298,10 @@ function isReasonOnlyMatch(err: ApiError): boolean {
 function extractMessageSuffix(err: ApiError): string {
   for (const prefix of Object.keys(messagePrefixMap)) {
     if (err.message.startsWith(prefix)) {
-      return err.message.slice(prefix.length).replace(/^[:\s]+/, "").trim()
+      return err.message
+        .slice(prefix.length)
+        .replace(/^[:\s]+/, "")
+        .trim()
     }
   }
   return ""
@@ -390,9 +400,7 @@ export function formApiErrorMessage(
     const d = err.details[0]
     const fieldLabel = d.field.replace(/^(metadata|spec)\./, "")
     const i18nKey = translateDetailMessage(d.message)
-    return i18nKey !== d.message
-      ? t(i18nKey, { field: fieldLabel })
-      : `${fieldLabel}: ${d.message}`
+    return i18nKey !== d.message ? t(i18nKey, { field: fieldLabel }) : `${fieldLabel}: ${d.message}`
   }
   const { headline, description } = decomposeApiError(err, t, resourceKey)
   return description ? `${headline}\n${description}` : headline
@@ -404,7 +412,11 @@ export function formApiErrorMessage(
  * @param t - The i18n translation function
  * @param resourceKey - Optional i18n key for the resource name (e.g. "user.title")
  */
-export function showApiError(err: unknown, t: (key: string, params?: Record<string, string | number>) => string, resourceKey?: string) {
+export function showApiError(
+  err: unknown,
+  t: (key: string, params?: Record<string, string | number>) => string,
+  resourceKey?: string,
+) {
   if (err instanceof ApiError) {
     // Field-level details (FieldError list) carry the actionable message
     // ("disks[0].mountPoint: duplicate ..."). The bare reason ("BadRequest"
@@ -415,9 +427,8 @@ export function showApiError(err: unknown, t: (key: string, params?: Record<stri
       const d = err.details[0]
       const fieldLabel = d.field.replace(/^(metadata|spec)\./, "")
       const i18nKey = translateDetailMessage(d.message)
-      const text = i18nKey !== d.message
-        ? t(i18nKey, { field: fieldLabel })
-        : `${fieldLabel}: ${d.message}`
+      const text =
+        i18nKey !== d.message ? t(i18nKey, { field: fieldLabel }) : `${fieldLabel}: ${d.message}`
       toast.error(text)
       return
     }
@@ -454,9 +465,7 @@ export function handleFormApiError(
       // backend emits bracket notation (`arr[0].x`) under a metadata./
       // spec. envelope the flat zod schemas do not carry. Normalize so
       // FormMessage on the matching FormField actually renders.
-      const field = d.field
-        .replace(/^(metadata|spec)\./, "")
-        .replace(/\[(\d+)\]/g, ".$1")
+      const field = d.field.replace(/^(metadata|spec)\./, "").replace(/\[(\d+)\]/g, ".$1")
       const i18nKey = translateDetailMessage(d.message)
       let message: string
       if (i18nKey !== d.message) {

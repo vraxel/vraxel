@@ -26,7 +26,8 @@ const iam = {
   "workspace.batchRemoveMemberConfirm": "确定要从租户中移除选中的 {count} 个用户吗？",
   "workspace.memberAdded": "用户添加成功",
   "workspace.memberRemoved": "用户移除成功",
-  "workspace.memberPartialRemoved": "成功移除 {success} 个用户，{failed} 个移除失败（所有者不可移除）",
+  "workspace.memberPartialRemoved":
+    "成功移除 {success} 个用户，{failed} 个移除失败（所有者不可移除）",
   "workspace.noMembers": "暂无用户。",
   "workspace.noAvailableUsers": "没有可添加的用户。",
   "workspace.validation.name.format": "名称需为3-50位字母、数字、连字符或下划线",
@@ -64,12 +65,15 @@ const iam = {
   "namespace.batchRemoveMemberConfirm": "确定要从项目中移除选中的 {count} 个用户吗？",
   "namespace.memberAdded": "用户添加成功",
   "namespace.memberRemoved": "用户移除成功",
-  "namespace.memberPartialRemoved": "成功移除 {success} 个用户，{failed} 个移除失败（所有者不可移除）",
+  "namespace.memberPartialRemoved":
+    "成功移除 {success} 个用户，{failed} 个移除失败（所有者不可移除）",
   "namespace.noMembers": "暂无用户。",
   "namespace.noAvailableUsers": "没有可添加的用户。",
-  "namespace.validation.name.format": "名称需为3-50位字母、数字、连字符或下划线，以字母或数字开头和结尾",
+  "namespace.validation.name.format":
+    "名称需为3-50位字母、数字、连字符或下划线，以字母或数字开头和结尾",
   "namespace.validation.name.taken": "该名称已被使用",
-  "namespace.validation.name.hint": "3-50位字母、数字、连字符或下划线，以字母或数字开头和结尾，如 my-project",
+  "namespace.validation.name.hint":
+    "3-50位字母、数字、连字符或下划线，以字母或数字开头和结尾，如 my-project",
   "namespace.builtinDefault": "默认项目",
   "namespace.builtinDefaultDesc": "租户 {name} 的默认项目",
 
@@ -87,7 +91,8 @@ const iam = {
   "user.deleteConfirm": "确定要删除用户「{name}」吗？此操作不可撤销。",
   "user.resetPassword": "重置密码",
   "user.resetPasswordTitle": "重置用户「{name}」的密码",
-  "user.resetPasswordHint": "为该用户设置一个新密码。其当前所有会话将被吊销，需要使用新密码重新登录。",
+  "user.resetPasswordHint":
+    "为该用户设置一个新密码。其当前所有会话将被吊销，需要使用新密码重新登录。",
   "user.batchDelete": "批量删除",
   "user.batchDeleteConfirm": "确定要删除选中的 {count} 个用户吗？此操作不可撤销。",
   "user.workspaces": "加入的租户",

@@ -2,9 +2,7 @@ import { useState } from "react"
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react"
 import { Button } from "@/shared/ui/button"
 import { Input } from "@/shared/ui/input"
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/shared/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select"
 import { useTranslation } from "@/i18n"
 import { PAGE_SIZE_OPTIONS } from "@/frameworks/list/use-list-state"
 import { buildPageItems } from "@/shared/components/pagination-utils"
@@ -17,7 +15,13 @@ interface PaginationProps {
   onPageSizeChange: (size: number) => void
 }
 
-export function Pagination({ totalCount, page, pageSize, onPageChange, onPageSizeChange }: PaginationProps) {
+export function Pagination({
+  totalCount,
+  page,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
+}: PaginationProps) {
   const { t } = useTranslation()
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
   const [jumpInput, setJumpInput] = useState("")
@@ -41,22 +45,48 @@ export function Pagination({ totalCount, page, pageSize, onPageChange, onPageSiz
         <div className="flex items-center gap-2">
           <span className="text-muted-foreground text-sm">{t("common.pageSize")}</span>
           <Select value={String(pageSize)} onValueChange={(v) => onPageSizeChange(Number(v))}>
-            <SelectTrigger className="h-8 w-[70px]"><SelectValue /></SelectTrigger>
-            <SelectContent>{PAGE_SIZE_OPTIONS.map((s) => <SelectItem key={s} value={String(s)}>{s}</SelectItem>)}</SelectContent>
+            <SelectTrigger className="h-8 w-[70px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PAGE_SIZE_OPTIONS.map((s) => (
+                <SelectItem key={s} value={String(s)}>
+                  {s}
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-1">
-        <Button variant="outline" size="icon-sm" disabled={page <= 1} onClick={() => onPageChange(1)} aria-label={t("common.firstPage")}>
+        <Button
+          variant="outline"
+          size="icon-sm"
+          disabled={page <= 1}
+          onClick={() => onPageChange(1)}
+          aria-label={t("common.firstPage")}
+        >
           <ChevronsLeft />
         </Button>
-        <Button variant="outline" size="icon-sm" disabled={page <= 1} onClick={() => onPageChange(page - 1)} aria-label={t("common.previous")}>
+        <Button
+          variant="outline"
+          size="icon-sm"
+          disabled={page <= 1}
+          onClick={() => onPageChange(page - 1)}
+          aria-label={t("common.previous")}
+        >
           <ChevronLeft />
         </Button>
         {pageItems.map((item) => {
           if (item === "ellipsis-l" || item === "ellipsis-r") {
             return (
-              <span key={item} aria-hidden="true" className="text-muted-foreground flex h-8 w-8 select-none items-center justify-center text-sm">...</span>
+              <span
+                key={item}
+                aria-hidden="true"
+                className="text-muted-foreground flex h-8 w-8 items-center justify-center text-sm select-none"
+              >
+                ...
+              </span>
             )
           }
           const isCurrent = item === page
@@ -67,16 +97,30 @@ export function Pagination({ totalCount, page, pageSize, onPageChange, onPageSiz
               size="icon-sm"
               aria-current={isCurrent ? "page" : undefined}
               aria-label={t("common.gotoPage", { page: item })}
-              onClick={() => { if (!isCurrent) onPageChange(item) }}
+              onClick={() => {
+                if (!isCurrent) onPageChange(item)
+              }}
             >
               {item}
             </Button>
           )
         })}
-        <Button variant="outline" size="icon-sm" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)} aria-label={t("common.next")}>
+        <Button
+          variant="outline"
+          size="icon-sm"
+          disabled={page >= totalPages}
+          onClick={() => onPageChange(page + 1)}
+          aria-label={t("common.next")}
+        >
           <ChevronRight />
         </Button>
-        <Button variant="outline" size="icon-sm" disabled={page >= totalPages} onClick={() => onPageChange(totalPages)} aria-label={t("common.lastPage")}>
+        <Button
+          variant="outline"
+          size="icon-sm"
+          disabled={page >= totalPages}
+          onClick={() => onPageChange(totalPages)}
+          aria-label={t("common.lastPage")}
+        >
           <ChevronsRight />
         </Button>
         {totalPages > 1 && (
@@ -90,7 +134,12 @@ export function Pagination({ totalCount, page, pageSize, onPageChange, onPageSiz
               aria-label={t("common.jumpToPageInput")}
               value={jumpInput}
               onChange={(e) => setJumpInput(e.target.value.replace(/[^0-9]/g, ""))}
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commitJump() } }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  commitJump()
+                }
+              }}
               onBlur={commitJump}
             />
             {pageUnit && <span className="text-muted-foreground text-sm">{pageUnit}</span>}

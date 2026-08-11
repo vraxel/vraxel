@@ -20,13 +20,11 @@ interface BreadcrumbEntry {
 
 /** Label keys for sub-resources not in NAV_ITEMS (nested resource paths embedded
  *  in a parent detail page). These link to the parent path, not their own. */
-const SUB_RESOURCE_LABEL_KEYS: Record<string, string> = {
-}
+const SUB_RESOURCE_LABEL_KEYS: Record<string, string> = {}
 
 /** Label keys for intermediate path segments that form compound resource paths.
  *  Unlike sub-resources, these link to their own path normally. */
-const INTERMEDIATE_LABEL_KEYS: Record<string, string> = {
-}
+const INTERMEDIATE_LABEL_KEYS: Record<string, string> = {}
 
 /** Resolve a path segment to its i18n label key. Module prefixes use `nav.{name}` convention. */
 function segmentLabelKey(seg: string): string | undefined {
@@ -98,7 +96,7 @@ export function AppBreadcrumb() {
       // Sub-resources (e.g. "subnets") are embedded in the parent detail page,
       // so link to the parent path instead of the non-existent standalone path.
       const isSubResource = seg in SUB_RESOURCE_LABEL_KEYS
-      const href = isLast ? undefined : (isSubResource ? parentPath : pathAccum)
+      const href = isLast ? undefined : isSubResource ? parentPath : pathAccum
       items.push({ label: t(labelKey), href })
     } else {
       // Dynamic segment (e.g. workspace ID, namespace ID, resource ID)
@@ -126,7 +124,9 @@ export function AppBreadcrumb() {
                   <BreadcrumbPage className="truncate">{item.label}</BreadcrumbPage>
                 ) : (
                   <BreadcrumbLink asChild>
-                    <Link to={item.href!} className="truncate block">{item.label}</Link>
+                    <Link to={item.href!} className="block truncate">
+                      {item.label}
+                    </Link>
                   </BreadcrumbLink>
                 )}
               </BreadcrumbItem>

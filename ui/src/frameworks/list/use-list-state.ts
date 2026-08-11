@@ -9,11 +9,7 @@ export interface UseListStateOptions {
 }
 
 export function useListState(options: UseListStateOptions = {}) {
-  const {
-    defaultSortBy = "created_at",
-    defaultSortOrder = "desc",
-    defaultPageSize = 20,
-  } = options
+  const { defaultSortBy = "created_at", defaultSortOrder = "desc", defaultPageSize = 20 } = options
 
   const [page, setPageRaw] = useState(1)
   const [pageSize, setPageSizeRaw] = useState(defaultPageSize)
@@ -34,7 +30,9 @@ export function useListState(options: UseListStateOptions = {}) {
         return searchInput
       })
     }, 300)
-    return () => { if (searchTimer.current) clearTimeout(searchTimer.current) }
+    return () => {
+      if (searchTimer.current) clearTimeout(searchTimer.current)
+    }
   }, [searchInput])
 
   const sortByRef = useRef(defaultSortBy)
@@ -63,13 +61,14 @@ export function useListState(options: UseListStateOptions = {}) {
   }, [])
 
   const toggleAll = useCallback((ids: string[]) => {
-    setSelected((prev) => prev.size === ids.length ? new Set() : new Set(ids))
+    setSelected((prev) => (prev.size === ids.length ? new Set() : new Set(ids)))
   }, [])
 
   const toggleOne = useCallback((id: string) => {
     setSelected((prev) => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id); else next.add(id)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
       return next
     })
   }, [])
@@ -99,11 +98,21 @@ export function useListState(options: UseListStateOptions = {}) {
   }, [])
 
   return {
-    page, setPage,
-    pageSize, setPageSize,
-    sortBy, sortOrder, handleSort,
-    searchInput, setSearchInput, search,
-    selected, toggleAll, toggleOne, clearSelection, syncSelection,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    sortBy,
+    sortOrder,
+    handleSort,
+    searchInput,
+    setSearchInput,
+    search,
+    selected,
+    toggleAll,
+    toggleOne,
+    clearSelection,
+    syncSelection,
   }
 }
 

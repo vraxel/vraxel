@@ -31,8 +31,7 @@ const sizeClass: Record<Size, string> = {
 // hover stays at /50 for the rest of the row; the slight contrast against
 // the opaque sticky cell is intentional and signals the column is pinned.
 // The left-edge shadow hints that content is scrolled underneath.
-const stickyHead =
-  "sticky right-0 z-20 bg-background shadow-[-4px_0_6px_-4px_rgb(0_0_0/0.08)]"
+const stickyHead = "sticky right-0 z-20 bg-background shadow-[-4px_0_6px_-4px_rgb(0_0_0/0.08)]"
 // Ghost-button hover overrides: the default ghost variant uses `hover:bg-accent`,
 // but in this theme `accent` and `muted` are the same color, so on hovered rows
 // (cell becomes `bg-muted`) the button hover is invisible. Inject a stronger
@@ -53,11 +52,7 @@ interface Props {
 }
 
 export function RowActionsHead({ children, className, size = "md" }: Props) {
-  return (
-    <TableHead className={cn(sizeClass[size], stickyHead, className)}>
-      {children}
-    </TableHead>
-  )
+  return <TableHead className={cn(sizeClass[size], stickyHead, className)}>{children}</TableHead>
 }
 
 export function RowActionsCell({ children, className, size = "md" }: Props) {

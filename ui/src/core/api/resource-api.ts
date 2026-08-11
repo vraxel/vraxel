@@ -58,24 +58,37 @@ export function defineResourceApi<
     def,
     list: (s: ScopeRef, params?: ListP) =>
       apiRequest<TList>(
-        api.get(resourcePath(def, s), { searchParams: toSearchParams(params), ...kyOpts(opts.list) }).json(),
+        api
+          .get(resourcePath(def, s), { searchParams: toSearchParams(params), ...kyOpts(opts.list) })
+          .json(),
       ),
     get: (s: ScopeRef, id: string | number) =>
       apiRequest<T>(api.get(resourcePath(def, s, id), kyOpts(opts.get)).json()),
     create: (s: ScopeRef, body: CreateP) =>
       apiRequest<T>(api.post(resourcePath(def, s), { json: body, ...kyOpts(opts.create) }).json()),
     update: (s: ScopeRef, id: string | number, body: UpdateP) =>
-      apiRequest<T>(api.put(resourcePath(def, s, id), { json: body, ...kyOpts(opts.update) }).json()),
+      apiRequest<T>(
+        api.put(resourcePath(def, s, id), { json: body, ...kyOpts(opts.update) }).json(),
+      ),
     patch: (s: ScopeRef, id: string | number, body: Partial<T> | object) =>
-      apiRequest<T>(api.patch(resourcePath(def, s, id), { json: body, ...kyOpts(opts.patch) }).json()),
+      apiRequest<T>(
+        api.patch(resourcePath(def, s, id), { json: body, ...kyOpts(opts.patch) }).json(),
+      ),
     delete: (s: ScopeRef, id: string | number, params?: object) =>
       apiRequest<void>(
-        jsonOrEmpty(api.delete(resourcePath(def, s, id), { searchParams: toSearchParams(params), ...kyOpts(opts.delete) })),
+        jsonOrEmpty(
+          api.delete(resourcePath(def, s, id), {
+            searchParams: toSearchParams(params),
+            ...kyOpts(opts.delete),
+          }),
+        ),
       ),
     // Backend CollectionDeleter: DELETE /{resource} with an ids body.
     deleteCollection: (s: ScopeRef, ids: string[]) =>
       apiRequest<TDeleteCollection>(
-        jsonOrEmpty(api.delete(resourcePath(def, s), { json: { ids }, ...kyOpts(opts.deleteCollection) })),
+        jsonOrEmpty(
+          api.delete(resourcePath(def, s), { json: { ids }, ...kyOpts(opts.deleteCollection) }),
+        ),
       ),
   }
 }
@@ -84,7 +97,9 @@ export function defineResourceApi<
 export function defineAction<TBody = void, TResp = unknown>(def: ResourceDef, action: string) {
   return (s: ScopeRef, id: string | number, body?: TBody) =>
     apiRequest<TResp>(
-      jsonOrEmpty(api.post(resourcePath(def, s, id, action), body === undefined ? {} : { json: body })),
+      jsonOrEmpty(
+        api.post(resourcePath(def, s, id, action), body === undefined ? {} : { json: body }),
+      ),
     )
 }
 
@@ -101,7 +116,9 @@ export function defineSubApi<T, TList = ListResponse<T>>(def: ResourceDef, sub: 
   return {
     list: (s: ScopeRef, parentId: string | number, params?: object) =>
       apiRequest<TList>(
-        api.get(resourcePath(def, s, parentId, sub), { searchParams: toSearchParams(params) }).json(),
+        api
+          .get(resourcePath(def, s, parentId, sub), { searchParams: toSearchParams(params) })
+          .json(),
       ),
     get: (s: ScopeRef, parentId: string | number, id: string | number) =>
       apiRequest<T>(api.get(resourcePath(def, s, parentId, sub, id)).json()),

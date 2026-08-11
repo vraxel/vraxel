@@ -1,7 +1,14 @@
 import { iamApi } from "./client"
 import { apiRequest } from "@/core/api/client"
 import type { ListParams, StatusResponse } from "@/core/api/types"
-import type { ChangePasswordRequest, NamespaceList, ResetPasswordRequest, User, UserList, WorkspaceList } from "./types"
+import type {
+  ChangePasswordRequest,
+  NamespaceList,
+  ResetPasswordRequest,
+  User,
+  UserList,
+  WorkspaceList,
+} from "./types"
 
 export async function listUsers(params?: ListParams): Promise<UserList> {
   return apiRequest(iamApi.get("users", { searchParams: params as Record<string, string> }).json())
@@ -15,10 +22,7 @@ export async function createUser(data: Pick<User, "metadata" | "spec">): Promise
   return apiRequest(iamApi.post("users", { json: data }).json())
 }
 
-export async function updateUser(
-  id: string,
-  data: Pick<User, "metadata" | "spec">,
-): Promise<User> {
+export async function updateUser(id: string, data: Pick<User, "metadata" | "spec">): Promise<User> {
   return apiRequest(iamApi.put(`users/${id}`, { json: data }).json())
 }
 
@@ -34,8 +38,14 @@ export async function getWorkspaceUser(workspaceId: string, userId: string): Pro
   return apiRequest(iamApi.get(`workspaces/${workspaceId}/users/${userId}`).json())
 }
 
-export async function getNamespaceUser(workspaceId: string, namespaceId: string, userId: string): Promise<User> {
-  return apiRequest(iamApi.get(`workspaces/${workspaceId}/namespaces/${namespaceId}/users/${userId}`).json())
+export async function getNamespaceUser(
+  workspaceId: string,
+  namespaceId: string,
+  userId: string,
+): Promise<User> {
+  return apiRequest(
+    iamApi.get(`workspaces/${workspaceId}/namespaces/${namespaceId}/users/${userId}`).json(),
+  )
 }
 
 export async function listWorkspaceUsers(
@@ -43,17 +53,26 @@ export async function listWorkspaceUsers(
   params?: ListParams,
 ): Promise<UserList> {
   return apiRequest(
-    iamApi.get(`workspaces/${workspaceId}/users`, { searchParams: params as Record<string, string> }).json(),
+    iamApi
+      .get(`workspaces/${workspaceId}/users`, { searchParams: params as Record<string, string> })
+      .json(),
   )
 }
 
-export async function addWorkspaceUsers(workspaceId: string, ids: string[], roleId?: string): Promise<void> {
+export async function addWorkspaceUsers(
+  workspaceId: string,
+  ids: string[],
+  roleId?: string,
+): Promise<void> {
   const body: { ids: string[]; roleId?: string } = { ids }
   if (roleId) body.roleId = roleId
   await apiRequest(iamApi.post(`workspaces/${workspaceId}/users`, { json: body }).json())
 }
 
-export async function removeWorkspaceUsers(workspaceId: string, ids: string[]): Promise<{ successCount: number; failedCount: number }> {
+export async function removeWorkspaceUsers(
+  workspaceId: string,
+  ids: string[],
+): Promise<{ successCount: number; failedCount: number }> {
   return apiRequest(iamApi.delete(`workspaces/${workspaceId}/users`, { json: { ids } }).json())
 }
 
@@ -63,18 +82,37 @@ export async function listNamespaceUsers(
   params?: ListParams,
 ): Promise<UserList> {
   return apiRequest(
-    iamApi.get(`workspaces/${workspaceId}/namespaces/${namespaceId}/users`, { searchParams: params as Record<string, string> }).json(),
+    iamApi
+      .get(`workspaces/${workspaceId}/namespaces/${namespaceId}/users`, {
+        searchParams: params as Record<string, string>,
+      })
+      .json(),
   )
 }
 
-export async function addNamespaceUsers(workspaceId: string, namespaceId: string, ids: string[], roleId?: string): Promise<void> {
+export async function addNamespaceUsers(
+  workspaceId: string,
+  namespaceId: string,
+  ids: string[],
+  roleId?: string,
+): Promise<void> {
   const body: { ids: string[]; roleId?: string } = { ids }
   if (roleId) body.roleId = roleId
-  await apiRequest(iamApi.post(`workspaces/${workspaceId}/namespaces/${namespaceId}/users`, { json: body }).json())
+  await apiRequest(
+    iamApi.post(`workspaces/${workspaceId}/namespaces/${namespaceId}/users`, { json: body }).json(),
+  )
 }
 
-export async function removeNamespaceUsers(workspaceId: string, namespaceId: string, ids: string[]): Promise<{ successCount: number; failedCount: number }> {
-  return apiRequest(iamApi.delete(`workspaces/${workspaceId}/namespaces/${namespaceId}/users`, { json: { ids } }).json())
+export async function removeNamespaceUsers(
+  workspaceId: string,
+  namespaceId: string,
+  ids: string[],
+): Promise<{ successCount: number; failedCount: number }> {
+  return apiRequest(
+    iamApi
+      .delete(`workspaces/${workspaceId}/namespaces/${namespaceId}/users`, { json: { ids } })
+      .json(),
+  )
 }
 
 export async function listUserWorkspaces(
@@ -82,7 +120,9 @@ export async function listUserWorkspaces(
   params?: ListParams,
 ): Promise<WorkspaceList> {
   return apiRequest(
-    iamApi.get(`users/${userId}/workspaces`, { searchParams: params as Record<string, string> }).json(),
+    iamApi
+      .get(`users/${userId}/workspaces`, { searchParams: params as Record<string, string> })
+      .json(),
   )
 }
 
@@ -91,7 +131,9 @@ export async function listUserNamespaces(
   params?: ListParams,
 ): Promise<NamespaceList> {
   return apiRequest(
-    iamApi.get(`users/${userId}/namespaces`, { searchParams: params as Record<string, string> }).json(),
+    iamApi
+      .get(`users/${userId}/namespaces`, { searchParams: params as Record<string, string> })
+      .json(),
   )
 }
 
@@ -115,5 +157,9 @@ import { defineResourceApi } from "@/core/api/resource-api"
 import { usersDef } from "../defs"
 
 export const usersApi = defineResourceApi<
-  User, UserList, ListParams, Pick<User, "metadata" | "spec">, Pick<User, "metadata" | "spec">
+  User,
+  UserList,
+  ListParams,
+  Pick<User, "metadata" | "spec">,
+  Pick<User, "metadata" | "spec">
 >(usersDef)

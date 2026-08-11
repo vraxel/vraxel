@@ -34,7 +34,9 @@ export const useStatusWatch = create<StatusWatchState>()((_set, get) => ({
   listeners: new Set<Listener>(),
   subscribe: (fn: Listener) => {
     get().listeners.add(fn)
-    return () => { get().listeners.delete(fn) }
+    return () => {
+      get().listeners.delete(fn)
+    }
   },
 }))
 
@@ -60,13 +62,25 @@ const connections = new Map<string, Connection>()
 const IDLE_CLOSE_DELAY_MS = 5000
 
 function dispatch(event: StatusEvent) {
-  useStatusWatch.getState().listeners.forEach(fn => fn(event))
+  useStatusWatch.getState().listeners.forEach((fn) => fn(event))
 }
 
 function connect(module: string, wsUrl: string, scopeKey: string) {
-  const c = connections.get(module) || { ws: null, scopeKey: "", reconnectTimer: null, refCount: 0, idleCloseTimer: null }
-  if (c.reconnectTimer) { clearTimeout(c.reconnectTimer); c.reconnectTimer = null }
-  if (c.ws) { c.ws.close(); c.ws = null }
+  const c = connections.get(module) || {
+    ws: null,
+    scopeKey: "",
+    reconnectTimer: null,
+    refCount: 0,
+    idleCloseTimer: null,
+  }
+  if (c.reconnectTimer) {
+    clearTimeout(c.reconnectTimer)
+    c.reconnectTimer = null
+  }
+  if (c.ws) {
+    c.ws.close()
+    c.ws = null
+  }
 
   c.scopeKey = scopeKey
   const ws = new WebSocket(wsUrl)
@@ -76,7 +90,9 @@ function connect(module: string, wsUrl: string, scopeKey: string) {
     if (arr[0] !== 0x00) return
     try {
       dispatch(JSON.parse(new TextDecoder().decode(arr.slice(1))))
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
   ws.onclose = () => {
     // The browser fires close asynchronously: when connect() replaces a
@@ -99,7 +115,12 @@ function connect(module: string, wsUrl: string, scopeKey: string) {
 // mysql/pgsql/redis events; subscribers on /db/mysql/watch only get
 // mysql events because the watch handler filters server-side, but
 // listeners should still defensively check entityType).
-export function connectModuleWatch(module: string, resource: string, scopeWorkspaceId?: string, scopeNamespaceId?: string): () => void {
+export function connectModuleWatch(
+  module: string,
+  resource: string,
+  scopeWorkspaceId?: string,
+  scopeNamespaceId?: string,
+): () => void {
   const scopeKey = `${resource}:${scopeWorkspaceId || ""}:${scopeNamespaceId || ""}`
   let c = connections.get(module)
   if (!c) {
@@ -107,8 +128,12 @@ export function connectModuleWatch(module: string, resource: string, scopeWorksp
     connections.set(module, c)
   }
   c.refCount++
-  if (c.idleCloseTimer) { clearTimeout(c.idleCloseTimer); c.idleCloseTimer = null }
-  const sameScopeAlive = c.scopeKey === scopeKey &&
+  if (c.idleCloseTimer) {
+    clearTimeout(c.idleCloseTimer)
+    c.idleCloseTimer = null
+  }
+  const sameScopeAlive =
+    c.scopeKey === scopeKey &&
     ((c.ws && c.ws.readyState <= WebSocket.OPEN) || c.reconnectTimer !== null)
   if (!sameScopeAlive) {
     const wsUrl = buildTaskWsUrl(module, resource, scopeWorkspaceId, scopeNamespaceId)
@@ -131,13 +156,25 @@ export function disconnectModuleWatch(module: string) {
   const c = connections.get(module)
   if (!c) return
   c.scopeKey = ""
-  if (c.reconnectTimer) { clearTimeout(c.reconnectTimer); c.reconnectTimer = null }
-  if (c.idleCloseTimer) { clearTimeout(c.idleCloseTimer); c.idleCloseTimer = null }
-  if (c.ws) { c.ws.close(); c.ws = null }
+  if (c.reconnectTimer) {
+    clearTimeout(c.reconnectTimer)
+    c.reconnectTimer = null
+  }
+  if (c.idleCloseTimer) {
+    clearTimeout(c.idleCloseTimer)
+    c.idleCloseTimer = null
+  }
+  if (c.ws) {
+    c.ws.close()
+    c.ws = null
+  }
   connections.delete(module)
 }
 
 // Backward-compat shim: existing host pages call this.
-export function connectStatusWatch(scopeWorkspaceId?: string, scopeNamespaceId?: string): () => void {
+export function connectStatusWatch(
+  scopeWorkspaceId?: string,
+  scopeNamespaceId?: string,
+): () => void {
   return connectModuleWatch("compute", "hosts/watch", scopeWorkspaceId, scopeNamespaceId)
 }

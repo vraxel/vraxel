@@ -14,5 +14,14 @@ export const qk = {
   detail: (def: ResourceDef, s: ScopeRef, id: string | number) =>
     [def.module, def.name, s.ws ?? "", s.ns ?? "", "detail", String(id)] as const,
   sub: (def: ResourceDef, s: ScopeRef, id: string | number, sub: string, params?: object) =>
-    [def.module, def.name, s.ws ?? "", s.ns ?? "", "detail", String(id), sub, params ?? {}] as const,
+    [
+      def.module,
+      def.name,
+      s.ws ?? "",
+      s.ns ?? "",
+      "detail",
+      String(id),
+      sub,
+      params ?? {},
+    ] as const,
 }

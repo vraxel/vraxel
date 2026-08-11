@@ -8,7 +8,7 @@
     "dev": "NODE_OPTIONS='--disable-warning=DEP0205' wait-on -t 60000 http://localhost:8088/livez && vite",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --noEmit",
-    "lint": "eslint . && pnpm lint:jsx && pnpm lint:boundaries",
+    "lint": "pnpm format:check && eslint . && pnpm lint:jsx && pnpm lint:boundaries",
     "lint:jsx": "node ./scripts/lint-jsx.mjs",
     "lint:boundaries": "node ./scripts/lint-boundaries.mjs",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",

@@ -13,7 +13,7 @@ const common = {
   "common.edit": "Edit",
   "common.cancel": "Cancel",
   "common.confirm": "Confirm",
-  "common.confirmByName.label": "Type the name \"{name}\" to confirm this action.",
+  "common.confirmByName.label": 'Type the name "{name}" to confirm this action.',
   "common.confirmByName.mismatch": "Name does not match.",
   "common.save": "Save",
   "common.search": "Search",
@@ -122,8 +122,10 @@ const common = {
   "api.error.networkError": "Cannot reach the server. Check your network or retry shortly.",
   "api.error.sessionExpired": "Session expired, redirecting to login",
   "api.error.memberLimitExceeded": "Member limit exceeded for this namespace",
-  "api.error.cannotDeleteWorkspace": "Cannot delete workspace: it still contains active resources, please remove them first",
-  "api.error.cannotDeleteNamespace": "Cannot delete namespace: it still contains active resources, please remove them first",
+  "api.error.cannotDeleteWorkspace":
+    "Cannot delete workspace: it still contains active resources, please remove them first",
+  "api.error.cannotDeleteNamespace":
+    "Cannot delete namespace: it still contains active resources, please remove them first",
   "blockingResource.host": "Host",
   // placement scheduler errors (mirrors placement.ReasonFor in the Go backend).
   "api.error.cannotRemoveOwner": "Cannot remove the owner from this resource",
@@ -138,14 +140,16 @@ const common = {
   // validation errors
   "api.validation.formHasErrors": "Form has {count} field(s) failing validation:",
   "api.validation.required": "{field} is required",
-  "api.validation.username.format": "Username must be 3-50 characters of letters, digits, underscores, or hyphens",
+  "api.validation.username.format":
+    "Username must be 3-50 characters of letters, digits, underscores, or hyphens",
   "api.validation.email.format": "Please enter a valid email address",
   "api.validation.phone.format": "Please enter a valid mobile number (e.g. 13800138000)",
   "api.validation.password.length": "Password must be 8-72 characters",
   "api.validation.password.uppercase": "Password must contain at least one uppercase letter",
   "api.validation.password.lowercase": "Password must contain at least one lowercase letter",
   "api.validation.password.digit": "Password must contain at least one digit",
-  "api.validation.name.format": "Name must be 3-50 letters, digits, hyphens, or underscores, starting and ending with a letter or digit",
+  "api.validation.name.format":
+    "Name must be 3-50 letters, digits, hyphens, or underscores, starting and ending with a letter or digit",
   "api.validation.rackCapacity.min": "Rack capacity must be >= 0",
   "api.validation.rackCapacity.range": "Rack capacity must be an integer between 0 and 10000",
   "api.validation.uHeight.range": "U height must be an integer between 0 and 100",
@@ -154,10 +158,12 @@ const common = {
   "api.validation.email.taken": "This email is already taken",
   "api.validation.phone.taken": "This phone number is already taken",
   "api.validation.password.hint": "8-72 characters, must include uppercase, lowercase, and a digit",
-  "api.validation.name.networkFormat": "Must be 3-50 lowercase alphanumeric characters or hyphens, starting and ending with alphanumeric",
+  "api.validation.name.networkFormat":
+    "Must be 3-50 lowercase alphanumeric characters or hyphens, starting and ending with alphanumeric",
   "api.validation.cidr.format": "Please enter a valid CIDR (e.g. 10.0.0.0/24)",
   "api.validation.ip.format": "Please enter a valid IP address",
-  "api.validation.image.format": "Invalid image reference format (e.g. nginx:1.25, registry.example.com/repo:tag)",
+  "api.validation.image.format":
+    "Invalid image reference format (e.g. nginx:1.25, registry.example.com/repo:tag)",
   "api.validation.gateway.notInRange": "Gateway is not within the CIDR range",
   "api.validation.cidr.overlap": "CIDR overlaps with an existing subnet",
   "api.validation.cidr.notWithinNetwork": "Subnet CIDR is not within network CIDR range",
@@ -168,7 +174,8 @@ const common = {
   "api.validation.memberRange": "Must be between 0 and 1,000,000",
   "api.validation.subnetRange": "Must be between 1 and 50",
   "api.validation.nonNegativeInt": "Must be a non-negative integer",
-  "api.validation.integer.format": "Must be a non-negative integer without leading zeros (\"0\" alone is allowed)",
+  "api.validation.integer.format":
+    'Must be a non-negative integer without leading zeros ("0" alone is allowed)',
   "api.validation.positive": "Must be a positive number",
   "api.validation.port.range": "Port must be between 1 and 65535",
   "api.validation.lat.range": "Latitude must be between -90 and 90",
@@ -176,9 +183,12 @@ const common = {
   "api.validation.tooLarge": "Value is too large",
   "api.validation.path.absolute": "Must be an absolute path (starting with /)",
   "api.validation.bufferPool.format": "Must be a number followed by M or G (e.g. 256M, 4G)",
-  "api.validation.resources.cpu.format": "Quantity must be a positive integer; decimals such as 0.5 Cores are auto-converted to a smaller unit (500 m) when the field loses focus.",
-  "api.validation.resources.memory.format": "Quantity must be a positive integer; decimals such as 0.5 Gi are auto-converted to a smaller unit (512 Mi) when the field loses focus.",
-  "api.validation.resources.volumeSize.format": "Must be a number suffixed with Mi, Gi, or Ti (e.g. 1Gi, 500Mi, 2Ti)",
+  "api.validation.resources.cpu.format":
+    "Quantity must be a positive integer; decimals such as 0.5 Cores are auto-converted to a smaller unit (500 m) when the field loses focus.",
+  "api.validation.resources.memory.format":
+    "Quantity must be a positive integer; decimals such as 0.5 Gi are auto-converted to a smaller unit (512 Mi) when the field loses focus.",
+  "api.validation.resources.volumeSize.format":
+    "Must be a number suffixed with Mi, Gi, or Ti (e.g. 1Gi, 500Mi, 2Ti)",
   "api.validation.connRange": "Must be between 1 and 100,000",
   "api.validation.binaryChoice": "Must be 0 or 1",
   "api.validation.hostnameOrIpRequired": "Hostname or IP is required",
@@ -189,7 +199,8 @@ const common = {
   "action.createSuccess": "Created successfully",
   "action.updateSuccess": "Updated successfully",
   "action.deleteSuccess": "Deleted successfully",
-  "action.resetPasswordSuccess": "Password reset. Refresh tokens revoked; the user's existing access token expires within 1 hour.",
+  "action.resetPasswordSuccess":
+    "Password reset. Refresh tokens revoked; the user's existing access token expires within 1 hour.",
 
   // user menu
   "userMenu.changePassword": "Change Password",

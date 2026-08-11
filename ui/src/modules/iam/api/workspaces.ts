@@ -4,7 +4,9 @@ import type { ListParams } from "@/core/api/types"
 import type { Workspace, WorkspaceList } from "./types"
 
 export async function listWorkspaces(params?: ListParams): Promise<WorkspaceList> {
-  return apiRequest(iamApi.get("workspaces", { searchParams: params as Record<string, string> }).json())
+  return apiRequest(
+    iamApi.get("workspaces", { searchParams: params as Record<string, string> }).json(),
+  )
 }
 
 export async function getWorkspace(id: string): Promise<Workspace> {
@@ -36,5 +38,9 @@ import { defineResourceApi } from "@/core/api/resource-api"
 import { workspacesDef } from "../defs"
 
 export const workspacesApi = defineResourceApi<
-  Workspace, WorkspaceList, ListParams, Pick<Workspace, "metadata" | "spec">, Pick<Workspace, "metadata" | "spec">
+  Workspace,
+  WorkspaceList,
+  ListParams,
+  Pick<Workspace, "metadata" | "spec">,
+  Pick<Workspace, "metadata" | "spec">
 >(workspacesDef)

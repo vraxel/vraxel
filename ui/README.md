@@ -15,7 +15,7 @@ pnpm dev        # vite :5173, waits for vraxel-server :8088, proxies /api /oidc 
 pnpm build      # tsc -b && vite build  (what CI runs)
 pnpm typecheck  # tsc -b --noEmit
 pnpm test       # vitest
-pnpm lint       # eslint + lint:jsx + lint:boundaries
+pnpm lint       # prettier --check + eslint + lint:jsx + lint:boundaries
 ```
 
 ## Layers

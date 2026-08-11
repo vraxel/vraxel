@@ -1,7 +1,10 @@
 import { Filter } from "lucide-react"
 import { TableHead } from "@/shared/ui/table"
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu"
 import { SortIcon } from "@/shared/components/sort-icon"
 import { useTranslation } from "@/i18n"
@@ -60,7 +63,9 @@ export function FilterTableHead<T extends string = string>({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button type="button" className="inline-flex items-center" aria-label="filter">
-              <Filter className={`h-3 w-3 ${isFiltered ? "fill-primary text-primary" : "opacity-40"}`} />
+              <Filter
+                className={`h-3 w-3 ${isFiltered ? "fill-primary text-primary" : "opacity-40"}`}
+              />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">

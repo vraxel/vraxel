@@ -57,9 +57,15 @@ export interface UseListQueryOptions<T> {
  */
 export function useListQuery<T extends ListRow>(opts: UseListQueryOptions<T>) {
   const {
-    def, api, scope, filterKeys: filterSpecs = [],
-    defaultSortBy = "created_at", defaultSortOrder = "desc", defaultPageSize = 20,
-    extraParams, enabled = true,
+    def,
+    api,
+    scope,
+    filterKeys: filterSpecs = [],
+    defaultSortBy = "created_at",
+    defaultSortOrder = "desc",
+    defaultPageSize = 20,
+    extraParams,
+    enabled = true,
   } = opts
   const filterKeys = filterSpecs.map((f) => (typeof f === "string" ? f : f.key))
   // filterSpecs is a fresh array literal on every caller render; key the
@@ -86,20 +92,28 @@ export function useListQuery<T extends ListRow>(opts: UseListQueryOptions<T>) {
   // debounce, resetting page there (single place).
   const [searchInput, setSearchInput] = useState(search)
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(null)
-  const commitSearch = useCallback((value: string) => {
-    setSp((prev) => {
-      const next = new URLSearchParams(prev)
-      if (value) next.set("q", value)
-      else next.delete("q")
-      next.set("page", "1")
-      return next
-    }, { replace: true })
-  }, [setSp])
+  const commitSearch = useCallback(
+    (value: string) => {
+      setSp(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          if (value) next.set("q", value)
+          else next.delete("q")
+          next.set("page", "1")
+          return next
+        },
+        { replace: true },
+      )
+    },
+    [setSp],
+  )
   useEffect(() => {
     searchTimer.current = setTimeout(() => {
       if (searchInput !== search) commitSearch(searchInput)
     }, 300)
-    return () => { if (searchTimer.current) clearTimeout(searchTimer.current) }
+    return () => {
+      if (searchTimer.current) clearTimeout(searchTimer.current)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchInput])
   // External URL changes (browser back/forward, sidebar links) must flow back
@@ -113,50 +127,74 @@ export function useListQuery<T extends ListRow>(opts: UseListQueryOptions<T>) {
     setSearchInput(search)
   }
 
-  const patchParams = useCallback((patch: Record<string, string | null>, resetPage = false) => {
-    setSp((prev) => {
-      const next = new URLSearchParams(prev)
-      for (const [k, v] of Object.entries(patch)) {
-        if (v === null || v === "") next.delete(k)
-        else next.set(k, v)
-      }
-      if (resetPage) next.set("page", "1")
-      return next
-    }, { replace: true })
-  }, [setSp])
+  const patchParams = useCallback(
+    (patch: Record<string, string | null>, resetPage = false) => {
+      setSp(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          for (const [k, v] of Object.entries(patch)) {
+            if (v === null || v === "") next.delete(k)
+            else next.set(k, v)
+          }
+          if (resetPage) next.set("page", "1")
+          return next
+        },
+        { replace: true },
+      )
+    },
+    [setSp],
+  )
 
   const setPage = useCallback((p: number) => patchParams({ page: String(p) }), [patchParams])
-  const setPageSize = useCallback((s: number) => patchParams({ pageSize: String(s) }, true), [patchParams])
-  const handleSort = useCallback((field: string) => {
-    const nextOrder = sortBy === field && sortOrder === "asc" ? "desc" : "asc"
-    // Clicking a new field starts at asc; clicking the current flips.
-    patchParams({ sortBy: field, sortOrder: sortBy === field ? nextOrder : "asc" })
-  }, [sortBy, sortOrder, patchParams])
-  const setFilter = useCallback((key: string, value: string) => {
-    const patch: Record<string, string | null> = { [key]: value === "all" ? null : value }
-    for (const dep of resetsByKey[key] ?? []) patch[dep] = null
-    patchParams(patch, true)
-  }, [patchParams, resetsByKey])
+  const setPageSize = useCallback(
+    (s: number) => patchParams({ pageSize: String(s) }, true),
+    [patchParams],
+  )
+  const handleSort = useCallback(
+    (field: string) => {
+      const nextOrder = sortBy === field && sortOrder === "asc" ? "desc" : "asc"
+      // Clicking a new field starts at asc; clicking the current flips.
+      patchParams({ sortBy: field, sortOrder: sortBy === field ? nextOrder : "asc" })
+    },
+    [sortBy, sortOrder, patchParams],
+  )
+  const setFilter = useCallback(
+    (key: string, value: string) => {
+      const patch: Record<string, string | null> = { [key]: value === "all" ? null : value }
+      for (const dep of resetsByKey[key] ?? []) patch[dep] = null
+      patchParams(patch, true)
+    },
+    [patchParams, resetsByKey],
+  )
 
   // Selection (transient).
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const toggleAll = useCallback((ids: string[]) => {
-    setSelected((prev) => (prev.size === ids.length ? new Set() : new Set(ids)))
-  }, [setSelected])
-  const toggleOne = useCallback((id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }, [setSelected])
+  const toggleAll = useCallback(
+    (ids: string[]) => {
+      setSelected((prev) => (prev.size === ids.length ? new Set() : new Set(ids)))
+    },
+    [setSelected],
+  )
+  const toggleOne = useCallback(
+    (id: string) => {
+      setSelected((prev) => {
+        const next = new Set(prev)
+        if (next.has(id)) next.delete(id)
+        else next.add(id)
+        return next
+      })
+    },
+    [setSelected],
+  )
   const clearSelection = useCallback(() => setSelected(new Set()), [setSelected])
 
   const params: ListParams = { page, pageSize, sortBy, sortOrder }
   if (search) params.search = search
-  for (const k of filterKeys) if (filters[k] !== "all") (params as Record<string, unknown>)[k] = filters[k]
-  if (extraParams) for (const [k, v] of Object.entries(extraParams)) if (v !== undefined) (params as Record<string, unknown>)[k] = v
+  for (const k of filterKeys)
+    if (filters[k] !== "all") (params as Record<string, unknown>)[k] = filters[k]
+  if (extraParams)
+    for (const [k, v] of Object.entries(extraParams))
+      if (v !== undefined) (params as Record<string, unknown>)[k] = v
 
   const query = useApiQuery({
     queryKey: qk.list(def, scope, params),
@@ -183,13 +221,30 @@ export function useListQuery<T extends ListRow>(opts: UseListQueryOptions<T>) {
   }
 
   return {
-    rows, totalCount,
-    isPending: query.isPending, isFetching: query.isFetching, error: query.error, refetch: query.refetch,
-    page, setPage, pageSize, setPageSize, sortBy, sortOrder, handleSort,
-    search, searchInput, setSearchInput,
-    filters, setFilter,
-    selected, toggleAll, toggleOne, clearSelection,
-    params, scope,
+    rows,
+    totalCount,
+    isPending: query.isPending,
+    isFetching: query.isFetching,
+    error: query.error,
+    refetch: query.refetch,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    sortBy,
+    sortOrder,
+    handleSort,
+    search,
+    searchInput,
+    setSearchInput,
+    filters,
+    setFilter,
+    selected,
+    toggleAll,
+    toggleOne,
+    clearSelection,
+    params,
+    scope,
   }
 }
 

@@ -20,6 +20,9 @@ export const useScopeStore = create<ScopeState>()(
       setScope: (wsId, nsId) => set({ workspaceId: wsId, namespaceId: nsId }),
       invalidate: () => set((s) => ({ version: s.version + 1 })),
     }),
-    { name: "vraxel-scope", partialize: (s) => ({ workspaceId: s.workspaceId, namespaceId: s.namespaceId }) },
+    {
+      name: "vraxel-scope",
+      partialize: (s) => ({ workspaceId: s.workspaceId, namespaceId: s.namespaceId }),
+    },
   ),
 )

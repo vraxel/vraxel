@@ -79,7 +79,9 @@ describe("usePermission", () => {
         },
       })
       const { result } = renderHook(() => usePermission())
-      expect(result.current.hasPermission("iam:workspaces:update", { workspaceId: "ws-1" })).toBe(true)
+      expect(result.current.hasPermission("iam:workspaces:update", { workspaceId: "ws-1" })).toBe(
+        true,
+      )
     })
 
     it("returns false when workspace permissions do not include code", () => {
@@ -104,7 +106,9 @@ describe("usePermission", () => {
     it("returns true when platform permission covers workspace scope", () => {
       setPermissions({ ...basePerms, platform: ["iam:workspaces:update"] })
       const { result } = renderHook(() => usePermission())
-      expect(result.current.hasPermission("iam:workspaces:update", { workspaceId: "ws-1" })).toBe(true)
+      expect(result.current.hasPermission("iam:workspaces:update", { workspaceId: "ws-1" })).toBe(
+        true,
+      )
     })
   })
 
@@ -126,7 +130,9 @@ describe("usePermission", () => {
         },
       })
       const { result } = renderHook(() => usePermission())
-      expect(result.current.hasPermission("iam:namespaces:update", { namespaceId: "ns-1" })).toBe(true)
+      expect(result.current.hasPermission("iam:namespaces:update", { namespaceId: "ns-1" })).toBe(
+        true,
+      )
     })
 
     it("returns true when parent workspace permissions include code (inheritance)", () => {
@@ -144,7 +150,9 @@ describe("usePermission", () => {
         },
       })
       const { result } = renderHook(() => usePermission())
-      expect(result.current.hasPermission("iam:namespaces:update", { namespaceId: "ns-1" })).toBe(true)
+      expect(result.current.hasPermission("iam:namespaces:update", { namespaceId: "ns-1" })).toBe(
+        true,
+      )
     })
 
     it("returns false when neither namespace nor parent workspace include code", () => {
@@ -167,7 +175,6 @@ describe("usePermission", () => {
       )
     })
   })
-
 })
 
 // --- Bug #72: Console icon must not leak across projects ---
@@ -215,8 +222,7 @@ describe("getFirstPermittedPath vs getDefaultPath - cross-project leak", () => {
       },
       namespaces: {},
     }
-    expect(getFirstPermittedPath(singleProject, "ws-1", null))
-      .toBe("/iam/workspaces/ws-1/users")
+    expect(getFirstPermittedPath(singleProject, "ws-1", null)).toBe("/iam/workspaces/ws-1/users")
   })
 
   it("getFirstPermittedPath returns 403 when no in-scope permission exists", () => {

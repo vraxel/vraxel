@@ -1,11 +1,21 @@
 import { iamApi } from "./client"
 import { apiRequest } from "@/core/api/client"
 import type { ListParams } from "@/core/api/types"
-import type { Permission, PermissionList, Role, RoleBinding, RoleBindingList, RoleList, TransferOwnershipRequest } from "./types"
+import type {
+  Permission,
+  PermissionList,
+  Role,
+  RoleBinding,
+  RoleBindingList,
+  RoleList,
+  TransferOwnershipRequest,
+} from "./types"
 
 // --- Permissions ---
 export async function listPermissions(params?: ListParams): Promise<PermissionList> {
-  return apiRequest(iamApi.get("permissions", { searchParams: params as Record<string, string> }).json())
+  return apiRequest(
+    iamApi.get("permissions", { searchParams: params as Record<string, string> }).json(),
+  )
 }
 
 export async function listAllPermissions(): Promise<Permission[]> {
@@ -48,7 +58,9 @@ export async function listWorkspaceRoles(
   params?: ListParams,
 ): Promise<RoleList> {
   return apiRequest(
-    iamApi.get(`workspaces/${workspaceId}/roles`, { searchParams: params as Record<string, string> }).json(),
+    iamApi
+      .get(`workspaces/${workspaceId}/roles`, { searchParams: params as Record<string, string> })
+      .json(),
   )
 }
 export async function getWorkspaceRole(workspaceId: string, roleId: string): Promise<Role> {
@@ -79,18 +91,30 @@ export async function listNamespaceRoles(
   params?: ListParams,
 ): Promise<RoleList> {
   return apiRequest(
-    iamApi.get(`workspaces/${workspaceId}/namespaces/${namespaceId}/roles`, { searchParams: params as Record<string, string> }).json(),
+    iamApi
+      .get(`workspaces/${workspaceId}/namespaces/${namespaceId}/roles`, {
+        searchParams: params as Record<string, string>,
+      })
+      .json(),
   )
 }
-export async function getNamespaceRole(workspaceId: string, namespaceId: string, roleId: string): Promise<Role> {
-  return apiRequest(iamApi.get(`workspaces/${workspaceId}/namespaces/${namespaceId}/roles/${roleId}`).json())
+export async function getNamespaceRole(
+  workspaceId: string,
+  namespaceId: string,
+  roleId: string,
+): Promise<Role> {
+  return apiRequest(
+    iamApi.get(`workspaces/${workspaceId}/namespaces/${namespaceId}/roles/${roleId}`).json(),
+  )
 }
 export async function createNamespaceRole(
   workspaceId: string,
   namespaceId: string,
   data: Pick<Role, "metadata" | "spec">,
 ): Promise<Role> {
-  return apiRequest(iamApi.post(`workspaces/${workspaceId}/namespaces/${namespaceId}/roles`, { json: data }).json())
+  return apiRequest(
+    iamApi.post(`workspaces/${workspaceId}/namespaces/${namespaceId}/roles`, { json: data }).json(),
+  )
 }
 export async function updateNamespaceRole(
   workspaceId: string,
@@ -98,13 +122,33 @@ export async function updateNamespaceRole(
   roleId: string,
   data: Pick<Role, "metadata" | "spec">,
 ): Promise<Role> {
-  return apiRequest(iamApi.put(`workspaces/${workspaceId}/namespaces/${namespaceId}/roles/${roleId}`, { json: data }).json())
+  return apiRequest(
+    iamApi
+      .put(`workspaces/${workspaceId}/namespaces/${namespaceId}/roles/${roleId}`, { json: data })
+      .json(),
+  )
 }
-export async function deleteNamespaceRole(workspaceId: string, namespaceId: string, roleId: string): Promise<void> {
-  await apiRequest(iamApi.delete(`workspaces/${workspaceId}/namespaces/${namespaceId}/roles/${roleId}`) as Promise<unknown>)
+export async function deleteNamespaceRole(
+  workspaceId: string,
+  namespaceId: string,
+  roleId: string,
+): Promise<void> {
+  await apiRequest(
+    iamApi.delete(
+      `workspaces/${workspaceId}/namespaces/${namespaceId}/roles/${roleId}`,
+    ) as Promise<unknown>,
+  )
 }
-export async function deleteNamespaceRoles(workspaceId: string, namespaceId: string, ids: string[]): Promise<void> {
-  await apiRequest(iamApi.delete(`workspaces/${workspaceId}/namespaces/${namespaceId}/roles`, { json: { ids } }).json())
+export async function deleteNamespaceRoles(
+  workspaceId: string,
+  namespaceId: string,
+  ids: string[],
+): Promise<void> {
+  await apiRequest(
+    iamApi
+      .delete(`workspaces/${workspaceId}/namespaces/${namespaceId}/roles`, { json: { ids } })
+      .json(),
+  )
 }
 
 // --- Platform RoleBindings ---
@@ -142,17 +186,18 @@ export async function createWorkspaceRoleBinding(
 ): Promise<RoleBinding> {
   return apiRequest(iamApi.post(`workspaces/${workspaceId}/rolebindings`, { json: data }).json())
 }
-export async function deleteWorkspaceRoleBinding(
-  workspaceId: string,
-  id: string,
-): Promise<void> {
-  await apiRequest(iamApi.delete(`workspaces/${workspaceId}/rolebindings/${id}`) as Promise<unknown>)
+export async function deleteWorkspaceRoleBinding(workspaceId: string, id: string): Promise<void> {
+  await apiRequest(
+    iamApi.delete(`workspaces/${workspaceId}/rolebindings/${id}`) as Promise<unknown>,
+  )
 }
 export async function deleteWorkspaceRoleBindings(
   workspaceId: string,
   ids: string[],
 ): Promise<void> {
-  await apiRequest(iamApi.delete(`workspaces/${workspaceId}/rolebindings`, { json: { ids } }).json())
+  await apiRequest(
+    iamApi.delete(`workspaces/${workspaceId}/rolebindings`, { json: { ids } }).json(),
+  )
 }
 
 // --- Namespace RoleBindings ---
@@ -186,7 +231,9 @@ export async function deleteNamespaceRoleBinding(
   id: string,
 ): Promise<void> {
   await apiRequest(
-    iamApi.delete(`workspaces/${workspaceId}/namespaces/${namespaceId}/rolebindings/${id}`) as Promise<unknown>,
+    iamApi.delete(
+      `workspaces/${workspaceId}/namespaces/${namespaceId}/rolebindings/${id}`,
+    ) as Promise<unknown>,
   )
 }
 export async function deleteNamespaceRoleBindings(
@@ -195,7 +242,9 @@ export async function deleteNamespaceRoleBindings(
   ids: string[],
 ): Promise<void> {
   await apiRequest(
-    iamApi.delete(`workspaces/${workspaceId}/namespaces/${namespaceId}/rolebindings`, { json: { ids } }).json(),
+    iamApi
+      .delete(`workspaces/${workspaceId}/namespaces/${namespaceId}/rolebindings`, { json: { ids } })
+      .json(),
   )
 }
 
@@ -266,9 +315,17 @@ import { defineResourceApi } from "@/core/api/resource-api"
 import { rolesDef, rolebindingsDef } from "../defs"
 
 export const rolesApi = defineResourceApi<
-  Role, RoleList, ListParams, Pick<Role, "metadata" | "spec">, Pick<Role, "metadata" | "spec">
+  Role,
+  RoleList,
+  ListParams,
+  Pick<Role, "metadata" | "spec">,
+  Pick<Role, "metadata" | "spec">
 >(rolesDef)
 
 export const rolebindingsApi = defineResourceApi<
-  RoleBinding, RoleBindingList, ListParams, Pick<RoleBinding, "spec">, Pick<RoleBinding, "spec">
+  RoleBinding,
+  RoleBindingList,
+  ListParams,
+  Pick<RoleBinding, "spec">,
+  Pick<RoleBinding, "spec">
 >(rolebindingsDef)

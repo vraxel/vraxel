@@ -30,7 +30,9 @@ describe("scopeOf / resourcePath", () => {
       "pki/v1/workspaces/3/credentials/42/rotate",
     )
     // Backend CustomVerb form: /{parent}/{id}:{verb}
-    expect(resourcePath(credentials, {}, 42, { verb: "usages" })).toBe("pki/v1/credentials/42:usages")
+    expect(resourcePath(credentials, {}, 42, { verb: "usages" })).toBe(
+      "pki/v1/credentials/42:usages",
+    )
   })
 
   it("scopeOf resolves by presence of ws/ns", () => {
@@ -70,7 +72,12 @@ describe("buildResourceRoutes", () => {
   })
 
   it("skips detail when no Detail page and platform-only resources stay platform-only", () => {
-    const def = defineResource({ module: "o11y", name: "endpoints", scopes: ["platform"], pages: { List } })
+    const def = defineResource({
+      module: "o11y",
+      name: "endpoints",
+      scopes: ["platform"],
+      pages: { List },
+    })
     expect(buildResourceRoutes([def]).map((r) => r.path)).toEqual(["endpoints"])
   })
 })

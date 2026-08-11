@@ -59,8 +59,8 @@ export interface MetricsQueryParams {
 
 export interface MetricsSeries {
   metric: Record<string, string>
-  value?: [number, string]       // instant query
-  values?: [number, string][]    // range query
+  value?: [number, string] // instant query
+  values?: [number, string][] // range query
 }
 
 export interface MetricsResult {

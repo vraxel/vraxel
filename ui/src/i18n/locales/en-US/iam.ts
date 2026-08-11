@@ -16,17 +16,22 @@ const iam = {
   "workspace.namespaceCount": "Namespaces",
   "workspace.memberCount": "Users",
   "workspace.searchPlaceholder": "Search name, display name, description...",
-  "workspace.deleteConfirm": "Are you sure you want to delete workspace \"{name}\"? This action cannot be undone.",
+  "workspace.deleteConfirm":
+    'Are you sure you want to delete workspace "{name}"? This action cannot be undone.',
   "workspace.batchDelete": "Batch Delete",
-  "workspace.batchDeleteConfirm": "Are you sure you want to delete {count} selected workspaces? This action cannot be undone.",
+  "workspace.batchDeleteConfirm":
+    "Are you sure you want to delete {count} selected workspaces? This action cannot be undone.",
   "workspace.addMember": "Add User",
   "workspace.addMemberDesc": "Select users to add to this workspace.",
   "workspace.removeMember": "Remove User",
-  "workspace.removeMemberConfirm": "Are you sure you want to remove user \"{name}\" from this workspace?",
-  "workspace.batchRemoveMemberConfirm": "Are you sure you want to remove {count} selected users from this workspace?",
+  "workspace.removeMemberConfirm":
+    'Are you sure you want to remove user "{name}" from this workspace?',
+  "workspace.batchRemoveMemberConfirm":
+    "Are you sure you want to remove {count} selected users from this workspace?",
   "workspace.memberAdded": "Users added successfully",
   "workspace.memberRemoved": "Users removed successfully",
-  "workspace.memberPartialRemoved": "Removed {success} users, {failed} failed (owner cannot be removed)",
+  "workspace.memberPartialRemoved":
+    "Removed {success} users, {failed} failed (owner cannot be removed)",
   "workspace.noMembers": "No users found.",
   "workspace.noAvailableUsers": "No users available to add.",
   "workspace.validation.name.format": "Name must be 3-50 letters, digits, hyphens, or underscores",
@@ -54,22 +59,29 @@ const iam = {
   "namespace.maxMembersHint": "0 means unlimited",
   "namespace.validation.maxMembers": "Must be an integer between 0 and 1000000",
   "namespace.searchPlaceholder": "Search name, display name, description...",
-  "namespace.deleteConfirm": "Are you sure you want to delete namespace \"{name}\"? This action cannot be undone.",
+  "namespace.deleteConfirm":
+    'Are you sure you want to delete namespace "{name}"? This action cannot be undone.',
   "namespace.batchDelete": "Batch Delete",
-  "namespace.batchDeleteConfirm": "Are you sure you want to delete {count} selected namespaces? This action cannot be undone.",
+  "namespace.batchDeleteConfirm":
+    "Are you sure you want to delete {count} selected namespaces? This action cannot be undone.",
   "namespace.addMember": "Add User",
   "namespace.addMemberDesc": "Select users to add to this namespace.",
   "namespace.removeMember": "Remove User",
-  "namespace.removeMemberConfirm": "Are you sure you want to remove user \"{name}\" from this namespace?",
-  "namespace.batchRemoveMemberConfirm": "Are you sure you want to remove {count} selected users from this namespace?",
+  "namespace.removeMemberConfirm":
+    'Are you sure you want to remove user "{name}" from this namespace?',
+  "namespace.batchRemoveMemberConfirm":
+    "Are you sure you want to remove {count} selected users from this namespace?",
   "namespace.memberAdded": "Users added successfully",
   "namespace.memberRemoved": "Users removed successfully",
-  "namespace.memberPartialRemoved": "Removed {success} users, {failed} failed (owner cannot be removed)",
+  "namespace.memberPartialRemoved":
+    "Removed {success} users, {failed} failed (owner cannot be removed)",
   "namespace.noMembers": "No users found.",
   "namespace.noAvailableUsers": "No users available to add.",
-  "namespace.validation.name.format": "Name must be 3-50 letters, digits, hyphens, or underscores, starting and ending with a letter or digit",
+  "namespace.validation.name.format":
+    "Name must be 3-50 letters, digits, hyphens, or underscores, starting and ending with a letter or digit",
   "namespace.validation.name.taken": "This name is already taken",
-  "namespace.validation.name.hint": "3-50 letters, digits, hyphens, or underscores, starting and ending with a letter or digit, e.g. my-project",
+  "namespace.validation.name.hint":
+    "3-50 letters, digits, hyphens, or underscores, starting and ending with a letter or digit, e.g. my-project",
   "namespace.builtinDefault": "Default",
   "namespace.builtinDefaultDesc": "Default namespace for workspace {name}",
 
@@ -84,12 +96,15 @@ const iam = {
   "user.username": "Username",
   "user.email": "Email",
   "user.searchPlaceholder": "Search username, email, phone, display name...",
-  "user.deleteConfirm": "Are you sure you want to delete user \"{name}\"? This action cannot be undone.",
+  "user.deleteConfirm":
+    'Are you sure you want to delete user "{name}"? This action cannot be undone.',
   "user.resetPassword": "Reset Password",
-  "user.resetPasswordTitle": "Reset password for \"{name}\"",
-  "user.resetPasswordHint": "Set a new password for this user. The user's existing sessions will be revoked and they must log in again with the new password.",
+  "user.resetPasswordTitle": 'Reset password for "{name}"',
+  "user.resetPasswordHint":
+    "Set a new password for this user. The user's existing sessions will be revoked and they must log in again with the new password.",
   "user.batchDelete": "Batch Delete",
-  "user.batchDeleteConfirm": "Are you sure you want to delete {count} selected users? This action cannot be undone.",
+  "user.batchDeleteConfirm":
+    "Are you sure you want to delete {count} selected users? This action cannot be undone.",
   "user.workspaces": "Joined Workspaces",
   "user.namespaceRefs": "Joined Namespaces",
   "user.noWorkspaces": "Not joined any workspace yet.",
@@ -114,9 +129,11 @@ const iam = {
   "role.rules": "Permission Rules",
   "role.rulesCount": "{count} rules",
   "role.searchPlaceholder": "Search name, display name, description...",
-  "role.deleteConfirm": "Are you sure you want to delete role \"{name}\"? This action cannot be undone.",
+  "role.deleteConfirm":
+    'Are you sure you want to delete role "{name}"? This action cannot be undone.',
   "role.batchDelete": "Batch Delete",
-  "role.batchDeleteConfirm": "Are you sure you want to delete {count} selected roles? This action cannot be undone.",
+  "role.batchDeleteConfirm":
+    "Are you sure you want to delete {count} selected roles? This action cannot be undone.",
   "role.builtinCannotEdit": "Built-in roles cannot be edited",
   "role.builtinCannotDelete": "Built-in roles cannot be deleted",
   "role.selectPermissions": "Select Permissions",
@@ -143,9 +160,11 @@ const iam = {
   "rolebinding.noRoles": "No roles available.",
   "rolebinding.noUsers": "No users available.",
   "rolebinding.noData": "No role bindings found.",
-  "rolebinding.deleteConfirm": "Are you sure you want to delete the role binding for user \"{name}\"?",
+  "rolebinding.deleteConfirm":
+    'Are you sure you want to delete the role binding for user "{name}"?',
   "rolebinding.batchDelete": "Batch Delete",
-  "rolebinding.batchDeleteConfirm": "Are you sure you want to delete {count} selected role bindings?",
+  "rolebinding.batchDeleteConfirm":
+    "Are you sure you want to delete {count} selected role bindings?",
   "rolebinding.scope": "Scope",
   "rolebinding.scope.platform": "Platform",
   "rolebinding.scope.workspace": "Workspace",

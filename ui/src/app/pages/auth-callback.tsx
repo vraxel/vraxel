@@ -31,7 +31,6 @@ export default function AuthCallbackPage() {
         }
         setError(err.message)
       })
-     
   }, [searchParams, navigate])
 
   const shownError = error ?? (missingCode ? t("auth.missingCode") : null)

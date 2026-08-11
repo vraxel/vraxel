@@ -88,11 +88,12 @@ export function getFirstPermittedPath(
   wsId: string | null,
   nsId: string | null,
 ): string {
-  const scope = nsId && wsId
-    ? { workspaceId: wsId, namespaceId: nsId }
-    : wsId
-      ? { workspaceId: wsId }
-      : undefined
+  const scope =
+    nsId && wsId
+      ? { workspaceId: wsId, namespaceId: nsId }
+      : wsId
+        ? { workspaceId: wsId }
+        : undefined
   const scopeLevel = getScopeLevel(wsId, nsId)
   for (const item of NAV_ITEMS) {
     if (!item.scopes.includes(scopeLevel)) continue

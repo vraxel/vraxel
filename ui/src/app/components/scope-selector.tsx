@@ -13,7 +13,13 @@ import { TruncateText } from "@/shared/components/truncate-text"
 import { useScopeStore } from "@/core/scope/scope-store"
 import { usePermissionStore } from "@/core/permission/permission-store"
 import { checkPermission, getFirstPermittedPath } from "@/core/permission/use-permission"
-import { detectResource, buildScopedPath, getResourcePermission, getScopeLevel, isResourceAtScope } from "@/core/registry/nav-config"
+import {
+  detectResource,
+  buildScopedPath,
+  getResourcePermission,
+  getScopeLevel,
+  isResourceAtScope,
+} from "@/core/registry/nav-config"
 import { listWorkspaces } from "@/modules/iam/api/workspaces"
 import { listNamespaces, listWorkspaceNamespaces } from "@/modules/iam/api/namespaces"
 import { useApiQuery } from "@/core/query/hooks"
@@ -36,7 +42,9 @@ export function ScopeSelector() {
   const permissions = usePermissionStore((s) => s.permissions)
   const hasPlatformScope = permissions?.isPlatformAdmin || (permissions?.platform?.length ?? 0) > 0
   // Workspace-level users (e.g. workspace-viewer) should see "All namespaces" within their workspace
-  const hasWorkspaceScope = !!(workspaceId && (permissions?.workspaces?.[workspaceId]?.permissions?.length ?? 0) > 0)
+  const hasWorkspaceScope = !!(
+    workspaceId && (permissions?.workspaces?.[workspaceId]?.permissions?.length ?? 0) > 0
+  )
 
   // Periodic polling: bump the scope store's version to re-fetch scope data
   // everywhere it is keyed (membership changes made by other users).
@@ -105,7 +113,11 @@ export function ScopeSelector() {
 
   // Stale namespace detection + auto-select for non-platform users
   useEffect(() => {
-    if (namespaceId && namespaces.length > 0 && !namespaces.some((ns) => ns.metadata.id === namespaceId)) {
+    if (
+      namespaceId &&
+      namespaces.length > 0 &&
+      !namespaces.some((ns) => ns.metadata.id === namespaceId)
+    ) {
       // Current namespace no longer accessible — redirect
       const newNsId = namespaces[0]?.metadata.id ?? null
       if (permissions) {
@@ -136,7 +148,12 @@ export function ScopeSelector() {
           const scope = wsId ? { workspaceId: wsId } : undefined
           // Navigate only; root-layout's useLayoutEffect syncs scope store from URL,
           // avoiding stale requests from the old page seeing the new scope before unmounting.
-          if (available && permCode && permissions && checkPermission(permissions, permCode, scope)) {
+          if (
+            available &&
+            permCode &&
+            permissions &&
+            checkPermission(permissions, permCode, scope)
+          ) {
             navigate(buildScopedPath(resource, wsId, null))
           } else if (permissions) {
             navigate(getFirstPermittedPath(permissions, wsId, null))
@@ -144,13 +161,15 @@ export function ScopeSelector() {
             navigate(buildScopedPath(resource, wsId, null))
           }
         }}
-        onOpenChange={(open) => { if (open) void wsQuery.refetch() }}
+        onOpenChange={(open) => {
+          if (open) void wsQuery.refetch()
+        }}
       >
         <SelectTrigger
           size="sm"
-          className="h-8 w-full min-w-0 gap-1.5 rounded-none border-0 bg-transparent px-3 text-xs shadow-none overflow-hidden"
+          className="h-8 w-full min-w-0 gap-1.5 overflow-hidden rounded-none border-0 bg-transparent px-3 text-xs shadow-none"
         >
-          <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <Building2 className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
           {(() => {
             const selectedWs = workspaces.find((ws) => ws.metadata.id === workspaceId)
             const wsLabel = (ws: Workspace) => ws.spec.displayName || ws.metadata.name
@@ -177,17 +196,25 @@ export function ScopeSelector() {
         </SelectContent>
       </Select>
       <Select
-        value={namespaceId ?? ((hasPlatformScope || hasWorkspaceScope) ? ALL : "")}
+        value={namespaceId ?? (hasPlatformScope || hasWorkspaceScope ? ALL : "")}
         onValueChange={(v) => {
           const nsId = v === ALL ? null : v
           const resource = detectResource(location.pathname)
           const targetScope = getScopeLevel(workspaceId, nsId)
           const available = resource ? isResourceAtScope(resource, targetScope) : false
           const permCode = available && resource ? getResourcePermission(resource) : undefined
-          const scope = nsId && workspaceId
-            ? { workspaceId, namespaceId: nsId }
-            : workspaceId ? { workspaceId } : undefined
-          if (available && permCode && permissions && checkPermission(permissions, permCode, scope)) {
+          const scope =
+            nsId && workspaceId
+              ? { workspaceId, namespaceId: nsId }
+              : workspaceId
+                ? { workspaceId }
+                : undefined
+          if (
+            available &&
+            permCode &&
+            permissions &&
+            checkPermission(permissions, permCode, scope)
+          ) {
             navigate(buildScopedPath(resource, workspaceId, nsId))
           } else if (permissions) {
             navigate(getFirstPermittedPath(permissions, workspaceId, nsId))
@@ -195,19 +222,22 @@ export function ScopeSelector() {
             navigate(buildScopedPath(resource, workspaceId, nsId))
           }
         }}
-        onOpenChange={(open) => { if (open) void nsQuery.refetch() }}
+        onOpenChange={(open) => {
+          if (open) void nsQuery.refetch()
+        }}
         disabled={!workspaceId}
       >
         <SelectTrigger
           size="sm"
-          className="h-8 w-full min-w-0 gap-1.5 rounded-none border-0 bg-transparent px-3 text-xs shadow-none overflow-hidden"
+          className="h-8 w-full min-w-0 gap-1.5 overflow-hidden rounded-none border-0 bg-transparent px-3 text-xs shadow-none"
         >
-          <FolderKanban className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <FolderKanban className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
           {(() => {
             const nsLabel = (ns: Namespace) =>
-              ns.metadata.name.endsWith("-default") && (!ns.spec.displayName || ns.spec.displayName === "Default")
+              ns.metadata.name.endsWith("-default") &&
+              (!ns.spec.displayName || ns.spec.displayName === "Default")
                 ? t("namespace.builtinDefault")
-                : (ns.spec.displayName || ns.metadata.name)
+                : ns.spec.displayName || ns.metadata.name
             const selectedNs = namespaces.find((ns) => ns.metadata.id === namespaceId)
             return (
               <SelectValue placeholder={t("scope.selectNamespace")}>
@@ -219,14 +249,19 @@ export function ScopeSelector() {
           })()}
         </SelectTrigger>
         <SelectContent className="max-w-64">
-          {(hasPlatformScope || hasWorkspaceScope) && <SelectItem value={ALL}>{t("scope.allNamespaces")}</SelectItem>}
+          {(hasPlatformScope || hasWorkspaceScope) && (
+            <SelectItem value={ALL}>{t("scope.allNamespaces")}</SelectItem>
+          )}
           {namespaces.length === 0 && !(hasPlatformScope || hasWorkspaceScope) ? (
             <SelectEmpty>{t("common.noOptions")}</SelectEmpty>
           ) : (
             namespaces.map((ns) => (
               <SelectItem key={ns.metadata.id} value={ns.metadata.id}>
                 <TruncateText>
-                  {ns.metadata.name.endsWith("-default") && (!ns.spec.displayName || ns.spec.displayName === "Default") ? t("namespace.builtinDefault") : (ns.spec.displayName || ns.metadata.name)}
+                  {ns.metadata.name.endsWith("-default") &&
+                  (!ns.spec.displayName || ns.spec.displayName === "Default")
+                    ? t("namespace.builtinDefault")
+                    : ns.spec.displayName || ns.metadata.name}
                 </TruncateText>
               </SelectItem>
             ))

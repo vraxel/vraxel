@@ -13,9 +13,9 @@ describe("buildPageItems", () => {
   })
 
   it.each([
-    [1,  99, [1, 2, 3, 4, 5, 6, "ellipsis-r", 99]],
-    [4,  99, [1, 2, 3, 4, 5, 6, "ellipsis-r", 99]],
-    [5,  99, [1, "ellipsis-l", 3, 4, 5, 6, 7, "ellipsis-r", 99]],
+    [1, 99, [1, 2, 3, 4, 5, 6, "ellipsis-r", 99]],
+    [4, 99, [1, 2, 3, 4, 5, 6, "ellipsis-r", 99]],
+    [5, 99, [1, "ellipsis-l", 3, 4, 5, 6, 7, "ellipsis-r", 99]],
     [50, 99, [1, "ellipsis-l", 48, 49, 50, 51, 52, "ellipsis-r", 99]],
     [95, 99, [1, "ellipsis-l", 93, 94, 95, 96, 97, "ellipsis-r", 99]],
     [96, 99, [1, "ellipsis-l", 94, 95, 96, 97, 98, 99]],

@@ -1,11 +1,4 @@
-import {
-  Users,
-  Building2,
-  FolderKanban,
-  Shield,
-  ShieldCheck,
-  ScrollText,
-} from "lucide-react"
+import { Users, Building2, FolderKanban, Shield, ShieldCheck, ScrollText } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
 export type ScopeLevel = "platform" | "workspace" | "namespace"
@@ -43,13 +36,61 @@ export const PARENT_GROUP_ICON: Record<string, LucideIcon> = {}
  */
 export const NAV_ITEMS: NavItemConfig[] = [
   // IAM
-  { resource: "workspaces", module: "iam", permission: "iam:workspaces:list", labelKey: "nav.workspaces", icon: Building2, group: "nav.iam", scopes: ["platform"] },
-  { resource: "namespaces", module: "iam", permission: "iam:namespaces:list", labelKey: "nav.namespaces", icon: FolderKanban, group: "nav.iam", scopes: ["platform", "workspace"] },
-  { resource: "users", module: "iam", permission: "iam:users:list", labelKey: "nav.users", icon: Users, group: "nav.iam", scopes: ["platform", "workspace", "namespace"] },
-  { resource: "roles", module: "iam", permission: "iam:roles:list", labelKey: "nav.roles", icon: Shield, group: "nav.iam", scopes: ["platform", "workspace", "namespace"] },
-  { resource: "rolebindings", module: "iam", permission: "iam:rolebindings:list", labelKey: "nav.rolebindings", icon: ShieldCheck, group: "nav.iam", scopes: ["platform", "workspace", "namespace"] },
+  {
+    resource: "workspaces",
+    module: "iam",
+    permission: "iam:workspaces:list",
+    labelKey: "nav.workspaces",
+    icon: Building2,
+    group: "nav.iam",
+    scopes: ["platform"],
+  },
+  {
+    resource: "namespaces",
+    module: "iam",
+    permission: "iam:namespaces:list",
+    labelKey: "nav.namespaces",
+    icon: FolderKanban,
+    group: "nav.iam",
+    scopes: ["platform", "workspace"],
+  },
+  {
+    resource: "users",
+    module: "iam",
+    permission: "iam:users:list",
+    labelKey: "nav.users",
+    icon: Users,
+    group: "nav.iam",
+    scopes: ["platform", "workspace", "namespace"],
+  },
+  {
+    resource: "roles",
+    module: "iam",
+    permission: "iam:roles:list",
+    labelKey: "nav.roles",
+    icon: Shield,
+    group: "nav.iam",
+    scopes: ["platform", "workspace", "namespace"],
+  },
+  {
+    resource: "rolebindings",
+    module: "iam",
+    permission: "iam:rolebindings:list",
+    labelKey: "nav.rolebindings",
+    icon: ShieldCheck,
+    group: "nav.iam",
+    scopes: ["platform", "workspace", "namespace"],
+  },
   // Audit
-  { resource: "logs", module: "audit", permission: "audit:logs:list", labelKey: "nav.auditLogs", icon: ScrollText, group: "nav.audit", scopes: ["platform"] },
+  {
+    resource: "logs",
+    module: "audit",
+    permission: "audit:logs:list",
+    labelKey: "nav.auditLogs",
+    icon: ScrollText,
+    group: "nav.audit",
+    scopes: ["platform"],
+  },
 ]
 
 // --- Derived maps ---
@@ -124,7 +165,8 @@ export function buildScopedPath(
 ): string {
   const module = resource ? RESOURCE_MODULE_MAP[resource] : undefined
   if (!resource || !module) {
-    if (wsId && nsId) return `${FALLBACK_MODULE_PATH}/workspaces/${wsId}/namespaces/${nsId}/${FALLBACK_RESOURCE}`
+    if (wsId && nsId)
+      return `${FALLBACK_MODULE_PATH}/workspaces/${wsId}/namespaces/${nsId}/${FALLBACK_RESOURCE}`
     if (wsId) return `${FALLBACK_MODULE_PATH}/workspaces/${wsId}/${FALLBACK_RESOURCE}`
     return `${FALLBACK_MODULE_PATH}/${FALLBACK_RESOURCE}`
   }

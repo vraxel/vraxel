@@ -13,10 +13,19 @@ import { useTranslation } from "@/i18n"
 import { startAuthFlow } from "@/core/auth/auth"
 import { useAuthStore } from "@/core/auth/auth-store"
 import { usePermissionStore } from "@/core/permission/permission-store"
-import { usePermission, getDefaultPath, getFirstPermittedPath } from "@/core/permission/use-permission"
+import {
+  usePermission,
+  getDefaultPath,
+  getFirstPermittedPath,
+} from "@/core/permission/use-permission"
 import { useScopeStore } from "@/core/scope/scope-store"
 import { isModulePrefix } from "@/core/registry/modules"
-import { NAV_ITEMS, buildScopedPath, buildPermScope, DEFAULT_PATH } from "@/core/registry/nav-config"
+import {
+  NAV_ITEMS,
+  buildScopedPath,
+  buildPermScope,
+  DEFAULT_PATH,
+} from "@/core/registry/nav-config"
 import type { ScopeLevel } from "@/core/registry/nav-config"
 import { pinyinInitials } from "@/core/registry/pinyin"
 import { translateTo } from "@/i18n"
@@ -51,13 +60,14 @@ const isParent = (e: NavEntry): e is NavParent => "parentLabelKey" in e
 // iOS UAs contain "like Mac OS X" (and iPadOS desktop mode reports
 // "Macintosh" with a touch screen), so bare /Mac/ would hint ⌘K on devices
 // without a Cmd key — exclude them.
-const IS_MAC = /Mac/i.test(navigator.userAgent)
-  && !/iPhone|iPad|iPod/i.test(navigator.userAgent)
-  && navigator.maxTouchPoints <= 1
+const IS_MAC =
+  /Mac/i.test(navigator.userAgent) &&
+  !/iPhone|iPad|iPod/i.test(navigator.userAgent) &&
+  navigator.maxTouchPoints <= 1
 const SEARCH_SHORTCUT = IS_MAC ? "⌘K" : "Ctrl+K"
 
 function buildNavGroups(wsId: string | null, nsId: string | null): NavEntry[] {
-  const scopeLevel: ScopeLevel = (wsId && nsId) ? "namespace" : wsId ? "workspace" : "platform"
+  const scopeLevel: ScopeLevel = wsId && nsId ? "namespace" : wsId ? "workspace" : "platform"
   const scope = buildPermScope(wsId ?? undefined, nsId ?? undefined)
 
   const entries: NavEntry[] = []
@@ -78,7 +88,9 @@ function buildNavGroups(wsId: string | null, nsId: string | null): NavEntry[] {
     if (item.parentGroup) {
       // Nest under a collapsible parent; `group` (if any) is a sub-section.
       currentGroup = null
-      let parent = entries.find((e): e is NavParent => isParent(e) && e.parentLabelKey === item.parentGroup)
+      let parent = entries.find(
+        (e): e is NavParent => isParent(e) && e.parentLabelKey === item.parentGroup,
+      )
       if (!parent) {
         parent = { parentLabelKey: item.parentGroup, directItems: [], subGroups: [] }
         entries.push(parent)
@@ -205,10 +217,12 @@ export default function RootLayout() {
   // first render happens with permissions still null, so navItemVisible filters
   // everything out; caching that empty snapshot (navGroups identity is stable
   // across the permission load) would leave search permanently matchless.
-  const searchItems: MenuSearchItem[] = flattenVisibleItems(navGroups, navItemVisible).map((it) => ({
-    key: it.to,
-    tokens: buildSearchTokens(it.labelKey),
-  }))
+  const searchItems: MenuSearchItem[] = flattenVisibleItems(navGroups, navItemVisible).map(
+    (it) => ({
+      key: it.to,
+      tokens: buildSearchTokens(it.labelKey),
+    }),
+  )
   const { query, setQuery, matchSet, currentKey, currentIndex, total, next, prev, clear } =
     useMenuSearch(searchItems)
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -280,7 +294,7 @@ export default function RootLayout() {
           active
             ? "bg-sidebar-accent text-sidebar-accent-foreground"
             : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground",
-          isCurrent && "ring-2 ring-primary ring-inset",
+          isCurrent && "ring-primary ring-2 ring-inset",
         )}
       >
         <item.icon className="h-4 w-4" />
@@ -352,7 +366,7 @@ export default function RootLayout() {
           </div>
           <div className="border-b px-2 py-1.5">
             <div className="relative">
-              <Search className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2" />
+              <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2" />
               <Input
                 ref={searchInputRef}
                 name="menu-search"
@@ -362,16 +376,16 @@ export default function RootLayout() {
                 onKeyDown={onSearchKeyDown}
                 placeholder={t("nav.searchPlaceholder", { key: SEARCH_SHORTCUT })}
                 aria-label={t("nav.searchPlaceholder", { key: SEARCH_SHORTCUT })}
-                className="h-8 rounded-md pl-8 pr-14"
+                className="h-8 rounded-md pr-14 pl-8"
               />
               {searching && (
-                <span className="text-muted-foreground pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs tabular-nums">
+                <span className="text-muted-foreground pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-xs tabular-nums">
                   {total > 0 ? `${currentIndex + 1}/${total}` : t("nav.searchNoMatch")}
                 </span>
               )}
             </div>
           </div>
-          <nav className="min-h-0 flex-1 overflow-y-auto space-y-3 p-2">
+          <nav className="min-h-0 flex-1 space-y-3 overflow-y-auto p-2">
             {navGroups.map((group, gi) => {
               if (isParent(group)) {
                 const directVis = group.directItems.filter(navItemVisible)
@@ -384,7 +398,7 @@ export default function RootLayout() {
                 // sub-groups collapse.
                 return (
                   <div key={group.parentLabelKey}>
-                    <div className="text-muted-foreground px-3 pb-1 pt-2 text-sm font-semibold">
+                    <div className="text-muted-foreground px-3 pt-2 pb-1 text-sm font-semibold">
                       {t(group.parentLabelKey)}
                     </div>
                     <div className="space-y-0.5">
@@ -421,13 +435,11 @@ export default function RootLayout() {
               return (
                 <div key={group.labelKey ?? `group-${gi}`}>
                   {group.labelKey && (
-                    <div className="text-muted-foreground px-3 pb-1 pt-2 text-sm font-semibold">
+                    <div className="text-muted-foreground px-3 pt-2 pb-1 text-sm font-semibold">
                       {t(group.labelKey)}
                     </div>
                   )}
-                  <div className="space-y-0.5">
-                    {visibleItems.map(renderNavLink)}
-                  </div>
+                  <div className="space-y-0.5">{visibleItems.map(renderNavLink)}</div>
                 </div>
               )
             })}

@@ -1,8 +1,6 @@
 import { useRef, useState, useCallback, useLayoutEffect } from "react"
 import { TableCell } from "@/shared/ui/table"
-import {
-  Tooltip, TooltipTrigger, TooltipContent,
-} from "@/shared/ui/tooltip"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/shared/ui/tooltip"
 
 /**
  * A TableCell that shows a tooltip when the inner text is truncated.
@@ -38,9 +36,12 @@ export function TruncateCell({
     return () => ro.disconnect()
   }, [children, text])
 
-  const handleOpenChange = useCallback((next: boolean) => {
-    setOpen(next && truncated)
-  }, [truncated])
+  const handleOpenChange = useCallback(
+    (next: boolean) => {
+      setOpen(next && truncated)
+    },
+    [truncated],
+  )
 
   // The max-width must live on the inner block span, not on the <td>:
   // auto table-layout ignores a max-width on <td>, so a capped block span

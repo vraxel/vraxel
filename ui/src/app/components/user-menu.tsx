@@ -11,13 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu"
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/shared/ui/dialog"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/shared/ui/dialog"
 import {
   Form,
   FormControl,
@@ -52,16 +46,16 @@ export function UserMenu() {
             <Avatar size="sm">
               <AvatarFallback>{initials}</AvatarFallback>
             </Avatar>
-            <span className="max-w-24 truncate text-xs" title={displayName}>{displayName}</span>
+            <span className="max-w-24 truncate text-xs" title={displayName}>
+              {displayName}
+            </span>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel className="font-normal">
             <div className="flex flex-col gap-1">
               <p className="text-sm font-medium">{displayName}</p>
-              {user?.email && (
-                <p className="text-xs text-muted-foreground">{user.email}</p>
-              )}
+              {user?.email && <p className="text-muted-foreground text-xs">{user.email}</p>}
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
@@ -95,7 +89,9 @@ function ChangePasswordDialog({
 
   const schema = z
     .object({
-      oldPassword: z.string().min(1, t("api.validation.required", { field: t("userMenu.oldPassword") })),
+      oldPassword: z
+        .string()
+        .min(1, t("api.validation.required", { field: t("userMenu.oldPassword") })),
       newPassword: z
         .string()
         .min(8, t("api.validation.password.length"))
@@ -137,7 +133,9 @@ function ChangePasswordDialog({
       if (err instanceof ApiError && err.details?.length) {
         for (const d of err.details) {
           const i18nKey = translateDetailMessage(d.message)
-          form.setError(d.field as keyof FormValues, { message: i18nKey !== d.message ? t(i18nKey) : d.message })
+          form.setError(d.field as keyof FormValues, {
+            message: i18nKey !== d.message ? t(i18nKey) : d.message,
+          })
         }
       } else if (err instanceof ApiError) {
         form.setError("root", { message: formApiErrorMessage(err, t) })
@@ -150,7 +148,13 @@ function ChangePasswordDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) form.reset() }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        onOpenChange(v)
+        if (!v) form.reset()
+      }}
+    >
       <DialogContent onOpenAutoFocus={(e) => e.preventDefault()} aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>{t("userMenu.changePassword")}</DialogTitle>
@@ -158,7 +162,7 @@ function ChangePasswordDialog({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             {form.formState.errors.root && (
-              <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive whitespace-pre-line break-words">
+              <div className="bg-destructive/10 text-destructive rounded-md px-3 py-2 text-sm break-words whitespace-pre-line">
                 {form.formState.errors.root.message}
               </div>
             )}

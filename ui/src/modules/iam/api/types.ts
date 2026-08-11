@@ -178,4 +178,3 @@ export interface ResetPasswordRequest {
 export interface TransferOwnershipRequest {
   newOwnerUserId: string
 }
-

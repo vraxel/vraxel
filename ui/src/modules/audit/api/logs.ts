@@ -21,7 +21,10 @@ export async function getAuditLog(id: string): Promise<AuditLog> {
 export type AuditLogRow = AuditLog & { metadata: { id: string } }
 
 export const auditLogsApi = {
-  list: async (_s: ScopeRef, params?: ListParams): Promise<{ items: AuditLogRow[]; totalCount: number }> => {
+  list: async (
+    _s: ScopeRef,
+    params?: ListParams,
+  ): Promise<{ items: AuditLogRow[]; totalCount: number }> => {
     const data = await listAuditLogs(params)
     return {
       items: (data.items ?? []).map((l) => ({ ...l, metadata: { id: l.spec.id } })),

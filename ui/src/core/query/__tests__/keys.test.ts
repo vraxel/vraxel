@@ -6,9 +6,23 @@ const def = defineResource({ module: "pki", name: "credentials", scopes: ["platf
 
 describe("qk", () => {
   it("scope segments are always present so prefixes never alias across scopes", () => {
-    expect(qk.list(def, {}, { page: 1 })).toEqual(["pki", "credentials", "", "", "list", { page: 1 }])
+    expect(qk.list(def, {}, { page: 1 })).toEqual([
+      "pki",
+      "credentials",
+      "",
+      "",
+      "list",
+      { page: 1 },
+    ])
     expect(qk.list(def, { ws: "3" })).toEqual(["pki", "credentials", "3", "", "list", {}])
-    expect(qk.detail(def, { ws: "3", ns: "7" }, 5)).toEqual(["pki", "credentials", "3", "7", "detail", "5"])
+    expect(qk.detail(def, { ws: "3", ns: "7" }, 5)).toEqual([
+      "pki",
+      "credentials",
+      "3",
+      "7",
+      "detail",
+      "5",
+    ])
   })
 
   it("resource prefix matches list/detail keys for invalidation", () => {

@@ -15,7 +15,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       currentWorkspaceId: null,
       currentWorkspaceName: null,
       currentNamespaceId: null,
-      setCurrentWorkspace: (id, name) => set({ currentWorkspaceId: id, currentWorkspaceName: name ?? null, currentNamespaceId: null }),
+      setCurrentWorkspace: (id, name) =>
+        set({
+          currentWorkspaceId: id,
+          currentWorkspaceName: name ?? null,
+          currentNamespaceId: null,
+        }),
       setCurrentNamespace: (id) => set({ currentNamespaceId: id }),
     }),
     { name: "vraxel-workspace" },

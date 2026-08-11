@@ -35,7 +35,7 @@ export function FormErrorBanner({ errors }: { errors: FieldErrors }) {
     // lines collapse into a single run and the user sees "操作冲突 uk_...
     // already exists" mashed together.
     return (
-      <div className="shrink-0 mb-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive whitespace-pre-line break-words">
+      <div className="bg-destructive/10 text-destructive mb-4 shrink-0 rounded-md px-3 py-2 text-sm break-words whitespace-pre-line">
         {errors.root.message as string}
       </div>
     )
@@ -43,10 +43,10 @@ export function FormErrorBanner({ errors }: { errors: FieldErrors }) {
   const messages = collectErrorMessages(errors)
   if (messages.length === 0) return null
   return (
-    <div className="shrink-0 mb-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive space-y-1">
+    <div className="bg-destructive/10 text-destructive mb-4 shrink-0 space-y-1 rounded-md px-3 py-2 text-sm">
       <div>{t("api.validation.formHasErrors", { count: messages.length })}</div>
       {messages.length > 0 && (
-        <ul className="list-disc pl-5 space-y-0.5 text-xs">
+        <ul className="list-disc space-y-0.5 pl-5 text-xs">
           {messages.map((m, i) => (
             <li key={i}>{m}</li>
           ))}

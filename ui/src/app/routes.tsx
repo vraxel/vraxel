@@ -45,10 +45,7 @@ export const routes: RouteObject[] = [
       },
       {
         path: "audit",
-        children: [
-          { index: true, element: <Navigate to="/audit/logs" replace /> },
-          ...auditRoutes,
-        ],
+        children: [{ index: true, element: <Navigate to="/audit/logs" replace /> }, ...auditRoutes],
       },
     ],
   },

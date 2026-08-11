@@ -33,11 +33,13 @@ describe("StatusWatch.deleted", () => {
     const received: StatusEvent[] = []
     const unsub = useStatusWatch.getState().subscribe((ev) => received.push(ev))
 
-    useStatusWatch.getState().listeners.forEach((fn) => fn({
-      entityType: "mysql",
-      entityId: 1,
-      status: "running",
-    }))
+    useStatusWatch.getState().listeners.forEach((fn) =>
+      fn({
+        entityType: "mysql",
+        entityId: 1,
+        status: "running",
+      }),
+    )
 
     expect(received[0].deleted).toBeUndefined()
     unsub()
@@ -49,12 +51,14 @@ describe("StatusWatch.deleted", () => {
     const unsubA = useStatusWatch.getState().subscribe((ev) => a.push(ev))
     const unsubB = useStatusWatch.getState().subscribe((ev) => b.push(ev))
 
-    useStatusWatch.getState().listeners.forEach((fn) => fn({
-      entityType: "redis",
-      entityId: 7,
-      status: "",
-      deleted: true,
-    }))
+    useStatusWatch.getState().listeners.forEach((fn) =>
+      fn({
+        entityType: "redis",
+        entityId: 7,
+        status: "",
+        deleted: true,
+      }),
+    )
 
     expect(a).toHaveLength(1)
     expect(b).toHaveLength(1)
@@ -145,7 +149,8 @@ describe("StatusWatch connection refcount", () => {
     vi.advanceTimersByTime(1_000)
     expect(FakeWebSocket.instances).toHaveLength(2)
     expect(FakeWebSocket.instances[1].readyState).toBe(1)
-    r1(); r2()
+    r1()
+    r2()
     vi.advanceTimersByTime(6_000)
     expect(FakeWebSocket.instances[1].readyState).toBe(3) // replacement closed after linger
     expect(FakeWebSocket.instances).toHaveLength(2) // no zombie respawn

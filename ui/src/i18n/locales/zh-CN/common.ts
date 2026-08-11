@@ -13,7 +13,7 @@ const common = {
   "common.edit": "编辑",
   "common.cancel": "取消",
   "common.confirm": "确认",
-  "common.confirmByName.label": "请输入名称 \"{name}\" 以确认此操作。",
+  "common.confirmByName.label": '请输入名称 "{name}" 以确认此操作。',
   "common.confirmByName.mismatch": "名称不匹配。",
   "common.save": "保存",
   "common.search": "搜索",
@@ -168,7 +168,7 @@ const common = {
   "api.validation.memberRange": "必须在 0 到 1,000,000 之间",
   "api.validation.subnetRange": "必须在 1 到 50 之间",
   "api.validation.nonNegativeInt": "必须为非负整数",
-  "api.validation.integer.format": "必须为非负整数，不能以 0 开头（\"0\" 单独可以）",
+  "api.validation.integer.format": '必须为非负整数，不能以 0 开头（"0" 单独可以）',
   "api.validation.positive": "必须为正数",
   "api.validation.port.range": "端口必须在 1 到 65535 之间",
   "api.validation.lat.range": "纬度必须在 -90 到 90 之间",
@@ -176,8 +176,10 @@ const common = {
   "api.validation.tooLarge": "值太大",
   "api.validation.path.absolute": "必须为绝对路径（以 / 开头）",
   "api.validation.bufferPool.format": "格式须为数字加 M 或 G（如 256M、4G）",
-  "api.validation.resources.cpu.format": "数量须为正整数；输入小数（如 0.5 Cores）离开输入框后会自动换算为更小单位（500 m）。",
-  "api.validation.resources.memory.format": "数量须为正整数；输入小数（如 0.5 Gi）离开输入框后会自动换算为更小单位（512 Mi）。",
+  "api.validation.resources.cpu.format":
+    "数量须为正整数；输入小数（如 0.5 Cores）离开输入框后会自动换算为更小单位（500 m）。",
+  "api.validation.resources.memory.format":
+    "数量须为正整数；输入小数（如 0.5 Gi）离开输入框后会自动换算为更小单位（512 Mi）。",
   "api.validation.resources.volumeSize.format": "格式须为数字加 Mi/Gi/Ti（如 1Gi、500Mi、2Ti）",
   "api.validation.connRange": "必须在 1 到 100,000 之间",
   "api.validation.binaryChoice": "必须为 0 或 1",
@@ -189,7 +191,8 @@ const common = {
   "action.createSuccess": "创建成功",
   "action.updateSuccess": "更新成功",
   "action.deleteSuccess": "删除成功",
-  "action.resetPasswordSuccess": "密码已重置。该用户的刷新令牌已吊销，现有 access token 在最长 1 小时内自动失效。",
+  "action.resetPasswordSuccess":
+    "密码已重置。该用户的刷新令牌已吊销，现有 access token 在最长 1 小时内自动失效。",
 
   // user menu
   "userMenu.changePassword": "修改密码",

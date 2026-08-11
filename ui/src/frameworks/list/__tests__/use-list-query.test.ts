@@ -11,10 +11,16 @@ const def = defineResource({ module: "pki", name: "credentials", scopes: ["platf
 function wrapper(initialEntries: string[]) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return ({ children }: { children: ReactNode }) =>
-    createElement(MemoryRouter, { initialEntries }, createElement(QueryClientProvider, { client: qc }, children))
+    createElement(
+      MemoryRouter,
+      { initialEntries },
+      createElement(QueryClientProvider, { client: qc }, children),
+    )
 }
 
-interface Row { metadata: { id: string } }
+interface Row {
+  metadata: { id: string }
+}
 function fakeApi(seen: { params?: object }[]) {
   return {
     list: vi.fn(async (_s: unknown, params?: object) => {
@@ -40,7 +46,12 @@ describe("useListQuery", () => {
     expect(result.current.search).toBe("db")
     expect(result.current.filters.status).toBe("active")
     expect(seen.at(-1)?.params).toMatchObject({
-      page: 3, pageSize: 50, sortBy: "name", sortOrder: "asc", search: "db", status: "active",
+      page: 3,
+      pageSize: 50,
+      sortBy: "name",
+      sortOrder: "asc",
+      search: "db",
+      status: "active",
     })
   })
 
@@ -60,7 +71,14 @@ describe("useListQuery", () => {
   it("sort toggles asc<->desc on the same field, resets to asc on a new field", async () => {
     const api = fakeApi([])
     const { result } = renderHook(
-      () => useListQuery<Row>({ def, api, scope: {}, defaultSortBy: "created_at", defaultSortOrder: "desc" }),
+      () =>
+        useListQuery<Row>({
+          def,
+          api,
+          scope: {},
+          defaultSortBy: "created_at",
+          defaultSortOrder: "desc",
+        }),
       { wrapper: wrapper(["/?sortBy=name&sortOrder=asc"]) },
     )
     await waitFor(() => expect(result.current.rows.length).toBe(1))
