@@ -157,3 +157,57 @@ func TestRoleBindingCreateMany(t *testing.T) {
 		t.Fatalf("after rollback %d bindings, want 4 (no partial write)", res.TotalCount)
 	}
 }
+
+func TestWorkspaceMemberRolesAreAdditive(t *testing.T) {
+	s := store.NewStores(dbtest.New(t))
+	ctx := context.Background()
+
+	owner := newUser(t, s, "wsowner-it")
+	ws, err := s.Workspace.Create(ctx, store.WorkspaceCreateInput{Name: "mrole-ws", OwnerID: owner.ID, Status: "active"})
+	if err != nil {
+		t.Fatalf("create workspace: %v", err)
+	}
+	// Creating a workspace seeds its default roles; fetch them.
+	viewer, err := s.Role.GetByNameAndWorkspace(ctx, "workspace-viewer", ws.ID)
+	if err != nil {
+		t.Fatalf("get viewer role: %v", err)
+	}
+	admin, err := s.Role.GetByNameAndWorkspace(ctx, "workspace-admin", ws.ID)
+	if err != nil {
+		t.Fatalf("get admin role: %v", err)
+	}
+
+	member := newUser(t, s, "wsmember-it")
+	if err := s.RoleBinding.AddWorkspaceMember(ctx, member.ID, ws.ID, viewer.ID); err != nil {
+		t.Fatalf("add viewer: %v", err)
+	}
+	// The second grant must NOT wipe the first -- the whole point of the
+	// additive change. Before, ReplaceWorkspaceMemberRole deleted it.
+	if err := s.RoleBinding.AddWorkspaceMember(ctx, member.ID, ws.ID, admin.ID); err != nil {
+		t.Fatalf("add admin: %v", err)
+	}
+
+	res, err := s.RoleBinding.ListWorkspaceMembers(ctx, ws.ID, list.Query{
+		Pagination: list.Pagination{Page: 1, PageSize: 50},
+	})
+	if err != nil {
+		t.Fatalf("list members: %v", err)
+	}
+	var m *store.UserWithRoleRow
+	for i := range res.Items {
+		if res.Items[i].ID == member.ID {
+			m = &res.Items[i]
+		}
+	}
+	if m == nil {
+		t.Fatal("member not listed")
+	}
+	if len(m.Roles) != 2 {
+		t.Fatalf("member should hold 2 roles, got %v", m.Roles)
+	}
+	// Owner sorts first; both roles present regardless of order.
+	got := map[string]bool{m.Roles[0]: true, m.Roles[1]: true}
+	if !got["workspace-viewer"] || !got["workspace-admin"] {
+		t.Fatalf("expected both roles, got %v", m.Roles)
+	}
+}

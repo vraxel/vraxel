@@ -278,18 +278,20 @@ WHERE (sqlc.narg('status')::VARCHAR IS NULL OR u.status = sqlc.narg('status'))
 
 -- name: ListWorkspaceMembers :many
 WITH members AS (
-    SELECT DISTINCT ON (rb.user_id)
+    -- One row per member with ALL their roles (a user may hold several
+    -- roles in the same scope). The owner role sorts first.
+    SELECT
         rb.user_id,
-        r.name AS role_name,
-        rb.created_at AS joined_at
+        array_agg(r.name ORDER BY rb.is_owner DESC, r.name ASC)::TEXT[] AS role_names,
+        min(rb.created_at)::TIMESTAMPTZ AS joined_at
     FROM role_bindings rb
     JOIN roles r ON r.id = rb.role_id
     WHERE rb.scope = 'workspace' AND rb.workspace_id = @workspace_id
-    ORDER BY rb.user_id, rb.is_owner DESC, r.name ASC
+    GROUP BY rb.user_id
 )
 SELECT u.id, u.username, u.email, u.display_name, u.phone, u.avatar_url, u.status,
        u.last_login_at, u.created_at, u.updated_at,
-       m.role_name, m.joined_at
+       m.role_names, m.joined_at
 FROM members m
 JOIN users u ON u.id = m.user_id
 WHERE (sqlc.narg('status')::VARCHAR IS NULL OR u.status = sqlc.narg('status'))
@@ -338,18 +340,19 @@ WHERE (sqlc.narg('status')::VARCHAR IS NULL OR u.status = sqlc.narg('status'))
 
 -- name: ListNamespaceMembers :many
 WITH members AS (
-    SELECT DISTINCT ON (rb.user_id)
+    -- One row per member with ALL their roles; owner role first.
+    SELECT
         rb.user_id,
-        r.name AS role_name,
-        rb.created_at AS joined_at
+        array_agg(r.name ORDER BY rb.is_owner DESC, r.name ASC)::TEXT[] AS role_names,
+        min(rb.created_at)::TIMESTAMPTZ AS joined_at
     FROM role_bindings rb
     JOIN roles r ON r.id = rb.role_id
     WHERE rb.scope = 'namespace' AND rb.namespace_id = @namespace_id
-    ORDER BY rb.user_id, rb.is_owner DESC, r.name ASC
+    GROUP BY rb.user_id
 )
 SELECT u.id, u.username, u.email, u.display_name, u.phone, u.avatar_url, u.status,
        u.last_login_at, u.created_at, u.updated_at,
-       m.role_name, m.joined_at
+       m.role_names, m.joined_at
 FROM members m
 JOIN users u ON u.id = m.user_id
 WHERE (sqlc.narg('status')::VARCHAR IS NULL OR u.status = sqlc.narg('status'))
@@ -531,27 +534,16 @@ WHERE user_id = @user_id AND scope = 'workspace' AND workspace_id = @workspace_i
 DELETE FROM role_bindings
 WHERE user_id = @user_id AND scope = 'namespace' AND namespace_id = @namespace_id AND is_owner = false;
 
--- name: ReplaceWorkspaceMemberRole :exec
-WITH deleted AS (
-    DELETE FROM role_bindings
-    WHERE user_id = @user_id
-      AND scope = 'workspace'
-      AND workspace_id = @workspace_id
-      AND is_owner = false
-)
+-- name: AddWorkspaceMemberRole :exec
+-- Additive: grants a workspace role without touching the member's other
+-- roles. A user can hold several roles in one workspace.
 INSERT INTO role_bindings (user_id, role_id, scope, workspace_id, is_owner)
 VALUES (@user_id, @role_id, 'workspace', @workspace_id, false)
 ON CONFLICT (user_id, role_id, workspace_id) WHERE scope = 'workspace'
 DO NOTHING;
 
--- name: ReplaceNamespaceMemberRole :exec
-WITH deleted AS (
-    DELETE FROM role_bindings
-    WHERE user_id = @user_id
-      AND scope = 'namespace'
-      AND namespace_id = @namespace_id
-      AND is_owner = false
-)
+-- name: AddNamespaceMemberRole :exec
+-- Additive: see AddWorkspaceMemberRole.
 INSERT INTO role_bindings (user_id, role_id, scope, workspace_id, namespace_id, is_owner)
 VALUES (@user_id, @role_id, 'namespace', @workspace_id, @namespace_id, false)
 ON CONFLICT (user_id, role_id, namespace_id) WHERE scope = 'namespace'

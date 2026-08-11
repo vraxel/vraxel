@@ -26,7 +26,7 @@ type UserWithNamespacesRow struct {
 // UserWithRoleRow bundles a user with their role in a namespace/workspace.
 type UserWithRoleRow struct {
 	UserRow
-	Role     string
+	Roles    []string
 	JoinedAt time.Time
 }
 

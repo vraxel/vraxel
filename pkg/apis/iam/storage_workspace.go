@@ -315,7 +315,7 @@ func (o workspaceUserOps) list(ctx apiserver.Ctx, query list.Query) (*list.Resul
 	items := make([]User, len(result.Items))
 	for i, m := range result.Items {
 		u := userToAPI(&m.UserRow)
-		u.Spec.Role = m.Role
+		u.Spec.Roles = m.Roles
 		u.Spec.JoinedAt = m.JoinedAt.Format(time.RFC3339)
 		items[i] = *u
 	}

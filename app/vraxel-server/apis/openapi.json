@@ -7297,9 +7297,12 @@
             "type": "string",
             "description": "手机号码"
           },
-          "role": {
-            "type": "string",
-            "description": "用户在租户或项目中的角色（仅成员列表查询时返回）"
+          "roles": {
+            "type": "array",
+            "description": "用户在租户或项目中持有的角色（仅成员列表查询时返回，可多个）",
+            "items": {
+              "type": "string"
+            }
           },
           "status": {
             "type": "string",

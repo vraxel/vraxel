@@ -10,6 +10,51 @@ import (
 	"time"
 )
 
+const addNamespaceMemberRole = `-- name: AddNamespaceMemberRole :exec
+INSERT INTO role_bindings (user_id, role_id, scope, workspace_id, namespace_id, is_owner)
+VALUES ($1, $2, 'namespace', $3, $4, false)
+ON CONFLICT (user_id, role_id, namespace_id) WHERE scope = 'namespace'
+DO NOTHING
+`
+
+type AddNamespaceMemberRoleParams struct {
+	UserID      int64  `json:"user_id"`
+	RoleID      int64  `json:"role_id"`
+	WorkspaceID *int64 `json:"workspace_id"`
+	NamespaceID *int64 `json:"namespace_id"`
+}
+
+// Additive: see AddWorkspaceMemberRole.
+func (q *Queries) AddNamespaceMemberRole(ctx context.Context, arg AddNamespaceMemberRoleParams) error {
+	_, err := q.db.Exec(ctx, addNamespaceMemberRole,
+		arg.UserID,
+		arg.RoleID,
+		arg.WorkspaceID,
+		arg.NamespaceID,
+	)
+	return err
+}
+
+const addWorkspaceMemberRole = `-- name: AddWorkspaceMemberRole :exec
+INSERT INTO role_bindings (user_id, role_id, scope, workspace_id, is_owner)
+VALUES ($1, $2, 'workspace', $3, false)
+ON CONFLICT (user_id, role_id, workspace_id) WHERE scope = 'workspace'
+DO NOTHING
+`
+
+type AddWorkspaceMemberRoleParams struct {
+	UserID      int64  `json:"user_id"`
+	RoleID      int64  `json:"role_id"`
+	WorkspaceID *int64 `json:"workspace_id"`
+}
+
+// Additive: grants a workspace role without touching the member's other
+// roles. A user can hold several roles in one workspace.
+func (q *Queries) AddWorkspaceMemberRole(ctx context.Context, arg AddWorkspaceMemberRoleParams) error {
+	_, err := q.db.Exec(ctx, addWorkspaceMemberRole, arg.UserID, arg.RoleID, arg.WorkspaceID)
+	return err
+}
+
 const clearNamespaceOwner = `-- name: ClearNamespaceOwner :exec
 UPDATE role_bindings SET is_owner = false
 WHERE scope = 'namespace' AND namespace_id = $1 AND is_owner = true
@@ -927,18 +972,19 @@ func (q *Queries) ListBindingIDsAndWorkspaceByRole(ctx context.Context, roleID i
 
 const listNamespaceMembers = `-- name: ListNamespaceMembers :many
 WITH members AS (
-    SELECT DISTINCT ON (rb.user_id)
+    -- One row per member with ALL their roles; owner role first.
+    SELECT
         rb.user_id,
-        r.name AS role_name,
-        rb.created_at AS joined_at
+        array_agg(r.name ORDER BY rb.is_owner DESC, r.name ASC)::TEXT[] AS role_names,
+        min(rb.created_at)::TIMESTAMPTZ AS joined_at
     FROM role_bindings rb
     JOIN roles r ON r.id = rb.role_id
     WHERE rb.scope = 'namespace' AND rb.namespace_id = $7
-    ORDER BY rb.user_id, rb.is_owner DESC, r.name ASC
+    GROUP BY rb.user_id
 )
 SELECT u.id, u.username, u.email, u.display_name, u.phone, u.avatar_url, u.status,
        u.last_login_at, u.created_at, u.updated_at,
-       m.role_name, m.joined_at
+       m.role_names, m.joined_at
 FROM members m
 JOIN users u ON u.id = m.user_id
 WHERE ($1::VARCHAR IS NULL OR u.status = $1)
@@ -989,7 +1035,7 @@ type ListNamespaceMembersRow struct {
 	LastLoginAt *time.Time `json:"last_login_at"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
-	RoleName    string     `json:"role_name"`
+	RoleNames   []string   `json:"role_names"`
 	JoinedAt    time.Time  `json:"joined_at"`
 }
 
@@ -1021,7 +1067,7 @@ func (q *Queries) ListNamespaceMembers(ctx context.Context, arg ListNamespaceMem
 			&i.LastLoginAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.RoleName,
+			&i.RoleNames,
 			&i.JoinedAt,
 		); err != nil {
 			return nil, err
@@ -1787,18 +1833,20 @@ func (q *Queries) ListUserWorkspaces(ctx context.Context, arg ListUserWorkspaces
 
 const listWorkspaceMembers = `-- name: ListWorkspaceMembers :many
 WITH members AS (
-    SELECT DISTINCT ON (rb.user_id)
+    -- One row per member with ALL their roles (a user may hold several
+    -- roles in the same scope). The owner role sorts first.
+    SELECT
         rb.user_id,
-        r.name AS role_name,
-        rb.created_at AS joined_at
+        array_agg(r.name ORDER BY rb.is_owner DESC, r.name ASC)::TEXT[] AS role_names,
+        min(rb.created_at)::TIMESTAMPTZ AS joined_at
     FROM role_bindings rb
     JOIN roles r ON r.id = rb.role_id
     WHERE rb.scope = 'workspace' AND rb.workspace_id = $7
-    ORDER BY rb.user_id, rb.is_owner DESC, r.name ASC
+    GROUP BY rb.user_id
 )
 SELECT u.id, u.username, u.email, u.display_name, u.phone, u.avatar_url, u.status,
        u.last_login_at, u.created_at, u.updated_at,
-       m.role_name, m.joined_at
+       m.role_names, m.joined_at
 FROM members m
 JOIN users u ON u.id = m.user_id
 WHERE ($1::VARCHAR IS NULL OR u.status = $1)
@@ -1849,7 +1897,7 @@ type ListWorkspaceMembersRow struct {
 	LastLoginAt *time.Time `json:"last_login_at"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
-	RoleName    string     `json:"role_name"`
+	RoleNames   []string   `json:"role_names"`
 	JoinedAt    time.Time  `json:"joined_at"`
 }
 
@@ -1881,7 +1929,7 @@ func (q *Queries) ListWorkspaceMembers(ctx context.Context, arg ListWorkspaceMem
 			&i.LastLoginAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.RoleName,
+			&i.RoleNames,
 			&i.JoinedAt,
 		); err != nil {
 			return nil, err
@@ -2028,62 +2076,6 @@ func (q *Queries) LoadUserPermissionRules(ctx context.Context, userID int64) ([]
 		return nil, err
 	}
 	return items, nil
-}
-
-const replaceNamespaceMemberRole = `-- name: ReplaceNamespaceMemberRole :exec
-WITH deleted AS (
-    DELETE FROM role_bindings
-    WHERE user_id = $1
-      AND scope = 'namespace'
-      AND namespace_id = $4
-      AND is_owner = false
-)
-INSERT INTO role_bindings (user_id, role_id, scope, workspace_id, namespace_id, is_owner)
-VALUES ($1, $2, 'namespace', $3, $4, false)
-ON CONFLICT (user_id, role_id, namespace_id) WHERE scope = 'namespace'
-DO NOTHING
-`
-
-type ReplaceNamespaceMemberRoleParams struct {
-	UserID      int64  `json:"user_id"`
-	RoleID      int64  `json:"role_id"`
-	WorkspaceID *int64 `json:"workspace_id"`
-	NamespaceID *int64 `json:"namespace_id"`
-}
-
-func (q *Queries) ReplaceNamespaceMemberRole(ctx context.Context, arg ReplaceNamespaceMemberRoleParams) error {
-	_, err := q.db.Exec(ctx, replaceNamespaceMemberRole,
-		arg.UserID,
-		arg.RoleID,
-		arg.WorkspaceID,
-		arg.NamespaceID,
-	)
-	return err
-}
-
-const replaceWorkspaceMemberRole = `-- name: ReplaceWorkspaceMemberRole :exec
-WITH deleted AS (
-    DELETE FROM role_bindings
-    WHERE user_id = $1
-      AND scope = 'workspace'
-      AND workspace_id = $3
-      AND is_owner = false
-)
-INSERT INTO role_bindings (user_id, role_id, scope, workspace_id, is_owner)
-VALUES ($1, $2, 'workspace', $3, false)
-ON CONFLICT (user_id, role_id, workspace_id) WHERE scope = 'workspace'
-DO NOTHING
-`
-
-type ReplaceWorkspaceMemberRoleParams struct {
-	UserID      int64  `json:"user_id"`
-	RoleID      int64  `json:"role_id"`
-	WorkspaceID *int64 `json:"workspace_id"`
-}
-
-func (q *Queries) ReplaceWorkspaceMemberRole(ctx context.Context, arg ReplaceWorkspaceMemberRoleParams) error {
-	_, err := q.db.Exec(ctx, replaceWorkspaceMemberRole, arg.UserID, arg.RoleID, arg.WorkspaceID)
-	return err
 }
 
 const repointRoleBindingRole = `-- name: RepointRoleBindingRole :exec

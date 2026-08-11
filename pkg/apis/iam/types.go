@@ -44,8 +44,8 @@ type UserSpec struct {
 	Builtin bool `json:"builtin,omitempty"`
 	// +openapi:description=用户所属的项目列表（仅在列表查询时返回）
 	Namespaces []string `json:"namespaces,omitempty"`
-	// +openapi:description=用户在租户或项目中的角色（仅成员列表查询时返回）
-	Role string `json:"role,omitempty"`
+	// +openapi:description=用户在租户或项目中持有的角色（仅成员列表查询时返回，可多个）
+	Roles []string `json:"roles,omitempty"`
 	// +openapi:description=用户加入租户或项目的时间（仅成员列表查询时返回）
 	JoinedAt string `json:"joinedAt,omitempty"`
 }
