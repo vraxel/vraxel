@@ -211,3 +211,59 @@ func TestWorkspaceMemberRolesAreAdditive(t *testing.T) {
 		t.Fatalf("expected both roles, got %v", m.Roles)
 	}
 }
+
+func TestListUserWorkspacesReturnsAllRoles(t *testing.T) {
+	s := store.NewStores(dbtest.New(t))
+	ctx := context.Background()
+
+	owner := newUser(t, s, "uwsowner-it")
+	ws, err := s.Workspace.Create(ctx, store.WorkspaceCreateInput{Name: "uws-ws", OwnerID: owner.ID, Status: "active"})
+	if err != nil {
+		t.Fatalf("create workspace: %v", err)
+	}
+	viewer, err := s.Role.GetByNameAndWorkspace(ctx, "workspace-viewer", ws.ID)
+	if err != nil {
+		t.Fatalf("get viewer role: %v", err)
+	}
+	admin, err := s.Role.GetByNameAndWorkspace(ctx, "workspace-admin", ws.ID)
+	if err != nil {
+		t.Fatalf("get admin role: %v", err)
+	}
+
+	member := newUser(t, s, "uwsmember-it")
+	for _, roleID := range []int64{viewer.ID, admin.ID} {
+		if err := s.RoleBinding.AddWorkspaceMember(ctx, member.ID, ws.ID, roleID); err != nil {
+			t.Fatalf("add member role: %v", err)
+		}
+	}
+
+	res, err := s.RoleBinding.ListUserWorkspaces(ctx, member.ID, list.Query{
+		Pagination: list.Pagination{Page: 1, PageSize: 50},
+	})
+	if err != nil {
+		t.Fatalf("list user workspaces: %v", err)
+	}
+	if len(res.Items) != 1 {
+		t.Fatalf("want 1 workspace, got %d", len(res.Items))
+	}
+	// The user-facing view must agree with the member view: both roles,
+	// not the one DISTINCT ON happened to keep.
+	if len(res.Items[0].Roles) != 2 || len(res.Items[0].RoleDisplayNames) != 2 {
+		t.Fatalf("want 2 roles + 2 display names, got %v / %v",
+			res.Items[0].Roles, res.Items[0].RoleDisplayNames)
+	}
+
+	// Searching by any held role must match, not just the first.
+	for _, q := range []string{"workspace-viewer", "workspace-admin"} {
+		res, err := s.RoleBinding.ListUserWorkspaces(ctx, member.ID, list.Query{
+			Pagination: list.Pagination{Page: 1, PageSize: 50},
+			Filters:    map[string]any{"search": q},
+		})
+		if err != nil {
+			t.Fatalf("search %q: %v", q, err)
+		}
+		if res.TotalCount != 1 {
+			t.Fatalf("search %q matched %d workspaces, want 1", q, res.TotalCount)
+		}
+	}
+}

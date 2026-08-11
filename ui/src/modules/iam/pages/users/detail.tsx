@@ -399,11 +399,19 @@ function UserWorkspacesCard({ userId }: { userId: string }) {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">
-                        {t(`role.${ws.spec.role}`, {
-                          defaultValue: ws.spec.roleDisplayName || ws.spec.role || "",
-                        })}
-                      </Badge>
+                      {ws.spec.roles && ws.spec.roles.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {ws.spec.roles.map((r, idx) => (
+                            <Badge key={r} variant="outline">
+                              {t(`role.${r}`, {
+                                defaultValue: ws.spec.roleDisplayNames?.[idx] || r,
+                              })}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        "-"
+                      )}
                     </TableCell>
                     <TruncateCell className="text-muted-foreground text-sm">
                       {ws.spec.joinedAt ? new Date(ws.spec.joinedAt).toLocaleString() : "-"}
@@ -623,11 +631,19 @@ function UserNamespacesCard({ userId }: { userId: string }) {
                     </TableCell>
                     <TableCell className="text-center">{ns.spec.memberCount ?? 0}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">
-                        {t(`role.${ns.spec.role}`, {
-                          defaultValue: ns.spec.roleDisplayName || ns.spec.role || "",
-                        })}
-                      </Badge>
+                      {ns.spec.roles && ns.spec.roles.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {ns.spec.roles.map((r, idx) => (
+                            <Badge key={r} variant="outline">
+                              {t(`role.${r}`, {
+                                defaultValue: ns.spec.roleDisplayNames?.[idx] || r,
+                              })}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        "-"
+                      )}
                     </TableCell>
                     <TruncateCell className="text-muted-foreground text-sm">
                       {ns.spec.joinedAt ? new Date(ns.spec.joinedAt).toLocaleString() : "-"}

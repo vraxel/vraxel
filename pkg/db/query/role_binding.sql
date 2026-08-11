@@ -386,14 +386,14 @@ OFFSET sqlc.arg('page_offset')::INT;
 
 -- name: CountUserWorkspaces :one
 WITH user_ws AS (
-    SELECT DISTINCT ON (rb.workspace_id)
+    SELECT
         rb.workspace_id,
-        r.name AS role_name,
-        r.display_name AS role_display_name
+        array_agg(r.name)::TEXT[] AS role_names,
+        array_agg(r.display_name)::TEXT[] AS role_display_names
     FROM role_bindings rb
     JOIN roles r ON r.id = rb.role_id
     WHERE rb.user_id = @user_id AND rb.scope = 'workspace'
-    ORDER BY rb.workspace_id, rb.is_owner DESC, r.name ASC
+    GROUP BY rb.workspace_id
 )
 SELECT count(*)
 FROM user_ws uw
@@ -402,28 +402,30 @@ WHERE (sqlc.narg('status')::VARCHAR IS NULL OR ws.status = sqlc.narg('status'))
   AND (sqlc.narg('search')::VARCHAR IS NULL OR (
        ws.name ILIKE '%' || sqlc.narg('search') || '%'
        OR ws.display_name ILIKE '%' || sqlc.narg('search') || '%'
-       OR uw.role_name ILIKE '%' || sqlc.narg('search') || '%'
-       OR uw.role_display_name ILIKE '%' || sqlc.narg('search') || '%'
+       OR array_to_string(uw.role_names, ',') ILIKE '%' || sqlc.narg('search') || '%'
+       OR array_to_string(uw.role_display_names, ',') ILIKE '%' || sqlc.narg('search') || '%'
   ));
 
 -- name: ListUserWorkspaces :many
 WITH user_ws AS (
-    SELECT DISTINCT ON (rb.workspace_id)
+    -- All roles the user holds in each workspace (owner role first), not
+    -- just one: a user may hold several roles in the same scope.
+    SELECT
         rb.workspace_id,
-        r.name AS role_name,
-        r.display_name AS role_display_name,
-        rb.created_at AS joined_at
+        array_agg(r.name ORDER BY rb.is_owner DESC, r.name ASC)::TEXT[] AS role_names,
+        array_agg(r.display_name ORDER BY rb.is_owner DESC, r.name ASC)::TEXT[] AS role_display_names,
+        min(rb.created_at)::TIMESTAMPTZ AS joined_at
     FROM role_bindings rb
     JOIN roles r ON r.id = rb.role_id
     WHERE rb.user_id = @user_id AND rb.scope = 'workspace'
-    ORDER BY rb.workspace_id, rb.is_owner DESC, r.name ASC
+    GROUP BY rb.workspace_id
 )
 SELECT ws.id, ws.name, ws.display_name, ws.description, ws.owner_id, ws.status,
        ws.created_at, ws.updated_at,
        u.username AS owner_username,
        (SELECT count(*) FROM namespaces n WHERE n.workspace_id = ws.id) AS namespace_count,
        (SELECT count(DISTINCT rb2.user_id) FROM role_bindings rb2 WHERE rb2.scope = 'workspace' AND rb2.workspace_id = ws.id) AS member_count,
-       uw.role_name, uw.role_display_name, uw.joined_at
+       uw.role_names, uw.role_display_names, uw.joined_at
 FROM user_ws uw
 JOIN workspaces ws ON ws.id = uw.workspace_id
 JOIN users u ON ws.owner_id = u.id
@@ -431,8 +433,8 @@ WHERE (sqlc.narg('status')::VARCHAR IS NULL OR ws.status = sqlc.narg('status'))
   AND (sqlc.narg('search')::VARCHAR IS NULL OR (
        ws.name ILIKE '%' || sqlc.narg('search') || '%'
        OR ws.display_name ILIKE '%' || sqlc.narg('search') || '%'
-       OR uw.role_name ILIKE '%' || sqlc.narg('search') || '%'
-       OR uw.role_display_name ILIKE '%' || sqlc.narg('search') || '%'
+       OR array_to_string(uw.role_names, ',') ILIKE '%' || sqlc.narg('search') || '%'
+       OR array_to_string(uw.role_display_names, ',') ILIKE '%' || sqlc.narg('search') || '%'
   ))
 ORDER BY
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'name' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN ws.name END ASC,
@@ -443,8 +445,8 @@ ORDER BY
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'namespace_count' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN (SELECT count(*) FROM namespaces n WHERE n.workspace_id = ws.id) END DESC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'member_count' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN (SELECT count(DISTINCT rb2.user_id) FROM role_bindings rb2 WHERE rb2.scope = 'workspace' AND rb2.workspace_id = ws.id) END ASC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'member_count' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN (SELECT count(DISTINCT rb2.user_id) FROM role_bindings rb2 WHERE rb2.scope = 'workspace' AND rb2.workspace_id = ws.id) END DESC,
-    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'role_name' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN uw.role_name END ASC,
-    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'role_name' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN uw.role_name END DESC,
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'role_name' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN uw.role_names[1] END ASC,
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'role_name' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN uw.role_names[1] END DESC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'created_at' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN ws.created_at END ASC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'created_at' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN ws.created_at END DESC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'updated_at' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN ws.updated_at END ASC,
@@ -457,14 +459,14 @@ OFFSET sqlc.arg('page_offset')::INT;
 
 -- name: CountUserNamespaces :one
 WITH user_ns AS (
-    SELECT DISTINCT ON (rb.namespace_id)
+    SELECT
         rb.namespace_id,
-        r.name AS role_name,
-        r.display_name AS role_display_name
+        array_agg(r.name)::TEXT[] AS role_names,
+        array_agg(r.display_name)::TEXT[] AS role_display_names
     FROM role_bindings rb
     JOIN roles r ON r.id = rb.role_id
     WHERE rb.user_id = @user_id AND rb.scope = 'namespace'
-    ORDER BY rb.namespace_id, rb.is_owner DESC, r.name ASC
+    GROUP BY rb.namespace_id
 )
 SELECT count(*)
 FROM user_ns un
@@ -475,28 +477,29 @@ WHERE (sqlc.narg('status')::VARCHAR IS NULL OR ns.status = sqlc.narg('status'))
   AND (sqlc.narg('search')::VARCHAR IS NULL OR (
        ns.name ILIKE '%' || sqlc.narg('search') || '%'
        OR ns.display_name ILIKE '%' || sqlc.narg('search') || '%'
-       OR un.role_name ILIKE '%' || sqlc.narg('search') || '%'
-       OR un.role_display_name ILIKE '%' || sqlc.narg('search') || '%'
+       OR array_to_string(un.role_names, ',') ILIKE '%' || sqlc.narg('search') || '%'
+       OR array_to_string(un.role_display_names, ',') ILIKE '%' || sqlc.narg('search') || '%'
   ));
 
 -- name: ListUserNamespaces :many
 WITH user_ns AS (
-    SELECT DISTINCT ON (rb.namespace_id)
+    -- All roles the user holds in each namespace (owner role first).
+    SELECT
         rb.namespace_id,
-        r.name AS role_name,
-        r.display_name AS role_display_name,
-        rb.created_at AS joined_at
+        array_agg(r.name ORDER BY rb.is_owner DESC, r.name ASC)::TEXT[] AS role_names,
+        array_agg(r.display_name ORDER BY rb.is_owner DESC, r.name ASC)::TEXT[] AS role_display_names,
+        min(rb.created_at)::TIMESTAMPTZ AS joined_at
     FROM role_bindings rb
     JOIN roles r ON r.id = rb.role_id
     WHERE rb.user_id = @user_id AND rb.scope = 'namespace'
-    ORDER BY rb.namespace_id, rb.is_owner DESC, r.name ASC
+    GROUP BY rb.namespace_id
 )
 SELECT ns.id, ns.name, ns.display_name, ns.description, ns.workspace_id, ns.owner_id,
        ns.visibility, ns.max_members, ns.status, ns.created_at, ns.updated_at,
        u.username AS owner_username,
        w.name AS workspace_name,
        (SELECT count(DISTINCT rb2.user_id) FROM role_bindings rb2 WHERE rb2.scope = 'namespace' AND rb2.namespace_id = ns.id) AS member_count,
-       un.role_name, un.role_display_name, un.joined_at
+       un.role_names, un.role_display_names, un.joined_at
 FROM user_ns un
 JOIN namespaces ns ON ns.id = un.namespace_id
 JOIN users u ON ns.owner_id = u.id
@@ -507,8 +510,8 @@ WHERE (sqlc.narg('status')::VARCHAR IS NULL OR ns.status = sqlc.narg('status'))
   AND (sqlc.narg('search')::VARCHAR IS NULL OR (
        ns.name ILIKE '%' || sqlc.narg('search') || '%'
        OR ns.display_name ILIKE '%' || sqlc.narg('search') || '%'
-       OR un.role_name ILIKE '%' || sqlc.narg('search') || '%'
-       OR un.role_display_name ILIKE '%' || sqlc.narg('search') || '%'
+       OR array_to_string(un.role_names, ',') ILIKE '%' || sqlc.narg('search') || '%'
+       OR array_to_string(un.role_display_names, ',') ILIKE '%' || sqlc.narg('search') || '%'
   ))
 ORDER BY
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'name' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN ns.name END ASC,
@@ -517,8 +520,8 @@ ORDER BY
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'display_name' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN ns.display_name END DESC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'member_count' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN (SELECT count(DISTINCT rb2.user_id) FROM role_bindings rb2 WHERE rb2.scope = 'namespace' AND rb2.namespace_id = ns.id) END ASC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'member_count' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN (SELECT count(DISTINCT rb2.user_id) FROM role_bindings rb2 WHERE rb2.scope = 'namespace' AND rb2.namespace_id = ns.id) END DESC,
-    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'role_name' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN un.role_name END ASC,
-    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'role_name' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN un.role_name END DESC,
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'role_name' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN un.role_names[1] END ASC,
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'role_name' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN un.role_names[1] END DESC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'created_at' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN ns.created_at END ASC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'created_at' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN ns.created_at END DESC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'updated_at' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN ns.updated_at END ASC,

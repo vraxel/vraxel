@@ -39,8 +39,8 @@ export interface WorkspaceSpec {
   memberCount?: number
   roleBindingCount?: number
   status?: "active" | "inactive"
-  role?: string
-  roleDisplayName?: string
+  roles?: string[]
+  roleDisplayNames?: string[]
   joinedAt?: string
 }
 
@@ -69,8 +69,8 @@ export interface NamespaceSpec {
   memberCount?: number
   roleBindingCount?: number
   status?: "active" | "inactive"
-  role?: string
-  roleDisplayName?: string
+  roles?: string[]
+  roleDisplayNames?: string[]
   joinedAt?: string
 }
 

@@ -428,12 +428,12 @@ func (s *pgRoleBindingStore) ListUserWorkspaces(ctx context.Context, userID int6
 				CreatedAt:   r.CreatedAt,
 				UpdatedAt:   r.UpdatedAt,
 			},
-			OwnerUsername:   r.OwnerUsername,
-			NamespaceCount:  r.NamespaceCount,
-			MemberCount:     r.MemberCount,
-			Role:            r.RoleName,
-			RoleDisplayName: r.RoleDisplayName,
-			JoinedAt:        r.JoinedAt,
+			OwnerUsername:    r.OwnerUsername,
+			NamespaceCount:   r.NamespaceCount,
+			MemberCount:      r.MemberCount,
+			Roles:            r.RoleNames,
+			RoleDisplayNames: r.RoleDisplayNames,
+			JoinedAt:         r.JoinedAt,
 		})
 	}
 
@@ -495,12 +495,12 @@ func (s *pgRoleBindingStore) ListUserNamespaces(ctx context.Context, userID int6
 				CreatedAt:   r.CreatedAt,
 				UpdatedAt:   r.UpdatedAt,
 			},
-			OwnerUsername:   r.OwnerUsername,
-			WorkspaceName:   r.WorkspaceName,
-			MemberCount:     r.MemberCount,
-			Role:            r.RoleName,
-			RoleDisplayName: r.RoleDisplayName,
-			JoinedAt:        r.JoinedAt,
+			OwnerUsername:    r.OwnerUsername,
+			WorkspaceName:    r.WorkspaceName,
+			MemberCount:      r.MemberCount,
+			Roles:            r.RoleNames,
+			RoleDisplayNames: r.RoleDisplayNames,
+			JoinedAt:         r.JoinedAt,
 		})
 	}
 
