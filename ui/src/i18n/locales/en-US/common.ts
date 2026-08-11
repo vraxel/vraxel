@@ -61,7 +61,6 @@ const common = {
   "nav.roles": "Roles",
   "nav.audit": "Audit",
   "nav.auditLogs": "Audit Logs",
-  "nav.rolebindings": "Role Bindings",
   "nav.kube": "Kubernetes",
   "nav.hosts": "Hosts",
   "nav.apiDocs": "API Docs",

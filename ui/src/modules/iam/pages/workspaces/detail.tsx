@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from "react"
 import { useParams, useNavigate } from "react-router"
-import { Pencil, Trash2, FolderKanban, Users, ShieldCheck } from "lucide-react"
+import { Pencil, Trash2, FolderKanban, Users } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { z } from "zod/v4"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -115,7 +115,7 @@ export default function WorkspaceDetailPage() {
 
       {/* Overview content */}
       <div className="space-y-6">
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-2 gap-4">
           <OverviewCard
             label={t("workspace.namespaces")}
             icon={FolderKanban}
@@ -127,12 +127,6 @@ export default function WorkspaceDetailPage() {
             icon={Users}
             value={workspace.spec.memberCount ?? 0}
             onClick={() => navigate("users")}
-          />
-          <OverviewCard
-            label={t("rolebinding.title")}
-            icon={ShieldCheck}
-            value={workspace.spec.roleBindingCount ?? 0}
-            onClick={() => navigate("rolebindings")}
           />
         </div>
         <Card>

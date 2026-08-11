@@ -22,12 +22,6 @@ export const rolesDef = defineResource({
   detailParam: "roleId",
 })
 
-export const rolebindingsDef = defineResource({
-  module: "iam",
-  name: "rolebindings",
-  scopes: ["platform", "workspace", "namespace"],
-})
-
 export const workspacesDef = defineResource({
   module: "iam",
   name: "workspaces",
