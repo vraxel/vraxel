@@ -8,6 +8,21 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    # Store-layer integration tests (pkg/db/dbtest) hit this instance;
+    # without it they skip. TEST_DB_* defaults match these credentials.
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: vraxel
+          POSTGRES_PASSWORD: vraxel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vraxel"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 

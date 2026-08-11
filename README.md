@@ -78,7 +78,11 @@ clean           Remove build output
 ```
 
 `make check` is the pre-commit gate; CI (.github/workflows/ci.yml) runs
-the same gate plus `go test -race` and `make build`. `make generate`
+the same gate plus `go test -race` and `make build`. Store-layer
+integration tests (a throwaway database per test via `pkg/db/dbtest`)
+run whenever PostgreSQL is reachable at the compose defaults -- start
+`deployment/docker-compose.yaml` locally or rely on the CI service
+container; without one they skip. `make generate`
 must be run and its output committed after changing
 `pkg/db/query/*.sql`, a resource registration, or a Go API type --
 `build` compiles committed sources and never regenerates.
@@ -116,6 +120,10 @@ add the routes to `ui/src/app/routes.tsx`, the nav entries to
 
 ## Operational notes
 
+- Password logins are brute-force throttled in PostgreSQL (shared by
+  all instances): 5 failures per username or 20 per client IP within
+  15 minutes lock the key for the rest of the window (HTTP 429 +
+  Retry-After). A success clears the username counter only.
 - `/debug/pprof/*` is disabled unless `-pprofAuthKey` or `-httpAuth.*`
   is configured -- it exposes heap contents and the command line, and
   this server fronts the edge. `/metrics` stays open (Prometheus
