@@ -39,8 +39,20 @@ type LoginThrottleStore interface {
 // provider performs no login throttling (unit-test construction).
 func (p *Provider) SetLoginThrottle(s LoginThrottleStore) { p.loginThrottle = s }
 
+// Registration abuse limits. Unlike login throttling (which counts only
+// failures), EVERY register attempt counts: successful spam registrations
+// are precisely the abuse being bounded, and each attempt burns a bcrypt
+// hash regardless of outcome. Counters share the login_throttle table
+// under a distinct key prefix; both windows are equal so the shared
+// sweep keeps register rows GC'd too.
+const (
+	registerWindow  = loginFailWindow
+	registerIPLimit = 10 // per client IP
+)
+
 func loginUserKey(username string) string { return "u:" + strings.ToLower(strings.TrimSpace(username)) }
 func loginIPKey(ip string) string         { return "ip:" + ip }
+func registerIPKey(ip string) string      { return "reg:" + ip }
 
 // LoginLocked reports whether a login attempt for (username, ip) is
 // currently locked out, and for how long. Fails open: a store error is
@@ -80,6 +92,35 @@ func throttleDecision(count int, windowStart time.Time, limit int, window time.D
 		return 0, false
 	}
 	return remaining, true
+}
+
+// RegisterLocked reports whether registration from ip is currently locked
+// out, and for how long. Same fail-open contract as LoginLocked.
+func (p *Provider) RegisterLocked(ctx context.Context, ip string) (time.Duration, bool) {
+	if p.loginThrottle == nil {
+		return 0, false
+	}
+	key := registerIPKey(ip)
+	count, windowStart, found, err := p.loginThrottle.Get(ctx, key)
+	if err != nil {
+		logger.Errorf("register throttle: get %q: %v", key, err)
+		return 0, false
+	}
+	if !found {
+		return 0, false
+	}
+	return throttleDecision(count, windowStart, registerIPLimit, registerWindow, time.Now())
+}
+
+// NoteRegisterAttempt records one registration attempt (success or not)
+// against the per-IP counter. Best-effort: errors are logged only.
+func (p *Provider) NoteRegisterAttempt(ctx context.Context, ip string) {
+	if p.loginThrottle == nil {
+		return
+	}
+	if err := p.loginThrottle.Bump(ctx, registerIPKey(ip), int(registerWindow.Seconds())); err != nil {
+		logger.Errorf("register throttle: bump: %v", err)
+	}
 }
 
 // NoteLoginFailure records a failed attempt against both counters.

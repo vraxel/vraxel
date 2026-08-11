@@ -6341,6 +6341,21 @@
         }
       }
     },
+    "/oidc/config": {
+      "get": {
+        "summary": "前端认证配置",
+        "description": "返回是否开放自助注册及可用的社交登录提供者",
+        "operationId": "oidcAuthConfig",
+        "tags": [
+          "OIDC"
+        ],
+        "responses": {
+          "200": {
+            "description": "配置"
+          }
+        }
+      }
+    },
     "/oidc/login": {
       "post": {
         "summary": "用户登录",
@@ -6394,6 +6409,37 @@
         "responses": {
           "204": {
             "description": "注销成功"
+          }
+        }
+      }
+    },
+    "/oidc/register": {
+      "post": {
+        "summary": "用户自助注册",
+        "description": "创建新用户并直接登录；未开启自助注册时该端点不存在",
+        "operationId": "oidcRegister",
+        "tags": [
+          "OIDC"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "注册并登录成功"
+          },
+          "400": {
+            "description": "参数校验失败"
+          },
+          "409": {
+            "description": "用户名或邮箱已存在"
           }
         }
       }

@@ -14,6 +14,8 @@ const { startAuthFlow } = vi.hoisted(() => ({ startAuthFlow: vi.fn() }))
 vi.mock("@/core/auth/auth", () => ({
   startAuthFlow,
   loginWithCredentials: vi.fn(),
+  fetchAuthConfig: vi.fn().mockResolvedValue({ selfRegistration: false, socialProviders: [] }),
+  socialLoginUrl: vi.fn(),
 }))
 
 import LoginPage from "../login"

@@ -1,12 +1,18 @@
 import { useEffect, useState } from "react"
-import { useSearchParams } from "react-router"
+import { Link, useSearchParams } from "react-router"
 import { Button } from "@/shared/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card"
 import { Input } from "@/shared/ui/input"
 import { Label } from "@/shared/ui/label"
 import { LanguageSwitcher } from "@/shared/components/language-switcher"
+import { SocialLogin } from "@/shared/components/social-login"
 import { useTranslation } from "@/i18n"
-import { loginWithCredentials, startAuthFlow } from "@/core/auth/auth"
+import {
+  fetchAuthConfig,
+  loginWithCredentials,
+  startAuthFlow,
+  type AuthConfig,
+} from "@/core/auth/auth"
 
 const loginErrorMap: Record<string, string> = {
   "invalid credentials": "login.error.invalidCredentials",
@@ -23,6 +29,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null)
+
+  useEffect(() => {
+    fetchAuthConfig()
+      .then(setAuthConfig)
+      .catch(() => setAuthConfig(null))
+  }, [])
 
   // A request_id is only meaningful if THIS browser session started the
   // handshake that produced it; otherwise (direct navigation, a stale
@@ -109,6 +122,24 @@ export default function LoginPage() {
               {loading ? "..." : t("login.signIn")}
             </Button>
           </form>
+
+          {authConfig && authConfig.socialProviders.length > 0 && (
+            <div className="mt-4">
+              <SocialLogin providers={authConfig.socialProviders} requestId={requestId} />
+            </div>
+          )}
+
+          {authConfig?.selfRegistration && (
+            <p className="text-muted-foreground mt-4 text-center text-sm">
+              {t("login.noAccount")}{" "}
+              <Link
+                to={`/register?request_id=${encodeURIComponent(requestId)}`}
+                className="text-primary hover:underline"
+              >
+                {t("login.createAccount")}
+              </Link>
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>

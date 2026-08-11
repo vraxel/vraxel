@@ -14,8 +14,9 @@ import (
 // vraxel_csrf cookies from a prior session (e.g. after server-side session
 // invalidation, DB reset, or signing-key rotation).
 var preSessionPaths = map[string]struct{}{
-	"/oidc/login": {},
-	"/oidc/token": {},
+	"/oidc/login":    {},
+	"/oidc/register": {},
+	"/oidc/token":    {},
 }
 
 // WithCSRF returns middleware that enforces the double-submit cookie pattern

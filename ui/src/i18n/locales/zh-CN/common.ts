@@ -52,6 +52,23 @@ const common = {
   "login.usernamePlaceholder": "请输入用户名",
   "login.passwordPlaceholder": "请输入密码",
   "login.signIn": "登录",
+  "login.noAccount": "还没有账号？",
+  "login.createAccount": "注册",
+  "login.orContinueWith": "或使用以下方式",
+  "login.social.github": "使用 GitHub 登录",
+  "login.social.google": "使用 Google 登录",
+
+  // register
+  "register.title": "注册账号",
+  "register.email": "邮箱",
+  "register.emailPlaceholder": "请输入邮箱",
+  "register.displayName": "显示名称",
+  "register.displayNamePlaceholder": "请输入显示名称（可选）",
+  "register.confirmPassword": "确认密码",
+  "register.confirmPasswordPlaceholder": "请再次输入密码",
+  "register.submit": "注册",
+  "register.haveAccount": "已有账号？",
+  "register.signIn": "去登录",
 
   // nav
   "nav.iam": "组织",
@@ -112,6 +129,12 @@ const common = {
   "login.error.tooManyAttempts": "失败次数过多，账号已临时锁定，请稍后再试",
   "login.error.sessionExpired": "登录会话已过期，正在重新跳转...",
   "login.error.failed": "登录失败，请重试",
+
+  // register errors
+  "register.error.passwordMismatch": "两次输入的密码不一致",
+  "register.error.conflict": "用户名或邮箱已存在",
+  "register.error.tooManyAttempts": "注册尝试过于频繁，请稍后再试",
+  "register.error.failed": "注册失败，请重试",
 
   // api errors
   "api.error.badRequest": "请求错误",

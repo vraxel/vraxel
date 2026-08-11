@@ -2,9 +2,25 @@ package store
 
 import (
 	"context"
+	"time"
 
 	"vraxel.io/vraxel/lib/list"
 )
+
+// RegistrationStore provisions users for the public self-service registration
+// and social-login flows: it creates the user, links external identities, and
+// grants the default platform role, all in one transaction.
+type RegistrationStore interface {
+	RegisterLocal(ctx context.Context, in RegisterLocalInput) (*UserRow, error)
+	FindOrCreateSocial(ctx context.Context, in SocialLoginInput) (*UserRow, error)
+}
+
+// OAuthStateStore is the short-lived CSRF/state store for the outbound
+// social-login OAuth2 flow.
+type OAuthStateStore interface {
+	Create(ctx context.Context, state, provider, requestID string, ttl time.Duration) error
+	Consume(ctx context.Context, state string) (*OAuthStateRow, error)
+}
 
 // UserStore defines database operations on users. Domain-typed.
 type UserStore interface {

@@ -133,6 +133,46 @@ func (q *Queries) DeleteUsersByIDs(ctx context.Context, ids []int64) ([]int64, e
 	return items, nil
 }
 
+const getUserByEmail = `-- name: GetUserByEmail :one
+SELECT id, username, email, display_name, phone, avatar_url, status, builtin,
+       last_login_at, created_at, updated_at
+FROM users
+WHERE email = $1
+`
+
+type GetUserByEmailRow struct {
+	ID          int64      `json:"id"`
+	Username    string     `json:"username"`
+	Email       string     `json:"email"`
+	DisplayName string     `json:"display_name"`
+	Phone       string     `json:"phone"`
+	AvatarUrl   string     `json:"avatar_url"`
+	Status      string     `json:"status"`
+	Builtin     bool       `json:"builtin"`
+	LastLoginAt *time.Time `json:"last_login_at"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+}
+
+func (q *Queries) GetUserByEmail(ctx context.Context, email string) (GetUserByEmailRow, error) {
+	row := q.db.QueryRow(ctx, getUserByEmail, email)
+	var i GetUserByEmailRow
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Email,
+		&i.DisplayName,
+		&i.Phone,
+		&i.AvatarUrl,
+		&i.Status,
+		&i.Builtin,
+		&i.LastLoginAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getUserByID = `-- name: GetUserByID :one
 SELECT id, username, email, display_name, phone, avatar_url, status, builtin,
        last_login_at, created_at, updated_at

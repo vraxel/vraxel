@@ -99,7 +99,7 @@ func main() {
 
 	startTime := time.Now()
 
-	rootHandler := buildRootHandler(ctx, database, apisResult, oidcProvider, authorizer, auditWriter)
+	rootHandler := buildRootHandler(ctx, cfg, database, apisResult, oidcProvider, authorizer, auditWriter)
 
 	go httpserver.Serve(listenAddrs, rootHandler, httpserver.ServerOptions{
 		UseProxyProtocol: useProxyProtocol,
@@ -116,6 +116,7 @@ func main() {
 // error (handler wiring or embedded asset load).
 func buildRootHandler(
 	ctx context.Context,
+	cfg *config.Config,
 	database *db.DB,
 	apisResult apis.Result,
 	oidcProvider *oidc.Provider,
@@ -151,7 +152,7 @@ func buildRootHandler(
 
 	return handler.NewRootHandler(handler.RootHandlerConfig{
 		APIHandler:  apiHandler,
-		OIDCMux:     apis.NewOIDCMux(oidcProvider, auditWriter),
+		OIDCMux:     apis.NewOIDCMux(oidcProvider, auditWriter, apisResult, &cfg.OIDC, cfg.Server.ExternalURL),
 		OpenAPISpec: localapis.OpenAPISpec,
 		FrontendFS:  distFS,
 		ReadinessChecks: []handler.ReadinessCheck{

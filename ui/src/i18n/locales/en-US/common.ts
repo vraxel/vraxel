@@ -52,6 +52,23 @@ const common = {
   "login.usernamePlaceholder": "Enter username",
   "login.passwordPlaceholder": "Enter password",
   "login.signIn": "Sign In",
+  "login.noAccount": "Don't have an account?",
+  "login.createAccount": "Create account",
+  "login.orContinueWith": "Or continue with",
+  "login.social.github": "Continue with GitHub",
+  "login.social.google": "Continue with Google",
+
+  // register
+  "register.title": "Create Account",
+  "register.email": "Email",
+  "register.emailPlaceholder": "Enter email",
+  "register.displayName": "Display Name",
+  "register.displayNamePlaceholder": "Enter display name (optional)",
+  "register.confirmPassword": "Confirm Password",
+  "register.confirmPasswordPlaceholder": "Re-enter password",
+  "register.submit": "Sign Up",
+  "register.haveAccount": "Already have an account?",
+  "register.signIn": "Sign in",
 
   // nav
   "nav.iam": "IAM",
@@ -112,6 +129,12 @@ const common = {
   "login.error.tooManyAttempts": "Too many failed attempts; temporarily locked, try again later.",
   "login.error.sessionExpired": "Session expired, redirecting...",
   "login.error.failed": "Login failed, please try again",
+
+  // register errors
+  "register.error.passwordMismatch": "The two passwords do not match",
+  "register.error.conflict": "Username or email already exists",
+  "register.error.tooManyAttempts": "Too many registration attempts; try again later.",
+  "register.error.failed": "Registration failed, please try again",
 
   // api errors
   "api.error.badRequest": "Bad request",

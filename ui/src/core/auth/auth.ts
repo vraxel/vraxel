@@ -160,7 +160,12 @@ export function clearLocalAuthState() {
 // post-login redirect target (would produce loops or land the user on the
 // login / callback / error page after signing in).
 function isAuthFlowPath(pathname: string): boolean {
-  return pathname === "/login" || pathname === "/auth/callback" || pathname === "/error"
+  return (
+    pathname === "/login" ||
+    pathname === "/register" ||
+    pathname === "/auth/callback" ||
+    pathname === "/error"
+  )
 }
 
 function saveReturnTo() {
@@ -238,6 +243,57 @@ export async function loginWithCredentials(
 
   const data = await res.json()
   return data.redirectUri
+}
+
+export async function registerWithCredentials(
+  username: string,
+  email: string,
+  password: string,
+  displayName: string,
+  requestId: string,
+): Promise<string> {
+  const res = await fetch("/oidc/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ username, email, password, displayName, requestId }),
+  })
+
+  if (!res.ok) {
+    const err = await res.json()
+    const e = new Error(err.error_description || "Registration failed")
+    // Surface the OAuth error code so the caller can distinguish conflict
+    // (duplicate username/email) from a generic failure.
+    ;(e as Error & { code?: string }).code = err.error
+    throw e
+  }
+
+  const data = await res.json()
+  return data.redirectUri
+}
+
+export type AuthConfig = {
+  selfRegistration: boolean
+  socialProviders: string[]
+}
+
+// Fetches which auth features the server exposes (self-registration open,
+// which social providers are configured) so the login / register pages can
+// render only the available options.
+export async function fetchAuthConfig(): Promise<AuthConfig> {
+  const res = await fetch("/oidc/config", { credentials: "include" })
+  if (!res.ok) {
+    return { selfRegistration: false, socialProviders: [] }
+  }
+  return res.json()
+}
+
+// Builds the URL that starts a social-login round trip. The current
+// request_id is carried through so the callback can resume the pending
+// authorization and hand the SPA an authorization code, exactly like a
+// password login.
+export function socialLoginUrl(provider: string, requestId: string): string {
+  return `/oidc/social/${provider}/start?request_id=${encodeURIComponent(requestId)}`
 }
 
 // Exchange the authorization code for the session. The server sets HttpOnly

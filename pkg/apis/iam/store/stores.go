@@ -12,6 +12,8 @@ type Stores struct {
 	Permission   PermissionStore
 	Role         RoleStore
 	RoleBinding  RoleBindingStore
+	Registration RegistrationStore
+	OAuthState   OAuthStateStore
 }
 
 // NewStores creates all IAM store impls from a single *db.DB handle.
@@ -24,5 +26,7 @@ func NewStores(d *db.DB) Stores {
 		Permission:   NewPGPermissionStore(d),
 		Role:         NewPGRoleStore(d),
 		RoleBinding:  NewPGRoleBindingStore(d),
+		Registration: NewPGRegistrationStore(d),
+		OAuthState:   NewPGOAuthStateStore(d),
 	}
 }

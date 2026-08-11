@@ -41,4 +41,8 @@ func TestThrottleNilStoreIsOpen(t *testing.T) {
 	}
 	p.NoteLoginFailure(t.Context(), "admin", "1.2.3.4")
 	p.NoteLoginSuccess(t.Context(), "admin")
+	if _, locked := p.RegisterLocked(t.Context(), "1.2.3.4"); locked {
+		t.Fatal("nil store must fail open for register")
+	}
+	p.NoteRegisterAttempt(t.Context(), "1.2.3.4")
 }

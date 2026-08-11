@@ -54,6 +54,14 @@ type Namespace struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+type OauthState struct {
+	State     string    `json:"state"`
+	Provider  string    `json:"provider"`
+	RequestID string    `json:"request_id"`
+	ExpiresAt time.Time `json:"expires_at"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type OidcAuthCode struct {
 	Code                string    `json:"code"`
 	ClientID            string    `json:"client_id"`
@@ -164,6 +172,15 @@ type User struct {
 	LastLoginAt  *time.Time `json:"last_login_at"`
 	CreatedAt    time.Time  `json:"created_at"`
 	UpdatedAt    time.Time  `json:"updated_at"`
+}
+
+type UserIdentity struct {
+	ID              int64     `json:"id"`
+	UserID          int64     `json:"user_id"`
+	Provider        string    `json:"provider"`
+	ProviderSubject string    `json:"provider_subject"`
+	Email           string    `json:"email"`
+	CreatedAt       time.Time `json:"created_at"`
 }
 
 type Workspace struct {

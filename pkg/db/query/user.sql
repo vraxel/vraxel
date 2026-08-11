@@ -16,6 +16,12 @@ SELECT id, username, email, display_name, phone, avatar_url, status, builtin,
 FROM users
 WHERE username = @username;
 
+-- name: GetUserByEmail :one
+SELECT id, username, email, display_name, phone, avatar_url, status, builtin,
+       last_login_at, created_at, updated_at
+FROM users
+WHERE email = @email;
+
 -- name: UpdateUser :one
 UPDATE users
 SET username = @username,

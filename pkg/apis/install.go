@@ -87,7 +87,9 @@ func NewAuditWriter(database *db.DB) *libaudit.Writer {
 	return audit.NewAuditWriter(database)
 }
 
-// NewOIDCMux creates the OIDC public endpoint HTTP handler.
-func NewOIDCMux(provider *oidc.Provider, auditLogger libaudit.Logger) http.Handler {
-	return iam.NewOIDCMux(provider, auditLogger)
+// NewOIDCMux creates the OIDC public endpoint HTTP handler, including the
+// self-service registration and social-login endpoints wired from the iam
+// stores and OIDC config.
+func NewOIDCMux(provider *oidc.Provider, auditLogger libaudit.Logger, result Result, cfg *config.OIDCConfig, externalURL string) http.Handler {
+	return iam.NewOIDCMux(provider, auditLogger, result.iamResult.Stores, cfg, externalURL)
 }

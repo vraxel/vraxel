@@ -101,6 +101,37 @@ type OIDCConfig struct {
 	AuthCodeTTL     string         `yaml:"authCodeTTL"`
 	LoginURL        string         `yaml:"loginUrl"`
 	Clients         []ClientConfig `yaml:"clients"`
+	// SelfRegistration gates the public POST /oidc/register endpoint and the
+	// signup UI. Nil defaults to true (open registration); set to false to
+	// make user creation admin-only again.
+	SelfRegistration *bool        `yaml:"selfRegistration"`
+	Social           SocialConfig `yaml:"social"`
+}
+
+// SocialConfig holds the external "login with" OAuth2 client credentials.
+// Each provider is off until its clientId + secret are configured (via yaml
+// or the *_CLIENT_ID / *_CLIENT_SECRET env vars).
+type SocialConfig struct {
+	GitHub SocialProviderConfig `yaml:"github"`
+	Google SocialProviderConfig `yaml:"google"`
+}
+
+// SocialProviderConfig holds one external provider's OAuth2 client config.
+type SocialProviderConfig struct {
+	ClientID string   `yaml:"clientId"`
+	Secret   string   `yaml:"secret"`
+	Scopes   []string `yaml:"scopes"`
+}
+
+// Enabled reports whether the provider has enough config to be used.
+func (p SocialProviderConfig) Enabled() bool {
+	return p.ClientID != "" && p.Secret != ""
+}
+
+// SelfRegistrationEnabled reports the effective self-registration flag
+// (defaults to true when unset).
+func (c OIDCConfig) SelfRegistrationEnabled() bool {
+	return c.SelfRegistration == nil || *c.SelfRegistration
 }
 
 // ClientConfig holds OAuth2 client configuration.
@@ -230,6 +261,12 @@ func setDefaultsOIDC(cfg *Config) {
 	if cfg.OIDC.Algorithm == "" {
 		cfg.OIDC.Algorithm = "EdDSA"
 	}
+	if len(cfg.OIDC.Social.GitHub.Scopes) == 0 {
+		cfg.OIDC.Social.GitHub.Scopes = []string{"read:user", "user:email"}
+	}
+	if len(cfg.OIDC.Social.Google.Scopes) == 0 {
+		cfg.OIDC.Social.Google.Scopes = []string{"openid", "email", "profile"}
+	}
 	// Derive the issuer from the server's external URL so a config with
 	// no oidc: section still boots with authentication ON. There is no
 	// "auth disabled" mode: an empty issuer would silently serve every
@@ -345,6 +382,18 @@ func applyEnvOIDC(cfg *Config) {
 	}
 	if v := os.Getenv("OIDC_LOGIN_URL"); v != "" {
 		cfg.OIDC.LoginURL = v
+	}
+	if v := os.Getenv("GITHUB_CLIENT_ID"); v != "" {
+		cfg.OIDC.Social.GitHub.ClientID = v
+	}
+	if v := os.Getenv("GITHUB_CLIENT_SECRET"); v != "" {
+		cfg.OIDC.Social.GitHub.Secret = v
+	}
+	if v := os.Getenv("GOOGLE_CLIENT_ID"); v != "" {
+		cfg.OIDC.Social.Google.ClientID = v
+	}
+	if v := os.Getenv("GOOGLE_CLIENT_SECRET"); v != "" {
+		cfg.OIDC.Social.Google.Secret = v
 	}
 }
 

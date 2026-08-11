@@ -3,10 +3,13 @@ package iam
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"vraxel.io/vraxel/lib/audit"
+	"vraxel.io/vraxel/lib/config"
 	"vraxel.io/vraxel/lib/logger"
 	"vraxel.io/vraxel/lib/oidc"
+	"vraxel.io/vraxel/pkg/apis/iam/store"
 )
 
 // NewOIDCMux 创建包含所有 OIDC 公开端点的 HTTP 路由。
@@ -19,7 +22,11 @@ import (
 //   - POST /oidc/logout                      — 注销端点，清除 cookie 并撤销 refresh token
 //   - GET  /oidc/userinfo                    — 用户信息端点，通过 Bearer Token 获取当前用户信息
 //   - POST /oidc/userinfo                    — 同上（支持 POST 方法）
-func NewOIDCMux(provider *oidc.Provider, auditLogger audit.Logger) http.Handler {
+//   - GET  /oidc/config                      — 前端认证配置（自助注册开关 + 社交登录提供者）
+//   - POST /oidc/register                    — 自助注册（仅在开启自助注册时挂载）
+//   - GET  /oidc/social/{provider}/start     — 发起 GitHub/Google 登录
+//   - GET  /oidc/social/{provider}/callback  — 外部提供者回调
+func NewOIDCMux(provider *oidc.Provider, auditLogger audit.Logger, stores store.Stores, cfg *config.OIDCConfig, externalURL string) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /.well-known/openid-configuration", handleDiscovery(provider))
 	mux.HandleFunc("GET /.well-known/jwks.json", handleJWKS(provider))
@@ -29,6 +36,22 @@ func NewOIDCMux(provider *oidc.Provider, auditLogger audit.Logger) http.Handler 
 	mux.HandleFunc("POST /oidc/logout", handleLogout(provider, auditLogger))
 	mux.HandleFunc("GET /oidc/userinfo", handleUserInfo(provider))
 	mux.HandleFunc("POST /oidc/userinfo", handleUserInfo(provider))
+
+	extras := authExtras{
+		registration:     stores.Registration,
+		oauthState:       stores.OAuthState,
+		social:           buildSocialProviders(cfg.Social),
+		selfRegistration: cfg.SelfRegistrationEnabled(),
+		defaultRole:      store.RolePlatformViewer,
+		externalURL:      strings.TrimRight(externalURL, "/"),
+	}
+	mux.HandleFunc("GET /oidc/config", handleAuthConfig(extras))
+	if extras.selfRegistration {
+		mux.HandleFunc("POST /oidc/register", handleRegister(provider, extras, auditLogger))
+	}
+	mux.HandleFunc("GET /oidc/social/{provider}/start", handleSocialStart(extras))
+	mux.HandleFunc("GET /oidc/social/{provider}/callback", handleSocialCallback(provider, extras, auditLogger))
+
 	return mux
 }
 
