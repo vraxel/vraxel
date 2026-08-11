@@ -474,7 +474,7 @@ func (q *Queries) CreateRoleBinding(ctx context.Context, arg CreateRoleBindingPa
 	return i, err
 }
 
-const createRoleBindingIfNotExists = `-- name: CreateRoleBindingIfNotExists :exec
+const createRoleBindingIfNotExists = `-- name: CreateRoleBindingIfNotExists :execrows
 INSERT INTO role_bindings (user_id, role_id, scope, workspace_id, namespace_id, is_owner)
 VALUES ($1, $2, $3, $4, $5, $6)
 ON CONFLICT DO NOTHING
@@ -489,8 +489,11 @@ type CreateRoleBindingIfNotExistsParams struct {
 	IsOwner     bool   `json:"is_owner"`
 }
 
-func (q *Queries) CreateRoleBindingIfNotExists(ctx context.Context, arg CreateRoleBindingIfNotExistsParams) error {
-	_, err := q.db.Exec(ctx, createRoleBindingIfNotExists,
+// Idempotent grant. Returns 1 when the binding was created and 0 when it
+// already existed, so a batch can report how many grants are new without
+// a separate (and racy) pre-count.
+func (q *Queries) CreateRoleBindingIfNotExists(ctx context.Context, arg CreateRoleBindingIfNotExistsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, createRoleBindingIfNotExists,
 		arg.UserID,
 		arg.RoleID,
 		arg.Scope,
@@ -498,7 +501,10 @@ func (q *Queries) CreateRoleBindingIfNotExists(ctx context.Context, arg CreateRo
 		arg.NamespaceID,
 		arg.IsOwner,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const deleteNonOwnerNamespaceBindings = `-- name: DeleteNonOwnerNamespaceBindings :execrows

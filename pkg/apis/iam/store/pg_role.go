@@ -370,7 +370,7 @@ func (s *pgRoleStore) SeedRBAC(ctx context.Context, roles []BuiltinRoleDef, admi
 		if adminUsername != "" && platformAdminRoleID != 0 {
 			adminUser, err := qtx.GetUserByUsername(ctx, adminUsername)
 			if err == nil {
-				_ = qtx.CreateRoleBindingIfNotExists(ctx, generated.CreateRoleBindingIfNotExistsParams{
+				_, _ = qtx.CreateRoleBindingIfNotExists(ctx, generated.CreateRoleBindingIfNotExistsParams{
 					UserID: adminUser.ID,
 					RoleID: platformAdminRoleID,
 					Scope:  ScopePlatform,

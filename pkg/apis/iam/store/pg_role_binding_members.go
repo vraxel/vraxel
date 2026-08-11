@@ -71,7 +71,7 @@ func (s *pgRoleBindingStore) AddNamespaceMember(ctx context.Context, userID, nam
 	}
 
 	if err := s.DB.WithTx(ctx, func(ctx context.Context, qtx *generated.Queries) error {
-		if err := qtx.CreateRoleBindingIfNotExists(ctx, generated.CreateRoleBindingIfNotExistsParams{
+		if _, err := qtx.CreateRoleBindingIfNotExists(ctx, generated.CreateRoleBindingIfNotExistsParams{
 			UserID:      userID,
 			RoleID:      wsMemberRole.ID,
 			Scope:       ScopeWorkspace,
