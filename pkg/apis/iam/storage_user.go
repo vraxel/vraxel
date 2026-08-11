@@ -261,6 +261,9 @@ func NewChangePasswordAction(userStore modstore.UserStore, refreshStore modstore
 
 // changePasswordExec 是 NewChangePasswordAction 闭包体的命名实现：校验请求、
 // 核验旧密码后设置新密码并吊销刷新令牌。目标 userId 由框架解析进 ctx.ID。
+//
+// 无密码账号（社交登录用户 password_hash 为空）是"首次设置密码"而非"修改"，
+// 此时跳过旧密码校验——否则空 hash 校验必然失败，社交用户永远设不了密码。
 func changePasswordExec(ctx apiserver.Ctx, req *ChangePasswordRequest, userStore modstore.UserStore, refreshStore modstore.RefreshTokenStore, hashPasswd PasswordHasher, verifyPasswd func(password, hash string) error) (*StatusResponse, error) {
 	uid := ctx.ID
 
@@ -278,9 +281,16 @@ func changePasswordExec(ctx apiserver.Ctx, req *ChangePasswordRequest, userStore
 		return nil, domainErr(err)
 	}
 
-	// Verify old password
-	if err := verifyPasswd(req.OldPassword, authUser.PasswordHash); err != nil {
-		return nil, apierrors.NewBadRequest("old password is incorrect", nil)
+	// Accounts that already have a password must prove the old one. A
+	// passwordless account (social login) is setting its first password, so
+	// no old password is required or checked.
+	if authUser.PasswordHash != "" {
+		if req.OldPassword == "" {
+			return nil, apierrors.NewBadRequest("oldPassword is required", nil)
+		}
+		if err := verifyPasswd(req.OldPassword, authUser.PasswordHash); err != nil {
+			return nil, apierrors.NewBadRequest("old password is incorrect", nil)
+		}
 	}
 
 	if err := setUserPasswordAndRevoke(ctx, uid, req.NewPassword, userStore, refreshStore, hashPasswd); err != nil {
@@ -295,9 +305,11 @@ func changePasswordExec(ctx apiserver.Ctx, req *ChangePasswordRequest, userStore
 }
 
 // changePasswordValidateRequest 校验修改密码请求体（JSON 解码由框架完成）。
+// oldPassword 是否必填由 changePasswordExec 按账号是否已有密码决定，这里只保证
+// newPassword 存在且符合强度策略。
 func changePasswordValidateRequest(req *ChangePasswordRequest) error {
-	if req.OldPassword == "" || req.NewPassword == "" {
-		return apierrors.NewBadRequest("oldPassword and newPassword are required", nil)
+	if req.NewPassword == "" {
+		return apierrors.NewBadRequest("newPassword is required", nil)
 	}
 
 	if errs := ValidatePassword(req.NewPassword); errs.HasErrors() {

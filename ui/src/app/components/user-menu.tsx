@@ -89,9 +89,10 @@ function ChangePasswordDialog({
 
   const schema = z
     .object({
-      oldPassword: z
-        .string()
-        .min(1, t("api.validation.required", { field: t("userMenu.oldPassword") })),
+      // Optional: passwordless (social-login) accounts set their first
+      // password with no old one. The server still rejects a blank old
+      // password for accounts that already have one.
+      oldPassword: z.string(),
       newPassword: z
         .string()
         .min(8, t("api.validation.password.length"))
@@ -175,6 +176,7 @@ function ChangePasswordDialog({
                   <FormControl>
                     <Input type="password" {...field} />
                   </FormControl>
+                  <FormDescription>{t("userMenu.oldPasswordOptionalHint")}</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

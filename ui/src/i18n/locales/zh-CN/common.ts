@@ -221,6 +221,7 @@ const common = {
   "userMenu.changePassword": "修改密码",
   "userMenu.logout": "退出登录",
   "userMenu.oldPassword": "当前密码",
+  "userMenu.oldPasswordOptionalHint": "若你通过 GitHub/Google 登录、首次设置密码，可留空。",
   "userMenu.newPassword": "新密码",
   "userMenu.confirmPassword": "确认新密码",
   "userMenu.passwordMismatch": "两次输入的密码不一致",

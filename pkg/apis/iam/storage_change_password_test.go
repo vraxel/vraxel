@@ -206,16 +206,16 @@ func TestChangePassword_UserNotFound(t *testing.T) {
 // --- TestChangePassword_MissingFields ---
 
 func TestChangePassword_MissingFields(t *testing.T) {
+	// A missing newPassword is a pure validation failure (no store access), so
+	// nil stores are fine. Whether oldPassword is required is decided later
+	// against the account's stored hash and is covered by the store-backed
+	// tests below, not here.
 	action := NewChangePasswordAction(nil, nil, nil, nil)
 
 	tests := []struct {
 		name string
 		req  ChangePasswordRequest
 	}{
-		{
-			name: "empty oldPassword",
-			req:  ChangePasswordRequest{OldPassword: "", NewPassword: "NewPass123"},
-		},
 		{
 			name: "empty newPassword",
 			req:  ChangePasswordRequest{OldPassword: "OldPass123", NewPassword: ""},
@@ -240,9 +240,72 @@ func TestChangePassword_MissingFields(t *testing.T) {
 			if statusErr.Status != http.StatusBadRequest {
 				t.Errorf("expected status 400, got %d", statusErr.Status)
 			}
-			if statusErr.Message != "oldPassword and newPassword are required" {
-				t.Errorf("expected message 'oldPassword and newPassword are required', got %q", statusErr.Message)
+			if statusErr.Message != "newPassword is required" {
+				t.Errorf("expected message 'newPassword is required', got %q", statusErr.Message)
 			}
 		})
+	}
+}
+
+// --- TestChangePassword_PasswordlessSetsInitial ---
+// A social-login user (empty password_hash) sets a first password with no old
+// password. Without the passwordless carve-out the empty-hash verify would
+// always fail and lock them out of ever having a password.
+func TestChangePassword_PasswordlessSetsInitial(t *testing.T) {
+	dbUser := testUser(1, "gh-user", "gh@example.com")
+
+	var capturedHash string
+	userStore := &mockUserStore{
+		GetByIDFn: func(ctx context.Context, id int64) (*modstore.UserRow, error) {
+			return dbUser, nil
+		},
+		GetUserForAuthFn: func(ctx context.Context, identifier string) (*modstore.UserAuthRow, error) {
+			return &modstore.UserAuthRow{ID: 1, Username: "gh-user", PasswordHash: "", Status: "active"}, nil
+		},
+		SetPasswordHashFn: func(ctx context.Context, id int64, hash string) error {
+			capturedHash = hash
+			return nil
+		},
+	}
+
+	hashPasswd := func(password string) (string, error) { return "newhash-" + password, nil }
+	verifyPasswd := func(password, hash string) error {
+		t.Fatal("verifyPasswd must not be called for a passwordless account")
+		return nil
+	}
+
+	action := NewChangePasswordAction(userStore, nil, hashPasswd, verifyPasswd)
+
+	resp, err := action(actionCtx(1), &ChangePasswordRequest{OldPassword: "", NewPassword: "NewPass123"})
+	if err != nil {
+		t.Fatalf("unexpected error setting initial password: %v", err)
+	}
+	if resp.Status != "Success" {
+		t.Errorf("expected Success, got %q", resp.Status)
+	}
+	if capturedHash != "newhash-NewPass123" {
+		t.Errorf("expected password to be set, got hash %q", capturedHash)
+	}
+}
+
+// --- TestChangePassword_ExistingRequiresOld ---
+// An account that already has a password must still supply a non-empty old one.
+func TestChangePassword_ExistingRequiresOld(t *testing.T) {
+	dbUser := testUser(1, "alice", "alice@example.com")
+	userStore := &mockUserStore{
+		GetByIDFn: func(ctx context.Context, id int64) (*modstore.UserRow, error) { return dbUser, nil },
+		GetUserForAuthFn: func(ctx context.Context, identifier string) (*modstore.UserAuthRow, error) {
+			return &modstore.UserAuthRow{ID: 1, Username: "alice", PasswordHash: "oldhash", Status: "active"}, nil
+		},
+	}
+	action := NewChangePasswordAction(userStore, nil, func(string) (string, error) { return "x", nil }, func(string, string) error { return nil })
+
+	_, err := action(actionCtx(1), &ChangePasswordRequest{OldPassword: "", NewPassword: "NewPass123"})
+	statusErr, ok := err.(*apierrors.StatusError)
+	if !ok {
+		t.Fatalf("expected *StatusError, got %T (%v)", err, err)
+	}
+	if statusErr.Message != "oldPassword is required" {
+		t.Errorf("expected 'oldPassword is required', got %q", statusErr.Message)
 	}
 }

@@ -213,6 +213,8 @@ const detailMessagePrefixMap: Record<string, string> = {
 const messageMap: Record<string, string> = {
   "old password is incorrect": "api.error.oldPasswordIncorrect",
   "oldPassword and newPassword are required": "api.error.badRequest",
+  "oldPassword is required": "api.error.badRequest",
+  "newPassword is required": "api.error.badRequest",
   "cannot remove workspace owner": "api.error.cannotRemoveOwner",
   "cannot remove namespace owner": "api.error.cannotRemoveOwner",
   "cannot delete built-in role": "api.error.cannotDeleteBuiltinRole",

@@ -229,6 +229,8 @@ const common = {
   "userMenu.changePassword": "Change Password",
   "userMenu.logout": "Sign Out",
   "userMenu.oldPassword": "Current Password",
+  "userMenu.oldPasswordOptionalHint":
+    "Leave blank if you signed in with GitHub/Google and are setting a password for the first time.",
   "userMenu.newPassword": "New Password",
   "userMenu.confirmPassword": "Confirm New Password",
   "userMenu.passwordMismatch": "Passwords do not match",
