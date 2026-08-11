@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react"
+import { NameCell } from "@/frameworks/list/name-cell"
 import { useApiQuery } from "@/core/query/hooks"
 import { useQueryClient, keepPreviousData } from "@tanstack/react-query"
-import { useNavigate, useParams } from "react-router"
+import { useParams } from "react-router"
 import { Plus, Pencil, Trash2, Search, Filter } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { z } from "zod/v4"
@@ -47,7 +48,6 @@ import { FormDialog } from "@/frameworks/form/form-dialog"
 
 export default function WorkspaceNamespacesPage() {
   const workspaceId = useParams().workspaceId!
-  const navigate = useNavigate()
   const { t } = useTranslation()
   const {
     page,
@@ -204,13 +204,6 @@ export default function WorkspaceNamespacesPage() {
               </TableHead>
               <TableHead
                 className="cursor-pointer select-none"
-                onClick={() => handleSort("display_name")}
-              >
-                {t("common.displayName")}
-                <SortIcon field="display_name" sortBy={sortBy} sortOrder={sortOrder} />
-              </TableHead>
-              <TableHead
-                className="cursor-pointer select-none"
                 onClick={() => handleSort("description")}
               >
                 {t("common.description")}
@@ -310,21 +303,15 @@ export default function WorkspaceNamespacesPage() {
                     </TableCell>
                   )}
                   <TableCell>
-                    <button
-                      className="text-left font-medium hover:underline"
-                      onClick={() =>
-                        navigate(`/iam/workspaces/${workspaceId}/namespaces/${ns.metadata.id}`)
+                    <NameCell
+                      to={`/iam/workspaces/${workspaceId}/namespaces/${ns.metadata.id}`}
+                      displayName={
+                        ns.spec.displayName ||
+                        (ns.metadata.name.endsWith("-default") ? t("namespace.builtinDefault") : "")
                       }
-                    >
-                      {ns.metadata.name}
-                    </button>
+                      name={ns.metadata.name}
+                    />
                   </TableCell>
-                  {(() => {
-                    const displayText =
-                      ns.spec.displayName ||
-                      (ns.metadata.name.endsWith("-default") ? t("namespace.builtinDefault") : "-")
-                    return <TruncateCell text={displayText}>{displayText}</TruncateCell>
-                  })()}
                   {(() => {
                     const descText =
                       ns.spec.description ||

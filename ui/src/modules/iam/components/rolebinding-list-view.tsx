@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import { NameCell } from "@/frameworks/list/name-cell"
 import { Plus, Trash2, Search } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/shared/ui/button"
@@ -134,16 +135,11 @@ export function RoleBindingListView({ config }: { config: RoleBindingListConfig 
       key: "username",
       header: t("user.username"),
       sortable: true,
-      truncate: true,
-      className: "font-medium",
-      cell: (binding) => binding.spec.username,
-    },
-    {
-      key: "user_display_name",
-      header: t("common.displayName"),
-      sortable: true,
-      truncate: true,
-      cell: (binding) => binding.spec.userDisplayName || "-",
+      // No link: the row's subject is the binding, not the user, and the
+      // user-detail route differs per scope.
+      cell: (binding) => (
+        <NameCell displayName={binding.spec.userDisplayName} name={binding.spec.username ?? ""} />
+      ),
     },
     {
       key: "role_name",

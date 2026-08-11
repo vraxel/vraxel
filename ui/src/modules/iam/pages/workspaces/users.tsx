@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react"
+import { NameCell } from "@/frameworks/list/name-cell"
 import { useApiQuery } from "@/core/query/hooks"
 import { useQueryClient, keepPreviousData } from "@tanstack/react-query"
-import { useParams, Link, Navigate } from "react-router"
+import { useParams, Navigate } from "react-router"
 import { Plus, UserMinus, Search, Filter } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/shared/ui/button"
@@ -217,13 +218,6 @@ export default function WorkspaceUsersPage() {
                 {t("user.email")}
                 <SortIcon field="email" sortBy={sortBy} sortOrder={sortOrder} />
               </TableHead>
-              <TableHead
-                className="cursor-pointer select-none"
-                onClick={() => handleSort("display_name")}
-              >
-                {t("common.displayName")}
-                <SortIcon field="display_name" sortBy={sortBy} sortOrder={sortOrder} />
-              </TableHead>
               <TableHead className="cursor-pointer select-none" onClick={() => handleSort("phone")}>
                 {t("common.phone")}
                 <SortIcon field="phone" sortBy={sortBy} sortOrder={sortOrder} />
@@ -299,16 +293,14 @@ export default function WorkspaceUsersPage() {
                       />
                     )}
                   </TableCell>
-                  <TableCell className="font-medium">
-                    <Link
+                  <TableCell>
+                    <NameCell
                       to={`/iam/workspaces/${workspaceId}/users/${m.metadata.id}`}
-                      className="hover:underline"
-                    >
-                      {m.spec.username}
-                    </Link>
+                      displayName={m.spec.displayName}
+                      name={m.spec.username}
+                    />
                   </TableCell>
                   <TruncateCell>{m.spec.email}</TruncateCell>
-                  <TruncateCell>{m.spec.displayName || "-"}</TruncateCell>
                   <TruncateCell>{m.spec.phone || "-"}</TruncateCell>
                   <TableCell>
                     {m.spec.role ? t(`role.${m.spec.role}`, { defaultValue: m.spec.role }) : "-"}

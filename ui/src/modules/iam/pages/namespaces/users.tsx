@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react"
+import { NameCell } from "@/frameworks/list/name-cell"
 import { useApiQuery } from "@/core/query/hooks"
 import { useQueryClient, keepPreviousData } from "@tanstack/react-query"
-import { useParams, Link, Navigate } from "react-router"
+import { useParams, Navigate } from "react-router"
 import { Plus, UserMinus, Search, Filter } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/shared/ui/button"
@@ -223,13 +224,6 @@ export default function NamespaceUsersPage() {
                 {t("user.email")}
                 <SortIcon field="email" sortBy={sortBy} sortOrder={sortOrder} />
               </TableHead>
-              <TableHead
-                className="cursor-pointer select-none"
-                onClick={() => handleSort("display_name")}
-              >
-                {t("common.displayName")}
-                <SortIcon field="display_name" sortBy={sortBy} sortOrder={sortOrder} />
-              </TableHead>
               <TableHead className="cursor-pointer select-none" onClick={() => handleSort("phone")}>
                 {t("common.phone")}
                 <SortIcon field="phone" sortBy={sortBy} sortOrder={sortOrder} />
@@ -305,13 +299,14 @@ export default function NamespaceUsersPage() {
                       />
                     </TableCell>
                   )}
-                  <TableCell className="font-medium">
-                    <Link to={`${usersBasePath}/${m.metadata.id}`} className="hover:underline">
-                      {m.spec.username}
-                    </Link>
+                  <TableCell>
+                    <NameCell
+                      to={`${usersBasePath}/${m.metadata.id}`}
+                      displayName={m.spec.displayName}
+                      name={m.spec.username}
+                    />
                   </TableCell>
                   <TableCell>{m.spec.email}</TableCell>
-                  <TableCell>{m.spec.displayName || "-"}</TableCell>
                   <TableCell>{m.spec.phone || "-"}</TableCell>
                   <TableCell>
                     {m.spec.role ? t(`role.${m.spec.role}`, { defaultValue: m.spec.role }) : "-"}

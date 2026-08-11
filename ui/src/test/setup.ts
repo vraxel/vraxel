@@ -23,3 +23,15 @@ if (
     key: (index: number) => Object.keys(store)[index] ?? null,
   } as Storage
 }
+
+// jsdom implements neither ResizeObserver nor matchMedia. TruncateText /
+// TruncateCell observe their own box to decide whether to offer an
+// overflow tooltip, so without this stub every test that renders a
+// truncating cell throws. A no-op is the right shape: jsdom does no
+// layout, so nothing would ever resize.
+class ResizeObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+globalThis.ResizeObserver ??= ResizeObserverStub as unknown as typeof ResizeObserver

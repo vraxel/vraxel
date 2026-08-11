@@ -29,6 +29,7 @@ import {
 import { namespacesDef } from "@/modules/iam/defs"
 import { useQueryClient } from "@tanstack/react-query"
 import { useListQuery } from "@/frameworks/list/use-list-query"
+import { NameCell } from "@/frameworks/list/name-cell"
 import { ResourceListPage, type ColumnDef } from "@/frameworks/list/resource-list-page"
 import { useApiMutation } from "@/core/query/hooks"
 import { qk } from "@/core/query/keys"
@@ -93,21 +94,16 @@ export default function NamespaceListPage() {
       key: "name",
       header: t("common.name"),
       sortable: true,
-      truncate: true,
       cell: (ns) => (
-        <Link to={`/iam/namespaces/${ns.metadata.id}`} className="font-medium hover:underline">
-          {ns.metadata.name}
-        </Link>
+        <NameCell
+          to={`/iam/namespaces/${ns.metadata.id}`}
+          displayName={
+            ns.spec.displayName ||
+            (ns.metadata.name.endsWith("-default") ? t("namespace.builtinDefault") : "")
+          }
+          name={ns.metadata.name}
+        />
       ),
-    },
-    {
-      key: "display_name",
-      header: t("common.displayName"),
-      sortable: true,
-      truncate: true,
-      cell: (ns) =>
-        ns.spec.displayName ||
-        (ns.metadata.name.endsWith("-default") ? t("namespace.builtinDefault") : "-"),
     },
     {
       key: "description",

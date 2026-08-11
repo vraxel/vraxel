@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react"
-import { Link } from "react-router"
 import { Plus, Pencil, Trash2 } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { z } from "zod/v4"
@@ -22,6 +21,7 @@ import {
 import { workspacesDef } from "@/modules/iam/defs"
 import { useQueryClient } from "@tanstack/react-query"
 import { useListQuery } from "@/frameworks/list/use-list-query"
+import { NameCell } from "@/frameworks/list/name-cell"
 import { ResourceListPage, type ColumnDef } from "@/frameworks/list/resource-list-page"
 import { useApiMutation } from "@/core/query/hooks"
 import { qk } from "@/core/query/keys"
@@ -79,19 +79,13 @@ export default function WorkspaceListPage() {
       key: "name",
       header: t("common.name"),
       sortable: true,
-      truncate: true,
       cell: (ws) => (
-        <Link to={`/iam/workspaces/${ws.metadata.id}`} className="font-medium hover:underline">
-          {ws.metadata.name}
-        </Link>
+        <NameCell
+          to={`/iam/workspaces/${ws.metadata.id}`}
+          displayName={ws.spec.displayName}
+          name={ws.metadata.name}
+        />
       ),
-    },
-    {
-      key: "display_name",
-      header: t("common.displayName"),
-      sortable: true,
-      truncate: true,
-      cell: (ws) => ws.spec.displayName || "-",
     },
     {
       key: "description",

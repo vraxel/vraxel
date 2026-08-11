@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react"
-import { Link, Navigate, useSearchParams } from "react-router"
+import { Navigate, useSearchParams } from "react-router"
 import { Plus, Pencil, Trash2 } from "lucide-react"
 import { useForm, useWatch } from "react-hook-form"
 import { z } from "zod/v4"
@@ -31,6 +31,7 @@ import {
 import { rolesDef } from "@/modules/iam/defs"
 import { useQueryClient } from "@tanstack/react-query"
 import { useListQuery } from "@/frameworks/list/use-list-query"
+import { NameCell } from "@/frameworks/list/name-cell"
 import { ResourceListPage, type ColumnDef } from "@/frameworks/list/resource-list-page"
 import { useApiMutation } from "@/core/query/hooks"
 import { qk } from "@/core/query/keys"
@@ -151,21 +152,17 @@ export default function RoleListPage() {
     ...(canDelete ? [selectColumn] : []),
     {
       key: "name",
-      header: t("role.name"),
+      header: t("common.name"),
       sortable: true,
-      truncate: true,
       cell: (role) => (
-        <Link to={`/iam/roles/${role.metadata.id}`} className="font-medium hover:underline">
-          {role.spec.name}
-        </Link>
+        <NameCell
+          to={`/iam/roles/${role.metadata.id}`}
+          // Built-in roles carry a localized label; custom roles fall
+          // back to their own display name.
+          displayName={t(`role.${role.spec.name}`, { defaultValue: role.spec.displayName ?? "" })}
+          name={role.spec.name}
+        />
       ),
-    },
-    {
-      key: "display_name",
-      header: t("common.displayName"),
-      sortable: true,
-      truncate: true,
-      cell: (role) => t(`role.${role.spec.name}`, { defaultValue: role.spec.displayName || "-" }),
     },
     {
       key: "scope",

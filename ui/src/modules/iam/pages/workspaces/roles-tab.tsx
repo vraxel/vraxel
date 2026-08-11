@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react"
+import { NameCell } from "@/frameworks/list/name-cell"
 import { useApiQuery } from "@/core/query/hooks"
 import { useQueryClient, keepPreviousData } from "@tanstack/react-query"
-import { useParams, Link, Navigate } from "react-router"
+import { useParams, Navigate } from "react-router"
 import { Plus, Pencil, Trash2, Search } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/shared/ui/button"
@@ -193,15 +194,8 @@ export default function WorkspaceRolesTab() {
                 </TableHead>
               )}
               <TableHead className="cursor-pointer select-none" onClick={() => handleSort("name")}>
-                {t("role.name")}
+                {t("common.name")}
                 <SortIcon field="name" sortBy={sortBy} sortOrder={sortOrder} />
-              </TableHead>
-              <TableHead
-                className="cursor-pointer select-none"
-                onClick={() => handleSort("display_name")}
-              >
-                {t("common.displayName")}
-                <SortIcon field="display_name" sortBy={sortBy} sortOrder={sortOrder} />
               </TableHead>
               <TableHead>{t("role.builtin")}</TableHead>
               <TableHead>{t("common.description")}</TableHead>
@@ -250,16 +244,14 @@ export default function WorkspaceRolesTab() {
                       />
                     </TableCell>
                   )}
-                  <TableCell className="font-medium">
-                    <Link
-                      to={`/iam/workspaces/${workspaceId}/roles/${role.metadata.id}`}
-                      className="hover:underline"
-                    >
-                      {role.spec.name}
-                    </Link>
-                  </TableCell>
                   <TableCell>
-                    {t(`role.${role.spec.name}`, { defaultValue: role.spec.displayName || "-" })}
+                    <NameCell
+                      to={`/iam/workspaces/${workspaceId}/roles/${role.metadata.id}`}
+                      displayName={t(`role.${role.spec.name}`, {
+                        defaultValue: role.spec.displayName ?? "",
+                      })}
+                      name={role.spec.name}
+                    />
                   </TableCell>
                   <TableCell>
                     <Badge variant={role.spec.builtin ? "secondary" : "outline"}>

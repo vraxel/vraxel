@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Link, Navigate, useParams } from "react-router"
+import { Navigate, useParams } from "react-router"
 import { Plus, Pencil, Trash2, KeyRound } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { z } from "zod/v4"
@@ -23,6 +23,7 @@ import { listUsers, createUser, updateUser, usersApi } from "@/modules/iam/api/u
 import { usersDef } from "@/modules/iam/defs"
 import { useQueryClient } from "@tanstack/react-query"
 import { useListQuery } from "@/frameworks/list/use-list-query"
+import { NameCell } from "@/frameworks/list/name-cell"
 import { ResourceListPage, type ColumnDef } from "@/frameworks/list/resource-list-page"
 import { useApiMutation } from "@/core/query/hooks"
 import { qk } from "@/core/query/keys"
@@ -125,11 +126,12 @@ export default function UserListPage() {
       key: "username",
       header: t("user.username"),
       sortable: true,
-      truncate: true,
       cell: (user) => (
-        <Link to={`/iam/users/${user.metadata.id}`} className="font-medium hover:underline">
-          {user.spec.username}
-        </Link>
+        <NameCell
+          to={`/iam/users/${user.metadata.id}`}
+          displayName={user.spec.displayName}
+          name={user.spec.username}
+        />
       ),
     },
     {
@@ -138,13 +140,6 @@ export default function UserListPage() {
       sortable: true,
       truncate: true,
       cell: (user) => user.spec.email,
-    },
-    {
-      key: "display_name",
-      header: t("common.displayName"),
-      sortable: true,
-      truncate: true,
-      cell: (user) => user.spec.displayName || "-",
     },
     {
       key: "phone",
