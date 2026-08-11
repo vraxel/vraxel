@@ -1,4 +1,4 @@
-import path from "path"
+import path from "node:path"
 import { defineConfig } from "vite"
 import react, { reactCompilerPreset } from "@vitejs/plugin-react"
 import babel from "@rolldown/plugin-babel"
@@ -21,19 +21,23 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(import.meta.dirname, "./src"),
     },
   },
   build: {
     rollupOptions: {
       input: {
-        main: path.resolve(__dirname, "index.html"),
-        "api-docs": path.resolve(__dirname, "api-docs.html"),
+        main: path.resolve(import.meta.dirname, "index.html"),
+        "api-docs": path.resolve(import.meta.dirname, "api-docs.html"),
       },
     },
   },
   server: {
     port: 5173,
+    // Fail instead of silently sliding to 5174: the OIDC client's
+    // redirect URI is pinned to :5173, so a shifted port turns into a
+    // login failure with no obvious link to the port.
+    strictPort: true,
     // The repo lives at /Users/.../vraxel and pnpm hoists shared deps into
     // /Users/.../vraxel/node_modules/.pnpm. Vite's default fs.allow only
     // includes the workspace root (ui/) + its own dist, so requests for
