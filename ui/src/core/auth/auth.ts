@@ -148,6 +148,7 @@ function clearPersistedUserState() {
 // 401-refresh-failure path in `api/client.ts` can reset state before kicking
 // off a fresh OIDC handshake.
 export function clearLocalAuthState() {
+  authFlowStarted = false
   sessionStorage.removeItem("pkce_code_verifier")
   sessionStorage.removeItem("oidc_flow_pending")
   sessionStorage.removeItem(RETURN_TO_KEY)
@@ -185,7 +186,17 @@ export function consumeReturnTo(): string {
 // startAuthFlow kicks off the OIDC PKCE handshake. Pass `saveReturnTo: false`
 // from logout: the current pathname belongs to the user being signed out, and
 // must not be replayed to whoever logs in next.
+// Guards against overlapping handshakes. startAuthFlow awaits sha256
+// before navigating, so two concurrent calls could interleave: the
+// second overwrites pkce_code_verifier while the first navigates with
+// its own challenge, and the token exchange then fails with a PKCE
+// mismatch. A navigation is already committed once the first call runs,
+// so later calls have nothing to add.
+let authFlowStarted = false
+
 export async function startAuthFlow(opts: { saveReturnTo?: boolean } = {}) {
+  if (authFlowStarted) return
+  authFlowStarted = true
   if (opts.saveReturnTo !== false) saveReturnTo()
   const codeVerifier = generateRandomString(64)
   sessionStorage.setItem("pkce_code_verifier", codeVerifier)
@@ -259,7 +270,12 @@ export async function exchangeCodeForTokens(code: string) {
 
   // Drain the body so the browser releases the connection.
   await res.text()
+  // The handshake is over: drop both one-shot markers together. The
+  // login page only READS oidc_flow_pending -- consuming it there made
+  // the check non-idempotent (a second effect run, e.g. StrictMode's
+  // double-invoke, saw no flag and restarted the flow, looping).
   sessionStorage.removeItem("pkce_code_verifier")
+  sessionStorage.removeItem("oidc_flow_pending")
 }
 
 // Rotate session cookies using the browser's existing vraxel_rt cookie.

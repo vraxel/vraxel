@@ -24,21 +24,18 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  // Ensure a fresh request_id on every page load.
-  // "oidc_flow_pending" is set by startAuthFlow() before redirecting to
-  // /oidc/authorize and consumed here on arrival. If the flag is absent
-  // (page refresh / direct navigation), the request_id in the URL may be
-  // expired, so we restart the flow to obtain a new one.
+  // A request_id is only meaningful if THIS browser session started the
+  // handshake that produced it; otherwise (direct navigation, a stale
+  // bookmark) it is likely expired and we start a fresh flow.
+  //
+  // The marker is read, never consumed: exchangeCodeForTokens clears it
+  // when the handshake completes. Consuming it here made the effect
+  // non-idempotent -- a second run found no flag, restarted the flow,
+  // and the new page did the same, forever.
   useEffect(() => {
-    if (!requestId) {
+    if (!requestId || !sessionStorage.getItem("oidc_flow_pending")) {
       startAuthFlow()
-      return
     }
-    if (sessionStorage.getItem("oidc_flow_pending")) {
-      sessionStorage.removeItem("oidc_flow_pending")
-      return
-    }
-    startAuthFlow()
   }, [requestId])
 
   const handleSubmit = async (e: React.FormEvent) => {
