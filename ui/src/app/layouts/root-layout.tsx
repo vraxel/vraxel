@@ -450,7 +450,7 @@ export default function RootLayout() {
             <AppBreadcrumb />
             <div className="ml-auto flex items-center gap-2">
               <a
-                href="/api-docs"
+                href="/api-docs.html"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:bg-accent hover:text-accent-foreground inline-flex h-9 w-9 items-center justify-center rounded-md text-sm font-medium transition-colors"

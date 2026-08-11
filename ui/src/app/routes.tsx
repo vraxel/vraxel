@@ -1,7 +1,6 @@
 import { Navigate, type RouteObject } from "react-router"
 import RootLayout from "@/app/layouts/root-layout"
 import LoginPage from "@/app/pages/login"
-import ApiDocsPage from "@/app/pages/api-docs"
 import AuthCallbackPage from "@/app/pages/auth-callback"
 import ErrorPage from "@/app/pages/error"
 import { iamRoutes } from "@/modules/iam/pages/routes"
@@ -21,10 +20,6 @@ export const routes: RouteObject[] = [
   {
     path: "/login",
     element: <LoginPage />,
-  },
-  {
-    path: "/api-docs",
-    element: <ApiDocsPage />,
   },
   {
     path: "/auth/callback",

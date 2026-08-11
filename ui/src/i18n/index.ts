@@ -1,8 +1,14 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import type { Locale, Messages } from "./types"
-import zhCN from "./locales/zh-CN"
+import zhCN, { type MessageKey } from "./locales/zh-CN"
 import enUS from "./locales/en-US"
+
+// Editor autocomplete for every catalog key while still admitting
+// dynamically-built keys (error maps, `role.${name}` templates). The
+// `string & {}` half keeps arbitrary strings assignable without
+// collapsing the union, so literals autocomplete but nothing breaks.
+export type TranslateKey = MessageKey | (string & {})
 
 const messages: Record<Locale, Messages> = {
   "zh-CN": zhCN,
@@ -46,7 +52,7 @@ function translateWith(
 
 export function useTranslation() {
   const { locale, setLocale } = useI18nStore()
-  const t = (key: string, vars?: Record<string, string | number>): string =>
+  const t = (key: TranslateKey, vars?: Record<string, string | number>): string =>
     translateWith(locale, key, vars)
   return { t, locale, setLocale }
 }
@@ -54,14 +60,14 @@ export function useTranslation() {
 // Non-hook translator for code that runs outside React (e.g. the global
 // TanStack Query error handler in core/query/client.ts). Reads the current
 // locale directly from the zustand store.
-export function translate(key: string, vars?: Record<string, string | number>): string {
+export function translate(key: TranslateKey, vars?: Record<string, string | number>): string {
   return translateWith(useI18nStore.getState().locale, key, vars)
 }
 
 // Translate into a specific locale regardless of the active UI locale. Used by
 // the sidebar quick-search to build cross-locale alias tokens (an English term
 // can match a Chinese label and vice versa).
-export function translateTo(locale: Locale, key: string): string {
+export function translateTo(locale: Locale, key: TranslateKey): string {
   return translateWith(locale, key)
 }
 
