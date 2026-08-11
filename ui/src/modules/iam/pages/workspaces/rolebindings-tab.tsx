@@ -2,7 +2,7 @@ import { useMemo } from "react"
 import { useParams, Navigate } from "react-router"
 import {
   listWorkspaceRoleBindings,
-  createWorkspaceRoleBinding,
+  createWorkspaceRoleBindings,
   deleteWorkspaceRoleBinding,
   deleteWorkspaceRoleBindings,
   listWorkspaceRoles,
@@ -23,7 +23,7 @@ export default function WorkspaceRoleBindingsTab() {
   const config = useMemo<RoleBindingListConfig>(
     () => ({
       listBindings: (params) => listWorkspaceRoleBindings(workspaceId, params),
-      createBinding: (data) => createWorkspaceRoleBinding(workspaceId, data),
+      createBindings: (ids, roleId) => createWorkspaceRoleBindings(workspaceId, ids, roleId),
       deleteBinding: (id) => deleteWorkspaceRoleBinding(workspaceId, id),
       deleteBindings: (ids) => deleteWorkspaceRoleBindings(workspaceId, ids),
       listRoles: (params) => listWorkspaceRoles(workspaceId, params),

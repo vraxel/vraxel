@@ -2,7 +2,7 @@
 // are the user and the role. Each scope's list only returns bindings of
 // that scope, so the view scope决定 prefix. Pin all three.
 import { describe, expect, it } from "vitest"
-import { scopedDetailPrefix } from "../rolebinding-list-view"
+import { scopedDetailPrefix } from "@/modules/iam/lib/scoped-path"
 
 describe("rolebinding detail prefixes", () => {
   it("platform", () => {

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import { scopedDetailPrefix } from "@/modules/iam/lib/scoped-path"
 import { Link } from "react-router"
 import { NameCell } from "@/frameworks/list/name-cell"
 import { Plus, Trash2, Search } from "lucide-react"
@@ -17,7 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui/dialog"
-import type { ListParams } from "@/core/api/types"
+import type { ListParams, BatchResult } from "@/core/api/types"
 import type { RoleBinding, RoleBindingList, RoleList, UserList } from "@/modules/iam/api/types"
 import type { ScopeRef } from "@/core/registry/resource"
 import { rolebindingsDef } from "@/modules/iam/defs"
@@ -35,7 +36,8 @@ import { ConfirmDialog } from "@/shared/components/confirm-dialog"
 /** API functions the shared view needs, parameterized by scope. */
 export interface RoleBindingListConfig {
   listBindings: (params: ListParams) => Promise<RoleBindingList>
-  createBinding: (data: Pick<RoleBinding, "spec">) => Promise<RoleBinding>
+  /** Binds one role to many users; returns how many bindings were new. */
+  createBindings: (userIds: string[], roleId: string) => Promise<BatchResult>
   deleteBinding: (id: string) => Promise<void>
   deleteBindings: (ids: string[]) => Promise<void>
   listRoles: (params?: ListParams) => Promise<RoleList>
@@ -56,19 +58,6 @@ export interface RoleBindingListConfig {
   scope: "platform" | "workspace" | "namespace"
   /** Scope params for permission checks (e.g. { workspaceId }) */
   scopeParams?: Record<string, string>
-}
-
-/**
- * Route prefix for the user / role a binding points at. A binding has no
- * detail page of its own, and each scope's list only returns bindings of
- * that scope (WHERE rb.scope = ...), so the view's scope is the row's
- * scope. A namespace without a workspace is not a reachable route, so it
- * degrades to the platform prefix.
- */
-export function scopedDetailPrefix(workspaceId?: string, namespaceId?: string): string {
-  if (workspaceId && namespaceId) return `/iam/workspaces/${workspaceId}/namespaces/${namespaceId}`
-  if (workspaceId) return `/iam/workspaces/${workspaceId}`
-  return "/iam"
 }
 
 export function RoleBindingListView({ config }: { config: RoleBindingListConfig }) {
@@ -281,7 +270,7 @@ function CreateRoleBindingDialog({
   config: RoleBindingListConfig
 }) {
   const { t } = useTranslation()
-  const [selectedUserId, setSelectedUserId] = useState("")
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set())
   const [selectedRoleId, setSelectedRoleId] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
@@ -312,7 +301,7 @@ function CreateRoleBindingDialog({
   if (prevOpen !== open) {
     setPrevOpen(open)
     if (open) {
-      setSelectedUserId("")
+      setSelectedUserIds(new Set())
       setSelectedRoleId("")
       setSearchQuery("")
     }
@@ -331,13 +320,23 @@ function CreateRoleBindingDialog({
     : users
 
   const handleSubmit = async () => {
-    if (!selectedUserId || !selectedRoleId) return
+    if (selectedUserIds.size === 0 || !selectedRoleId) return
     setSubmitting(true)
     try {
-      await config.createBinding({
-        spec: { userId: selectedUserId, roleId: selectedRoleId, scope: config.scope },
-      })
-      toast.success(t("action.createSuccess"))
+      const result = await config.createBindings(Array.from(selectedUserIds), selectedRoleId)
+      // Insertion is idempotent server-side, so failedCount here means
+      // "already had this role", not an error -- say so rather than
+      // reporting a success count the user cannot reconcile.
+      if (result.failedCount > 0) {
+        toast.success(
+          t("rolebinding.createPartial", {
+            created: result.successCount,
+            skipped: result.failedCount,
+          }),
+        )
+      } else {
+        toast.success(t("action.createSuccess"))
+      }
       onOpenChange(false)
       onSuccess()
     } catch (err) {
@@ -346,6 +345,14 @@ function CreateRoleBindingDialog({
       setSubmitting(false)
     }
   }
+
+  const toggleUser = (id: string) =>
+    setSelectedUserIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -429,15 +436,12 @@ function CreateRoleBindingDialog({
                 filteredUsers.map((user) => (
                   <label
                     key={user.metadata.id}
-                    className={`hover:bg-muted/50 flex cursor-pointer items-center gap-3 px-4 py-2 ${selectedUserId === user.metadata.id ? "bg-muted" : ""}`}
+                    className={`hover:bg-muted/50 flex cursor-pointer items-center gap-3 px-4 py-2 ${selectedUserIds.has(user.metadata.id) ? "bg-muted" : ""}`}
                   >
                     <Checkbox
-                      checked={selectedUserId === user.metadata.id}
-                      onCheckedChange={() =>
-                        setSelectedUserId(
-                          selectedUserId === user.metadata.id ? "" : user.metadata.id,
-                        )
-                      }
+                      name={`bind-user-${user.metadata.id}`}
+                      checked={selectedUserIds.has(user.metadata.id)}
+                      onCheckedChange={() => toggleUser(user.metadata.id)}
                     />
                     <div className="min-w-0 flex-1">
                       <TruncateText className="text-sm font-medium">
@@ -459,9 +463,13 @@ function CreateRoleBindingDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!selectedUserId || !selectedRoleId || submitting}
+            disabled={selectedUserIds.size === 0 || !selectedRoleId || submitting}
           >
-            {submitting ? "..." : t("rolebinding.create")}
+            {submitting
+              ? "..."
+              : selectedUserIds.size > 1
+                ? t("rolebinding.createN", { count: selectedUserIds.size })
+                : t("rolebinding.create")}
           </Button>
         </DialogFooter>
       </DialogContent>

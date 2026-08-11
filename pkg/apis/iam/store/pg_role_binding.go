@@ -72,6 +72,68 @@ func (s *pgRoleBindingStore) Create(ctx context.Context, in RoleBindingCreateInp
 	return &out, nil
 }
 
+func (s *pgRoleBindingStore) CreateMany(ctx context.Context, inputs []RoleBindingCreateInput) (int, error) {
+	if len(inputs) == 0 {
+		return 0, nil
+	}
+	// Count rows that did not already exist, so the caller can report how
+	// many grants are new. CountByUserRole is not needed: the unique index
+	// makes the insert idempotent, and a pre-check would race anyway.
+	before, err := s.countBindings(ctx, inputs)
+	if err != nil {
+		return 0, err
+	}
+	if err := s.DB.WithTx(ctx, func(ctx context.Context, qtx *generated.Queries) error {
+		for _, in := range inputs {
+			if err := qtx.CreateRoleBindingIfNotExists(ctx, generated.CreateRoleBindingIfNotExistsParams{
+				UserID:      in.UserID,
+				RoleID:      in.RoleID,
+				Scope:       in.Scope,
+				WorkspaceID: in.WorkspaceID,
+				NamespaceID: in.NamespaceID,
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		return 0, fmt.Errorf("create role bindings: %w", pgerrors.CheckPG(err))
+	}
+	after, err := s.countBindings(ctx, inputs)
+	if err != nil {
+		return 0, err
+	}
+	// Invalidate after commit: a notification for a rolled-back grant
+	// would make every instance re-read the old rules for nothing.
+	for _, in := range inputs {
+		s.notifyUserChange(ctx, in.UserID)
+	}
+	return after - before, nil
+}
+
+// countBindings reports how many of the given (user, role, scope) pairs
+// already exist, used to derive the inserted count around an idempotent
+// batch insert.
+func (s *pgRoleBindingStore) countBindings(ctx context.Context, inputs []RoleBindingCreateInput) (int, error) {
+	n := 0
+	for _, in := range inputs {
+		exists, err := s.Q().ExistsRoleBinding(ctx, generated.ExistsRoleBindingParams{
+			UserID:      in.UserID,
+			RoleID:      in.RoleID,
+			Scope:       in.Scope,
+			WorkspaceID: in.WorkspaceID,
+			NamespaceID: in.NamespaceID,
+		})
+		if err != nil {
+			return 0, fmt.Errorf("check role binding: %w", pgerrors.CheckPG(err))
+		}
+		if exists {
+			n++
+		}
+	}
+	return n, nil
+}
+
 func (s *pgRoleBindingStore) Delete(ctx context.Context, id int64) error {
 	rb, err := s.Q().GetRoleBindingByID(ctx, id)
 	if err != nil {

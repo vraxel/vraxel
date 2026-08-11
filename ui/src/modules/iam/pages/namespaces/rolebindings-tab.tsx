@@ -2,7 +2,7 @@ import { useMemo } from "react"
 import { useParams, Navigate } from "react-router"
 import {
   listNamespaceRoleBindings,
-  createNamespaceRoleBinding,
+  createNamespaceRoleBindings,
   deleteNamespaceRoleBinding,
   deleteNamespaceRoleBindings,
   listNamespaceRoles,
@@ -23,7 +23,8 @@ export default function NamespaceRoleBindingsTab() {
   const config = useMemo<RoleBindingListConfig>(
     () => ({
       listBindings: (params) => listNamespaceRoleBindings(workspaceId, namespaceId, params),
-      createBinding: (data) => createNamespaceRoleBinding(workspaceId, namespaceId, data),
+      createBindings: (ids, roleId) =>
+        createNamespaceRoleBindings(workspaceId, namespaceId, ids, roleId),
       deleteBinding: (id) => deleteNamespaceRoleBinding(workspaceId, namespaceId, id),
       deleteBindings: (ids) => deleteNamespaceRoleBindings(workspaceId, namespaceId, ids),
       listRoles: (params) => listNamespaceRoles(workspaceId, namespaceId, params),

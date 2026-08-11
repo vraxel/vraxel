@@ -557,6 +557,40 @@ func (q *Queries) ExistsNamespaceMember(ctx context.Context, arg ExistsNamespace
 	return exists, err
 }
 
+const existsRoleBinding = `-- name: ExistsRoleBinding :one
+SELECT EXISTS (
+    SELECT 1 FROM role_bindings
+    WHERE user_id = $1
+      AND role_id = $2
+      AND scope = $3
+      AND workspace_id IS NOT DISTINCT FROM $4
+      AND namespace_id IS NOT DISTINCT FROM $5
+)
+`
+
+type ExistsRoleBindingParams struct {
+	UserID      int64  `json:"user_id"`
+	RoleID      int64  `json:"role_id"`
+	Scope       string `json:"scope"`
+	WorkspaceID *int64 `json:"workspace_id"`
+	NamespaceID *int64 `json:"namespace_id"`
+}
+
+// Presence check for the batch-grant path, which needs to distinguish
+// "newly bound" from "already bound" around an idempotent insert.
+func (q *Queries) ExistsRoleBinding(ctx context.Context, arg ExistsRoleBindingParams) (bool, error) {
+	row := q.db.QueryRow(ctx, existsRoleBinding,
+		arg.UserID,
+		arg.RoleID,
+		arg.Scope,
+		arg.WorkspaceID,
+		arg.NamespaceID,
+	)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const existsWorkspaceMember = `-- name: ExistsWorkspaceMember :one
 SELECT EXISTS(
     SELECT 1 FROM role_bindings

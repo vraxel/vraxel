@@ -1,6 +1,6 @@
 import { iamApi } from "./client"
 import { apiRequest } from "@/core/api/client"
-import type { ListParams } from "@/core/api/types"
+import type { ListParams, BatchResult } from "@/core/api/types"
 import type {
   Permission,
   PermissionList,
@@ -157,8 +157,12 @@ export async function listRoleBindings(params?: ListParams): Promise<RoleBinding
     iamApi.get("rolebindings", { searchParams: params as Record<string, string> }).json(),
   )
 }
-export async function createRoleBinding(data: Pick<RoleBinding, "spec">): Promise<RoleBinding> {
-  return apiRequest(iamApi.post("rolebindings", { json: data }).json())
+// One role, many users: a binding row is one (user, role) pair, so this
+// writes ids.length rows in a single server-side transaction and returns
+// how many were newly created (re-granting an existing binding is a
+// no-op, counted under failedCount).
+export async function createRoleBindings(ids: string[], roleId: string): Promise<BatchResult> {
+  return apiRequest(iamApi.post("rolebindings", { json: { ids, roleId } }).json())
 }
 export async function deleteRoleBinding(id: string): Promise<void> {
   await apiRequest(iamApi.delete(`rolebindings/${id}`) as Promise<unknown>)
@@ -180,11 +184,14 @@ export async function listWorkspaceRoleBindings(
       .json(),
   )
 }
-export async function createWorkspaceRoleBinding(
+export async function createWorkspaceRoleBindings(
   workspaceId: string,
-  data: Pick<RoleBinding, "spec">,
-): Promise<RoleBinding> {
-  return apiRequest(iamApi.post(`workspaces/${workspaceId}/rolebindings`, { json: data }).json())
+  ids: string[],
+  roleId: string,
+): Promise<BatchResult> {
+  return apiRequest(
+    iamApi.post(`workspaces/${workspaceId}/rolebindings`, { json: { ids, roleId } }).json(),
+  )
 }
 export async function deleteWorkspaceRoleBinding(workspaceId: string, id: string): Promise<void> {
   await apiRequest(
@@ -214,14 +221,17 @@ export async function listNamespaceRoleBindings(
       .json(),
   )
 }
-export async function createNamespaceRoleBinding(
+export async function createNamespaceRoleBindings(
   workspaceId: string,
   namespaceId: string,
-  data: Pick<RoleBinding, "spec">,
-): Promise<RoleBinding> {
+  ids: string[],
+  roleId: string,
+): Promise<BatchResult> {
   return apiRequest(
     iamApi
-      .post(`workspaces/${workspaceId}/namespaces/${namespaceId}/rolebindings`, { json: data })
+      .post(`workspaces/${workspaceId}/namespaces/${namespaceId}/rolebindings`, {
+        json: { ids, roleId },
+      })
       .json(),
   )
 }

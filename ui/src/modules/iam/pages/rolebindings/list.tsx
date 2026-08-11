@@ -1,7 +1,7 @@
 import { useMemo } from "react"
 import {
   listRoleBindings,
-  createRoleBinding,
+  createRoleBindings,
   deleteRoleBinding,
   deleteRoleBindings,
   listRoles,
@@ -16,7 +16,7 @@ export default function RoleBindingListPage() {
   const config = useMemo<RoleBindingListConfig>(
     () => ({
       listBindings: (params) => listRoleBindings(params),
-      createBinding: (data) => createRoleBinding(data),
+      createBindings: (ids, roleId) => createRoleBindings(ids, roleId),
       deleteBinding: (id) => deleteRoleBinding(id),
       deleteBindings: (ids) => deleteRoleBindings(ids),
       listRoles: (params) => listRoles(params),

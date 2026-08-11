@@ -154,6 +154,8 @@ const iam = {
   "rolebinding.title": "Role Bindings",
   "rolebinding.manage": "Manage role bindings. {count} total.",
   "rolebinding.create": "Create Role Binding",
+  "rolebinding.createN": "Create Bindings ({count} users)",
+  "rolebinding.createPartial": "Bound {created} users; {skipped} already had this role.",
   "rolebinding.createDesc": "Select a user and a role to create a role binding.",
   "rolebinding.selectRole": "Select Role",
   "rolebinding.selectUser": "Select User",

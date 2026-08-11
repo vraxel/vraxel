@@ -711,3 +711,15 @@ ORDER BY
     u.created_at DESC
 LIMIT sqlc.arg('page_size')::INT
 OFFSET sqlc.arg('page_offset')::INT;
+
+-- name: ExistsRoleBinding :one
+-- Presence check for the batch-grant path, which needs to distinguish
+-- "newly bound" from "already bound" around an idempotent insert.
+SELECT EXISTS (
+    SELECT 1 FROM role_bindings
+    WHERE user_id = @user_id
+      AND role_id = @role_id
+      AND scope = @scope
+      AND workspace_id IS NOT DISTINCT FROM @workspace_id
+      AND namespace_id IS NOT DISTINCT FROM @namespace_id
+);

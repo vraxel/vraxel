@@ -142,6 +142,8 @@ const iam = {
   "rolebinding.title": "角色绑定",
   "rolebinding.manage": "管理角色绑定。共 {count} 个。",
   "rolebinding.create": "创建角色绑定",
+  "rolebinding.createN": "创建绑定（{count} 个用户）",
+  "rolebinding.createPartial": "已为 {created} 个用户创建绑定，{skipped} 个已拥有该角色。",
   "rolebinding.createDesc": "选择用户和角色创建角色绑定。",
   "rolebinding.selectRole": "选择角色",
   "rolebinding.selectUser": "选择用户",
