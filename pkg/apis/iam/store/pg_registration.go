@@ -146,7 +146,7 @@ func bindDefaultPlatformRole(ctx context.Context, q *generated.Queries, userID i
 	if err != nil {
 		return fmt.Errorf("get default role %q: %w", roleName, err)
 	}
-	if err := q.CreateRoleBindingIfNotExists(ctx, generated.CreateRoleBindingIfNotExistsParams{
+	if _, err := q.CreateRoleBindingIfNotExists(ctx, generated.CreateRoleBindingIfNotExistsParams{
 		UserID: userID, RoleID: role.ID, Scope: "platform", IsOwner: false,
 	}); err != nil {
 		return fmt.Errorf("bind default role: %w", err)
