@@ -54,17 +54,29 @@ func NewModules(ctx context.Context, database *db.DB) Result {
 	mux := pgnotify.New(database.Pool)
 
 	iamResult := iam.NewModule(ctx, database)
-	auditResult := audit.NewModule(database)
 
 	return Result{
-		Mux: mux,
-		Registrars: []func(*apiserver.Server){
-			iamResult.Register,
-			auditResult.Register,
-		},
-		iamResult: iamResult,
+		Mux:        mux,
+		Registrars: moduleRegistrars(database),
+		iamResult:  iamResult,
 	}
 }
+
+// moduleRegistrars is the single list of modules. Both the running
+// server and openapi-gen go through it, so a module cannot be wired
+// into one and forgotten in the other.
+func moduleRegistrars(database *db.DB) []func(*apiserver.Server) {
+	return []func(*apiserver.Server){
+		iam.Registrar(database),
+		audit.Registrar(database),
+	}
+}
+
+// Registrars returns every module's registration closure without a
+// database. Registration builds no queries, so the resulting server has
+// the real route table and nothing else -- the input openapi-gen needs
+// to describe exactly the endpoints that exist.
+func Registrars() []func(*apiserver.Server) { return moduleRegistrars(nil) }
 
 // NewAuthorizer creates a fully-wired Authorizer from API group definitions.
 // Subscribes RBAC invalidation on the shared multiplexer -- the LAST

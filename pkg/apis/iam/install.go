@@ -19,8 +19,7 @@ import (
 
 // ModuleResult holds the output of IAM module initialization.
 type ModuleResult struct {
-	Register func(*apiserver.Server)
-	Stores   store.Stores
+	Stores store.Stores
 }
 
 // NewModule initializes the IAM module: builds the registration closure
@@ -38,10 +37,14 @@ func NewModule(ctx context.Context, database *db.DB) ModuleResult {
 		logger.Fatalf("cannot seed RBAC: %v", err)
 	}
 
-	return ModuleResult{
-		Register: newRegistrar(stores),
-		Stores:   stores,
-	}
+	return ModuleResult{Stores: stores}
+}
+
+// Registrar returns the module's route-registration closure. See the
+// note on audit.Registrar: a nil database is legal here because
+// registration only stores handles.
+func Registrar(database *db.DB) func(*apiserver.Server) {
+	return newRegistrar(store.NewStores(database))
 }
 
 // newRegistrar returns the registration closure over typed ResourceDefs.

@@ -97,14 +97,6 @@ func Login() {}
 	if len(setting.Paths) != 1 || setting.Paths[0] != "/custom/settings" {
 		t.Errorf("Setting.Paths = %v, want exactly [/custom/settings]", setting.Paths)
 	}
-
-	// PathOperations: implemented operations recorded per served path.
-	if ops := user.PathOperations["/users"]; !ops["list"] || !ops["get"] {
-		t.Errorf("User.PathOperations[/users] = %v, want list+get", user.PathOperations["/users"])
-	}
-	if !member.PathOperations["/projects/{projectId}/members"]["create"] {
-		t.Errorf("Member.PathOperations missing create on /projects/{projectId}/members")
-	}
 }
 
 func findType(t *testing.T, groups []GroupInfo, name string) TypeInfo {

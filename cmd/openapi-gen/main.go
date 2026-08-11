@@ -5,8 +5,32 @@ import (
 	"fmt"
 	"os"
 
+	"vraxel.io/vraxel/lib/apiserver"
 	"vraxel.io/vraxel/lib/openapi"
+	"vraxel.io/vraxel/pkg/apis"
 )
+
+// routes registers every module on a bare apiserver -- no database, no
+// authorizer -- purely to read back the route table. That table is what
+// the spec describes: deriving endpoints from source-code shape is how
+// the spec came to advertise operations answering 405 and to miss real
+// paths such as /api/audit/v1/logs.
+func routes() []openapi.Route {
+	srv := apiserver.New(apiserver.Config{})
+	for _, register := range apis.Registrars() {
+		register(srv)
+	}
+	infos := srv.Routes()
+	out := make([]openapi.Route, 0, len(infos))
+	for _, r := range infos {
+		out = append(out, openapi.Route{
+			Method: r.Method, Path: r.Path, Kind: r.Kind,
+			Group: r.Group, Resource: r.Resource,
+			TypeName: r.TypeName, Name: r.Name,
+		})
+	}
+	return out
+}
 
 func main() {
 	var (
@@ -32,6 +56,7 @@ func main() {
 	}
 
 	generator := openapi.NewGenerator(title, "Vraxel Platform API", version)
+	generator.SetRoutes(routes())
 	doc := generator.Generate(groups)
 
 	var w *os.File
