@@ -11,17 +11,17 @@ func TestSetDefaultsZeroConfig(t *testing.T) {
 	cfg := &Config{}
 	SetDefaults(cfg)
 
-	if cfg.Server.ExternalURL != "http://localhost:8088" {
+	if cfg.Server.ExternalURL != "http://localhost:9099" {
 		t.Fatalf("externalUrl default = %q", cfg.Server.ExternalURL)
 	}
-	if cfg.OIDC.Issuer != "http://localhost:8088" {
+	if cfg.OIDC.Issuer != "http://localhost:9099" {
 		t.Fatalf("issuer must derive from externalUrl, got %q", cfg.OIDC.Issuer)
 	}
 	if len(cfg.OIDC.Clients) != 1 || cfg.OIDC.Clients[0].ID != "vraxel-ui" {
 		t.Fatalf("default client missing: %+v", cfg.OIDC.Clients)
 	}
 	uris := cfg.OIDC.Clients[0].RedirectURIs
-	if len(uris) != 2 || uris[0] != "http://localhost:8088/auth/callback" {
+	if len(uris) != 2 || uris[0] != "http://localhost:9099/auth/callback" {
 		t.Fatalf("redirect URIs must be full URLs (exact-match validated), got %v", uris)
 	}
 	if err := cfg.Server.Validate(); err != nil {

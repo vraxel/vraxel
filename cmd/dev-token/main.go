@@ -14,7 +14,7 @@
 //	go run ./cmd/dev-token
 //	go run ./cmd/dev-token -ttl 365d
 //	TOKEN=$(go run ./cmd/dev-token)
-//	curl --cookie "vraxel_at=$TOKEN" http://localhost:8088/api/iam/v1/users
+//	curl --cookie "vraxel_at=$TOKEN" http://localhost:9099/api/iam/v1/users
 package main
 
 import (
@@ -42,7 +42,7 @@ func main() {
 	username := flag.String("user", "admin", "username to generate token for")
 	ttl := flag.String("ttl", "30d", "token TTL (e.g. 1h, 7d, 30d, 365d)")
 	algorithm := flag.String("algorithm", "EdDSA", "signing algorithm")
-	issuer := flag.String("issuer", "http://localhost:8088", "token issuer")
+	issuer := flag.String("issuer", "http://localhost:9099", "token issuer")
 	flag.Parse()
 
 	duration, err := parseDuration(*ttl)

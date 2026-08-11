@@ -41,7 +41,7 @@ Vraxel includes a built-in OpenID Connect (OIDC) provider that supports the Auth
 1. Client → GET /oidc/authorize
      ?response_type=code
      &client_id=vraxel-ui
-     &redirect_uri=http://localhost:5173/auth/callback
+     &redirect_uri=http://localhost:5199/auth/callback
      &scope=openid+profile+email
      &state=<random>
      &nonce=<random>
@@ -54,7 +54,7 @@ Vraxel includes a built-in OpenID Connect (OIDC) provider that supports the Auth
      {"username": "...", "password": "...", "requestId": "..."}
 
 4. Server validates password → generates auth code → returns
-     {"redirectUri": "http://localhost:5173/auth/callback?code=...&state=..."}
+     {"redirectUri": "http://localhost:5199/auth/callback?code=...&state=..."}
 
 5. Client redirects to callback URL
 
@@ -99,7 +99,7 @@ oidc:
     - id: "vraxel-ui"
       public: true          # No client_secret, PKCE required
       redirectUris:
-        - "http://localhost:5173/auth/callback"
+        - "http://localhost:5199/auth/callback"
       scopes: ["openid", "profile", "email", "phone"]
 ```
 

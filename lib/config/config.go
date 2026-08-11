@@ -25,7 +25,7 @@ type Config struct {
 // ServerConfig holds server-level configuration.
 type ServerConfig struct {
 	// ExternalURL is the externally accessible URL of this Vraxel server.
-	// Example: "http://vraxel.local:8088"
+	// Example: "http://vraxel.local:9099"
 	ExternalURL string `yaml:"externalUrl"`
 	// Name uniquely identifies this Vraxel deployment. Emitted as the `server`
 	// label on every metric target and log stream so a single metrics/logs
@@ -174,7 +174,7 @@ func SetDefaults(cfg *Config) {
 
 func setDefaultsServer(cfg *Config) {
 	if cfg.Server.ExternalURL == "" {
-		cfg.Server.ExternalURL = "http://localhost:8088"
+		cfg.Server.ExternalURL = "http://localhost:9099"
 	}
 	if cfg.Server.Name == "" {
 		cfg.Server.Name = "vraxel"
@@ -246,7 +246,7 @@ func setDefaultsOIDC(cfg *Config) {
 			// external URL plus the vite dev server.
 			RedirectURIs: []string{
 				strings.TrimRight(cfg.Server.ExternalURL, "/") + "/auth/callback",
-				"http://localhost:5173/auth/callback",
+				"http://localhost:5199/auth/callback",
 			},
 			Scopes: []string{"openid", "profile", "email", "phone"},
 		}}

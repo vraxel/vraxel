@@ -11,7 +11,7 @@ typescript-eslint (typescript-eslint#10940). Bump to 7.x once that
 lands.
 
 ```bash
-pnpm dev        # vite :5173, waits for vraxel-server :8088, proxies /api /oidc /docs
+pnpm dev        # vite :5199, waits for vraxel-server :9099, proxies /api /oidc /docs
 pnpm build      # tsc -b && vite build  (what CI runs)
 pnpm typecheck  # tsc -b --noEmit
 pnpm test       # vitest

@@ -22,6 +22,6 @@ RUN CGO_ENABLED=0 go build \
 
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /vraxel-server /vraxel-server
-EXPOSE 8088
+EXPOSE 9099
 ENTRYPOINT ["/vraxel-server"]
 CMD ["-config", "/etc/vraxel/config.yaml"]

@@ -45,18 +45,18 @@ route's permission code is derived from the registered storages and
 synced into the `permissions` table.
 
 Zero-config also works -- with no config file at all, every default
-lands (PG on localhost, `externalUrl` http://localhost:8088) and the
+lands (PG on localhost, `externalUrl` http://localhost:9099) and the
 OIDC issuer + redirect URIs are derived from `externalUrl`, so
 authentication is always on. There is no "auth disabled" mode. Override
 precedence: CLI flags > env (`DB_*`, `SERVER_EXTERNAL_URL`, ...) >
 config file > defaults.
 
-Open <http://localhost:8088> and log in with `admin` / `Admin123!`.
+Open <http://localhost:9099> and log in with `admin` / `Admin123!`.
 
 For frontend work run both halves with HMR:
 
 ```bash
-make dev     # vraxel-server :8088 + vite :5173 (proxies /api, /oidc, /docs)
+make dev     # vraxel-server :9099 + vite :5199 (proxies /api, /oidc, /docs)
 ```
 
 `make dev` prints and uses the gitignored
@@ -64,12 +64,12 @@ make dev     # vraxel-server :8088 + vite :5173 (proxies /api, /oidc, /docs)
 `config.yaml`. The overlay only needs the handful of values that differ
 from the defaults -- typically `server.externalUrl`, `server.name` and
 `database.host`; the OIDC issuer and both callback URLs (embedded
-frontend + vite on :5173) are derived from `externalUrl`, so no `oidc:`
+frontend + vite on :5199) are derived from `externalUrl`, so no `oidc:`
 section is needed for local work:
 
 ```yaml
 server:
-  externalUrl: "http://localhost:8088"
+  externalUrl: "http://localhost:9099"
   name: "vraxel-dev"
 database:
   host: "db.internal.example" # omit entirely for a local PostgreSQL
@@ -80,7 +80,7 @@ database:
 `make` with no target lists everything:
 
 ```
-dev             Run vraxel-server (:8088) + vite (:5173) with HMR
+dev             Run vraxel-server (:9099) + vite (:5199) with HMR
 build           Build the frontend and link the release binary into bin/
 generate        Regenerate committed sqlc / OpenAPI / TS artifacts (commit the result)
 check           Run all gates: gofmt, vet, layer guard, Go tests, UI typecheck/lint/tests
@@ -107,7 +107,7 @@ distroless, ~30MB image).
 
 ```bash
 TOKEN=$(DB_HOST=... go run ./cmd/dev-token)
-curl -s --cookie "vraxel_at=$TOKEN" http://localhost:8088/api/iam/v1/users
+curl -s --cookie "vraxel_at=$TOKEN" http://localhost:9099/api/iam/v1/users
 ```
 
 Auth is cookie-only (BFF pattern). CSRF is enforced only when a

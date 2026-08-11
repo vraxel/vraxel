@@ -94,7 +94,7 @@ func main() {
 	// 2. Start HTTP server
 	listenAddrs := *httpListenAddrs
 	if len(listenAddrs) == 0 {
-		listenAddrs = []string{":8088"}
+		listenAddrs = []string{":9099"}
 	}
 
 	startTime := time.Now()

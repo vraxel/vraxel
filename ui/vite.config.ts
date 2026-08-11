@@ -33,10 +33,10 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
-    // Fail instead of silently sliding to 5174: the OIDC client's
-    // redirect URI is pinned to :5173, so a shifted port turns into a
-    // login failure with no obvious link to the port.
+    port: 5199,
+    // Fail instead of silently sliding to the next free port: the OIDC
+    // client's redirect URI is pinned to :5199, so a shifted port turns
+    // into a login failure with no obvious link to the port.
     strictPort: true,
     // The repo lives at /Users/.../vraxel and pnpm hoists shared deps into
     // /Users/.../vraxel/node_modules/.pnpm. Vite's default fs.allow only
@@ -50,7 +50,7 @@ export default defineConfig({
     },
     proxy: {
       "/api/": {
-        target: "http://localhost:8088",
+        target: "http://localhost:9099",
         changeOrigin: true,
         ws: true,
         configure: (proxy) => {
@@ -61,15 +61,15 @@ export default defineConfig({
         },
       },
       "/docs": {
-        target: "http://localhost:8088",
+        target: "http://localhost:9099",
         changeOrigin: true,
       },
       "/oidc": {
-        target: "http://localhost:8088",
+        target: "http://localhost:9099",
         changeOrigin: true,
       },
       "/.well-known": {
-        target: "http://localhost:8088",
+        target: "http://localhost:9099",
         changeOrigin: true,
       },
     },
