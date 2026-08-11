@@ -137,7 +137,7 @@ func (s *pgNamespaceStore) Create(ctx context.Context, input NamespaceCreateInpu
 			return nil, err
 		}
 
-		if err := qtx.CreateRoleBindingIfNotExists(ctx, generated.CreateRoleBindingIfNotExistsParams{
+		if _, err := qtx.CreateRoleBindingIfNotExists(ctx, generated.CreateRoleBindingIfNotExistsParams{
 			UserID:      input.OwnerID,
 			RoleID:      nsAdminRoleID,
 			Scope:       ScopeNamespace,

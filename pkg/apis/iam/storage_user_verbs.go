@@ -32,8 +32,8 @@ func NewUserWorkspacesVerb(rbStore modstore.RoleBindingStore) func(apiserver.Ctx
 				NamespaceCount: item.NamespaceCount,
 				MemberCount:    item.MemberCount,
 			})
-			ws.Spec.Role = item.Role
-			ws.Spec.RoleDisplayName = item.RoleDisplayName
+			ws.Spec.Roles = item.Roles
+			ws.Spec.RoleDisplayNames = item.RoleDisplayNames
 			ws.Spec.JoinedAt = item.JoinedAt.Format(time.RFC3339)
 			items[i] = *ws
 		}
@@ -64,8 +64,8 @@ func NewUserNamespacesVerb(rbStore modstore.RoleBindingStore) func(apiserver.Ctx
 				WorkspaceName: item.WorkspaceName,
 				MemberCount:   item.MemberCount,
 			})
-			ns.Spec.Role = item.Role
-			ns.Spec.RoleDisplayName = item.RoleDisplayName
+			ns.Spec.Roles = item.Roles
+			ns.Spec.RoleDisplayNames = item.RoleDisplayNames
 			ns.Spec.JoinedAt = item.JoinedAt.Format(time.RFC3339)
 			items[i] = *ns
 		}

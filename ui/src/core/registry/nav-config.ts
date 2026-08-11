@@ -1,4 +1,4 @@
-import { Users, Building2, FolderKanban, Shield, ShieldCheck, ScrollText } from "lucide-react"
+import { Users, Building2, FolderKanban, Shield, ScrollText } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
 export type ScopeLevel = "platform" | "workspace" | "namespace"
@@ -69,15 +69,6 @@ export const NAV_ITEMS: NavItemConfig[] = [
     permission: "iam:roles:list",
     labelKey: "nav.roles",
     icon: Shield,
-    group: "nav.iam",
-    scopes: ["platform", "workspace", "namespace"],
-  },
-  {
-    resource: "rolebindings",
-    module: "iam",
-    permission: "iam:rolebindings:list",
-    labelKey: "nav.rolebindings",
-    icon: ShieldCheck,
     group: "nav.iam",
     scopes: ["platform", "workspace", "namespace"],
   },

@@ -122,6 +122,10 @@ const iam = {
   "role.noData": "No roles found.",
   "role.notFound": "Role not found.",
   "role.details": "Role Details",
+  "role.users": "Users with this role",
+  "role.assignUsers": "Assign Users",
+  "role.assignUsersHint": "Grant this role to the selected users.",
+  "role.noUsers": "No users have this role yet.",
   "role.name": "Name",
   "role.scope": "Scope",
   "role.builtin": "Built-in",
@@ -152,27 +156,20 @@ const iam = {
 
   // role binding management
   "rolebinding.title": "Role Bindings",
-  "rolebinding.manage": "Manage role bindings. {count} total.",
   "rolebinding.create": "Create Role Binding",
-  "rolebinding.createDesc": "Select a user and a role to create a role binding.",
+  "rolebinding.revoke": "Revoke",
+  "rolebinding.revokeConfirm": 'Revoke this role from "{name}"?',
+  "rolebinding.ownerLocked": "The owner role cannot be revoked",
+  "rolebinding.createN": "Create Bindings ({count} users)",
+  "rolebinding.createPartial": "Bound {created} users; {skipped} already had this role.",
   "rolebinding.selectRole": "Select Role",
   "rolebinding.selectUser": "Select User",
-  "rolebinding.noRoles": "No roles available.",
   "rolebinding.noUsers": "No users available.",
-  "rolebinding.noData": "No role bindings found.",
-  "rolebinding.deleteConfirm":
-    'Are you sure you want to delete the role binding for user "{name}"?',
-  "rolebinding.batchDelete": "Batch Delete",
-  "rolebinding.batchDeleteConfirm":
-    "Are you sure you want to delete {count} selected role bindings?",
   "rolebinding.scope": "Scope",
   "rolebinding.scope.platform": "Platform",
   "rolebinding.scope.workspace": "Workspace",
   "rolebinding.scope.namespace": "Namespace",
   "rolebinding.scopeTarget": "Scope Target",
-  "rolebinding.role": "Role",
-  "rolebinding.roleDisplayName": "Role Display Name",
-  "rolebinding.searchPlaceholder": "Search username, role name...",
 
   // built-in role display names
   "role.platform-admin": "Platform Admin",

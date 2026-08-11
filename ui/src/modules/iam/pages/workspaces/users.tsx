@@ -303,7 +303,17 @@ export default function WorkspaceUsersPage() {
                   <TruncateCell>{m.spec.email}</TruncateCell>
                   <TruncateCell>{m.spec.phone || "-"}</TruncateCell>
                   <TableCell>
-                    {m.spec.role ? t(`role.${m.spec.role}`, { defaultValue: m.spec.role }) : "-"}
+                    {m.spec.roles && m.spec.roles.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {m.spec.roles.map((r) => (
+                          <Badge key={r} variant="secondary">
+                            {t(`role.${r}`, { defaultValue: r })}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      "-"
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge variant={m.spec.status === "active" ? "default" : "secondary"}>

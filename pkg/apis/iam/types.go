@@ -44,8 +44,8 @@ type UserSpec struct {
 	Builtin bool `json:"builtin,omitempty"`
 	// +openapi:description=用户所属的项目列表（仅在列表查询时返回）
 	Namespaces []string `json:"namespaces,omitempty"`
-	// +openapi:description=用户在租户或项目中的角色（仅成员列表查询时返回）
-	Role string `json:"role,omitempty"`
+	// +openapi:description=用户在租户或项目中持有的角色（仅成员列表查询时返回，可多个）
+	Roles []string `json:"roles,omitempty"`
 	// +openapi:description=用户加入租户或项目的时间（仅成员列表查询时返回）
 	JoinedAt string `json:"joinedAt,omitempty"`
 }
@@ -95,10 +95,10 @@ type WorkspaceSpec struct {
 	// +openapi:description=租户状态
 	// +openapi:enum=active,inactive
 	Status string `json:"status,omitempty"`
-	// +openapi:description=当前用户在此租户的角色（仅 custom verb 查询时返回）
-	Role string `json:"role,omitempty"`
-	// +openapi:description=当前用户在此租户的角色显示名称（仅 custom verb 查询时返回）
-	RoleDisplayName string `json:"roleDisplayName,omitempty"`
+	// +openapi:description=当前用户在此租户持有的全部角色（仅 custom verb 查询时返回，owner 角色在前）
+	Roles []string `json:"roles,omitempty"`
+	// +openapi:description=当前用户在此租户持有的全部角色显示名称（顺序与 roles 一致）
+	RoleDisplayNames []string `json:"roleDisplayNames,omitempty"`
 	// +openapi:description=当前用户加入此租户的时间（仅 custom verb 查询时返回）
 	JoinedAt string `json:"joinedAt,omitempty"`
 }
@@ -156,10 +156,10 @@ type NamespaceSpec struct {
 	// +openapi:description=项目状态
 	// +openapi:enum=active,inactive
 	Status string `json:"status,omitempty"`
-	// +openapi:description=当前用户在此项目的角色（仅 custom verb 查询时返回）
-	Role string `json:"role,omitempty"`
-	// +openapi:description=当前用户在此项目的角色显示名称（仅 custom verb 查询时返回）
-	RoleDisplayName string `json:"roleDisplayName,omitempty"`
+	// +openapi:description=当前用户在此项目持有的全部角色（仅 custom verb 查询时返回，owner 角色在前）
+	Roles []string `json:"roles,omitempty"`
+	// +openapi:description=当前用户在此项目持有的全部角色显示名称（顺序与 roles 一致）
+	RoleDisplayNames []string `json:"roleDisplayNames,omitempty"`
 	// +openapi:description=当前用户加入此项目的时间（仅 custom verb 查询时返回）
 	JoinedAt string `json:"joinedAt,omitempty"`
 }

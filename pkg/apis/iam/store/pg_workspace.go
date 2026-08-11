@@ -124,7 +124,7 @@ func (s *pgWorkspaceStore) Create(ctx context.Context, in WorkspaceCreateInput) 
 			return nil, err
 		}
 
-		if err := qtx.CreateRoleBindingIfNotExists(ctx, generated.CreateRoleBindingIfNotExistsParams{
+		if _, err := qtx.CreateRoleBindingIfNotExists(ctx, generated.CreateRoleBindingIfNotExistsParams{
 			UserID:      in.OwnerID,
 			RoleID:      wsAdminRoleID,
 			Scope:       ScopeWorkspace,
@@ -134,7 +134,7 @@ func (s *pgWorkspaceStore) Create(ctx context.Context, in WorkspaceCreateInput) 
 			return nil, fmt.Errorf("create workspace owner role binding: %w", err)
 		}
 
-		if err := qtx.CreateRoleBindingIfNotExists(ctx, generated.CreateRoleBindingIfNotExistsParams{
+		if _, err := qtx.CreateRoleBindingIfNotExists(ctx, generated.CreateRoleBindingIfNotExistsParams{
 			UserID:      in.OwnerID,
 			RoleID:      nsAdminRoleID,
 			Scope:       ScopeNamespace,

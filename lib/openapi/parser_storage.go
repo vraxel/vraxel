@@ -110,9 +110,13 @@ func buildStorageInfo(base string, doc *ast.CommentGroup) *storageInfo {
 		resource = overrideResource
 	}
 
+	// The qualified prefix keys this storage's summaries. It must come
+	// from the path the storage actually serves (+openapi:path) when one
+	// is declared: three rolebinding storages derive three different
+	// names but all collapse to the same empty prefix, so the last one
+	// parsed silently overwrote the others' summaries.
 	prefix := pathToQualifiedPrefix(path)
-	// When noDerive, the qualified prefix comes from the first explicit path.
-	if noDerive && len(extraPaths) > 0 {
+	if len(extraPaths) > 0 {
 		prefix = pathToQualifiedPrefix(extraPaths[0])
 	}
 
@@ -146,24 +150,23 @@ func mergeStoragePaths(group *GroupInfo, typeIndex map[string]int, storageTypes 
 	}
 }
 
-// scanFuncAnnotations scans a package's functions: storage-type methods feed
-// operation summaries and the implemented-operations set; standalone functions
-// feed action / customverb summaries. It returns the per-package operation set.
-func scanFuncAnnotations(pkg *ast.Package, group *GroupInfo, typeIndex map[string]int, storageTypes map[string]*storageInfo) map[string]map[string]bool {
-	storageOps := make(map[string]map[string]bool)
+// scanFuncAnnotations scans a package's functions: storage-type methods
+// feed operation summaries; standalone functions feed action /
+// customverb summaries. Which operations exist is not inferred here --
+// that comes from the apiserver route table (see Route).
+func scanFuncAnnotations(pkg *ast.Package, group *GroupInfo, typeIndex map[string]int, storageTypes map[string]*storageInfo) {
 	for _, fd := range funcDecls(pkg) {
 		if fd.Recv != nil {
-			applyMethodAnnotation(group, typeIndex, storageTypes, storageOps, fd)
+			applyMethodAnnotation(group, typeIndex, storageTypes, fd)
 		} else {
 			applyStandaloneFuncAnnotation(group, typeIndex, fd)
 		}
 	}
-	return storageOps
 }
 
-// applyMethodAnnotation records an implemented operation for a storage-type
-// method and merges its +openapi:summary / summary.QUALIFIER into the TypeInfo.
-func applyMethodAnnotation(group *GroupInfo, typeIndex map[string]int, storageTypes map[string]*storageInfo, storageOps map[string]map[string]bool, fd *ast.FuncDecl) {
+// applyMethodAnnotation merges a storage-type method's
+// +openapi:summary / summary.QUALIFIER into the TypeInfo.
+func applyMethodAnnotation(group *GroupInfo, typeIndex map[string]int, storageTypes map[string]*storageInfo, fd *ast.FuncDecl) {
 	recvType := receiverTypeName(fd.Recv)
 	st, ok := storageTypes[recvType]
 	if !ok {
@@ -173,10 +176,6 @@ func applyMethodAnnotation(group *GroupInfo, typeIndex map[string]int, storageTy
 	if !ok {
 		return
 	}
-	if storageOps[recvType] == nil {
-		storageOps[recvType] = make(map[string]bool)
-	}
-	storageOps[recvType][op] = true
 
 	annotations := ParseAnnotations(fd.Doc)
 	if len(annotations) == 0 {
@@ -249,41 +248,5 @@ func applyCustomVerbAnnotation(group *GroupInfo, typeIndex map[string]int, custo
 	}
 	if response != "" {
 		group.Types[idx].CustomVerbResponse[customVerb] = response
-	}
-}
-
-// populatePathOperations records, for each storage type, the set of operations
-// implemented on every path it serves (derived path plus explicit extras).
-func populatePathOperations(group *GroupInfo, typeIndex map[string]int, storageTypes map[string]*storageInfo, storageOps map[string]map[string]bool) {
-	for storageName, ops := range storageOps {
-		st, ok := storageTypes[storageName]
-		if !ok {
-			continue
-		}
-		idx, ok := typeIndex[st.resourceName]
-		if !ok {
-			continue
-		}
-		allPaths := []string{st.derivedPath}
-		for _, ep := range st.extraPaths {
-			allPaths = appendUnique(allPaths, ep)
-		}
-		setPathOperations(&group.Types[idx], allPaths, ops)
-	}
-}
-
-// setPathOperations marks every operation in ops as implemented on each path
-// for the given TypeInfo, lazily allocating the nested maps.
-func setPathOperations(ti *TypeInfo, paths []string, ops map[string]bool) {
-	if ti.PathOperations == nil {
-		ti.PathOperations = make(map[string]map[string]bool)
-	}
-	for _, p := range paths {
-		if ti.PathOperations[p] == nil {
-			ti.PathOperations[p] = make(map[string]bool)
-		}
-		for op := range ops {
-			ti.PathOperations[p][op] = true
-		}
 	}
 }

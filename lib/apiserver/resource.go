@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
 
 	"vraxel.io/vraxel/lib/list"
 	"vraxel.io/vraxel/lib/runtime"
@@ -283,6 +284,7 @@ func Register[T any](s *Server, def ResourceDef[T]) {
 		MaxBodyBytes: def.MaxBodyBytes,
 		Sensitive:    def.Sensitive,
 		IDParam:      def.IDParam,
+		TypeName:     reflect.TypeOf((*T)(nil)).Elem().Name(),
 
 		ExtraAllow:        def.ExtraAllow,
 		ListAccessScope:   def.ListAccessScope,
@@ -327,7 +329,9 @@ func registerScopedRoutes[T any](s *Server, def ResourceDef[T], reg *resourceReg
 	// Read-only verbs are plain path segments under the item, checking
 	// the parent's get permission (v1 CustomVerb semantics at the v2 URL).
 	for _, v := range def.Verbs {
-		s.handle("GET "+item+"/"+v.Name, reg.meta(s, lv, "get", true), verbRoute(s, v.handler, idParam))
+		vm := reg.meta(s, lv, "get", true)
+		vm.Kind = "verb"
+		s.handle("GET "+item+"/"+v.Name, vm, verbRoute(s, v.handler, idParam))
 	}
 	if def.Ops.Create != nil {
 		s.handle("POST "+base, writeMeta("create", false), wrapCreate(s, def))
@@ -354,6 +358,7 @@ func registerScopedRoutes[T any](s *Server, def ResourceDef[T], reg *resourceReg
 			pattern = a.Method + " " + base + "/" + a.Name
 		}
 		m := reg.meta(s, lv, a.Name, a.OnItem)
+		m.Kind = "action"
 		m.PermCodes = a.Permission
 		m.StatusCode = a.StatusCode
 		m.Sensitive = a.Sensitive || def.Sensitive

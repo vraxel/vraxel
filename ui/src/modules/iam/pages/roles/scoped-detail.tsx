@@ -14,7 +14,14 @@ import {
   getNamespaceRole,
   deleteNamespaceRole,
   listAllPermissions,
+  listWorkspaceRoleBindings,
+  listNamespaceRoleBindings,
+  createWorkspaceRoleBindings,
+  createNamespaceRoleBindings,
+  deleteWorkspaceRoleBinding,
+  deleteNamespaceRoleBinding,
 } from "@/modules/iam/api/rbac"
+import { listWorkspaceUsers, listNamespaceUsers } from "@/modules/iam/api/users"
 import { showApiError } from "@/core/api/client"
 import type { Permission } from "@/modules/iam/api/types"
 import { useTranslation } from "@/i18n"
@@ -22,11 +29,14 @@ import { useApiQuery } from "@/core/query/hooks"
 import { useQueryClient } from "@tanstack/react-query"
 import { PermissionSelector, patternCovers } from "@/modules/iam/components/permission-selector"
 import { ScopedRoleFormDialog } from "@/modules/iam/components/scoped-role-form-dialog"
+import { RoleUsersSection } from "@/modules/iam/components/role-users-section"
+import { usePermission } from "@/core/permission/use-permission"
 
 export default function ScopedRoleDetailPage() {
   const { workspaceId, namespaceId, roleId } = useParams()
   const navigate = useNavigate()
   const { t } = useTranslation()
+  const { hasPermission } = usePermission()
   const qc = useQueryClient()
   const detailQuery = useApiQuery({
     queryKey: ["iam", "role-detail", workspaceId, namespaceId ?? "", roleId],
@@ -53,6 +63,9 @@ export default function ScopedRoleDetailPage() {
 
   const scope = namespaceId ? "namespace" : "workspace"
   const scopeId = namespaceId ?? workspaceId!
+  const scopeParams = namespaceId
+    ? { workspaceId: workspaceId!, namespaceId }
+    : { workspaceId: workspaceId! }
 
   // Build base path for back navigation
   const basePath = namespaceId
@@ -206,6 +219,37 @@ export default function ScopedRoleDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* users with this role */}
+      {hasPermission("iam:rolebindings:list", scopeParams) && (
+        <RoleUsersSection
+          config={{
+            roleId: role.metadata.id,
+            detailPrefix: namespaceId
+              ? `/iam/workspaces/${workspaceId}/namespaces/${namespaceId}`
+              : `/iam/workspaces/${workspaceId}`,
+            listBindings: (params) =>
+              namespaceId
+                ? listNamespaceRoleBindings(workspaceId!, namespaceId, params)
+                : listWorkspaceRoleBindings(workspaceId!, params),
+            listCandidates: (params) =>
+              namespaceId
+                ? listNamespaceUsers(workspaceId!, namespaceId, { ...params, available: "true" })
+                : listWorkspaceUsers(workspaceId!, { ...params, available: "true" }),
+            assign: (ids) =>
+              namespaceId
+                ? createNamespaceRoleBindings(workspaceId!, namespaceId, ids, role.metadata.id)
+                : createWorkspaceRoleBindings(workspaceId!, ids, role.metadata.id),
+            revoke: (id) =>
+              namespaceId
+                ? deleteNamespaceRoleBinding(workspaceId!, namespaceId, id)
+                : deleteWorkspaceRoleBinding(workspaceId!, id),
+            canAssign: hasPermission("iam:rolebindings:create", scopeParams),
+            canRevoke: hasPermission("iam:rolebindings:delete", scopeParams),
+            cacheKey: [scope, workspaceId, namespaceId, role.metadata.id],
+          }}
+        />
+      )}
 
       {/* edit dialog */}
       {!role.spec.builtin && (

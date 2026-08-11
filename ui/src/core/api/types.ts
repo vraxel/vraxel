@@ -21,7 +21,8 @@ export interface BatchRequest extends TypeMeta {
   ids: string[]
 }
 
-export interface DeletionResult {
+/** Envelope for any batch mutation (apiserver.BatchResult). */
+export interface BatchResult {
   successCount: number
   failedCount: number
   failedIds?: string[]

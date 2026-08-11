@@ -26,13 +26,13 @@ func (s *pgRoleBindingStore) AddWorkspaceMember(ctx context.Context, userID, wor
 	}
 
 	if err := s.DB.WithTx(ctx, func(ctx context.Context, qtx *generated.Queries) error {
-		return qtx.ReplaceWorkspaceMemberRole(ctx, generated.ReplaceWorkspaceMemberRoleParams{
+		return qtx.AddWorkspaceMemberRole(ctx, generated.AddWorkspaceMemberRoleParams{
 			UserID:      userID,
 			RoleID:      bindRoleID,
 			WorkspaceID: wsIDPtr,
 		})
 	}); err != nil {
-		return fmt.Errorf("replace workspace member role: %w", err)
+		return fmt.Errorf("add workspace member role: %w", err)
 	}
 	s.notifyUserChange(ctx, userID)
 	return nil
@@ -71,7 +71,7 @@ func (s *pgRoleBindingStore) AddNamespaceMember(ctx context.Context, userID, nam
 	}
 
 	if err := s.DB.WithTx(ctx, func(ctx context.Context, qtx *generated.Queries) error {
-		if err := qtx.CreateRoleBindingIfNotExists(ctx, generated.CreateRoleBindingIfNotExistsParams{
+		if _, err := qtx.CreateRoleBindingIfNotExists(ctx, generated.CreateRoleBindingIfNotExistsParams{
 			UserID:      userID,
 			RoleID:      wsMemberRole.ID,
 			Scope:       ScopeWorkspace,
@@ -79,7 +79,7 @@ func (s *pgRoleBindingStore) AddNamespaceMember(ctx context.Context, userID, nam
 		}); err != nil {
 			return fmt.Errorf("auto-add workspace member: %w", err)
 		}
-		return qtx.ReplaceNamespaceMemberRole(ctx, generated.ReplaceNamespaceMemberRoleParams{
+		return qtx.AddNamespaceMemberRole(ctx, generated.AddNamespaceMemberRoleParams{
 			UserID:      userID,
 			RoleID:      bindRoleID,
 			WorkspaceID: wsIDPtr,
@@ -171,7 +171,7 @@ func (s *pgRoleBindingStore) ListWorkspaceMembers(ctx context.Context, workspace
 				CreatedAt:   r.CreatedAt,
 				UpdatedAt:   r.UpdatedAt,
 			},
-			Role:     r.RoleName,
+			Roles:    r.RoleNames,
 			JoinedAt: r.JoinedAt,
 		})
 	}
@@ -229,7 +229,7 @@ func (s *pgRoleBindingStore) ListNamespaceMembers(ctx context.Context, namespace
 				CreatedAt:   r.CreatedAt,
 				UpdatedAt:   r.UpdatedAt,
 			},
-			Role:     r.RoleName,
+			Roles:    r.RoleNames,
 			JoinedAt: r.JoinedAt,
 		})
 	}

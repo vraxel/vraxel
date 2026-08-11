@@ -72,6 +72,42 @@ func (s *pgRoleBindingStore) Create(ctx context.Context, in RoleBindingCreateInp
 	return &out, nil
 }
 
+func (s *pgRoleBindingStore) CreateMany(ctx context.Context, inputs []RoleBindingCreateInput) (int, error) {
+	if len(inputs) == 0 {
+		return 0, nil
+	}
+	// The insert itself reports whether it created a row (ON CONFLICT DO
+	// NOTHING affects 0 rows when the binding already exists), so the
+	// "newly granted" count needs no separate pre-count -- which would
+	// also be wrong under a concurrent grant of the same pair.
+	created := 0
+	if err := s.DB.WithTx(ctx, func(ctx context.Context, qtx *generated.Queries) error {
+		created = 0
+		for _, in := range inputs {
+			n, err := qtx.CreateRoleBindingIfNotExists(ctx, generated.CreateRoleBindingIfNotExistsParams{
+				UserID:      in.UserID,
+				RoleID:      in.RoleID,
+				Scope:       in.Scope,
+				WorkspaceID: in.WorkspaceID,
+				NamespaceID: in.NamespaceID,
+			})
+			if err != nil {
+				return err
+			}
+			created += int(n)
+		}
+		return nil
+	}); err != nil {
+		return 0, fmt.Errorf("create role bindings: %w", pgerrors.CheckPG(err))
+	}
+	// Invalidate after commit: a notification for a rolled-back grant
+	// would make every instance re-read the old rules for nothing.
+	for _, in := range inputs {
+		s.notifyUserChange(ctx, in.UserID)
+	}
+	return created, nil
+}
+
 func (s *pgRoleBindingStore) Delete(ctx context.Context, id int64) error {
 	rb, err := s.Q().GetRoleBindingByID(ctx, id)
 	if err != nil {
@@ -392,12 +428,12 @@ func (s *pgRoleBindingStore) ListUserWorkspaces(ctx context.Context, userID int6
 				CreatedAt:   r.CreatedAt,
 				UpdatedAt:   r.UpdatedAt,
 			},
-			OwnerUsername:   r.OwnerUsername,
-			NamespaceCount:  r.NamespaceCount,
-			MemberCount:     r.MemberCount,
-			Role:            r.RoleName,
-			RoleDisplayName: r.RoleDisplayName,
-			JoinedAt:        r.JoinedAt,
+			OwnerUsername:    r.OwnerUsername,
+			NamespaceCount:   r.NamespaceCount,
+			MemberCount:      r.MemberCount,
+			Roles:            r.RoleNames,
+			RoleDisplayNames: r.RoleDisplayNames,
+			JoinedAt:         r.JoinedAt,
 		})
 	}
 
@@ -459,12 +495,12 @@ func (s *pgRoleBindingStore) ListUserNamespaces(ctx context.Context, userID int6
 				CreatedAt:   r.CreatedAt,
 				UpdatedAt:   r.UpdatedAt,
 			},
-			OwnerUsername:   r.OwnerUsername,
-			WorkspaceName:   r.WorkspaceName,
-			MemberCount:     r.MemberCount,
-			Role:            r.RoleName,
-			RoleDisplayName: r.RoleDisplayName,
-			JoinedAt:        r.JoinedAt,
+			OwnerUsername:    r.OwnerUsername,
+			WorkspaceName:    r.WorkspaceName,
+			MemberCount:      r.MemberCount,
+			Roles:            r.RoleNames,
+			RoleDisplayNames: r.RoleDisplayNames,
+			JoinedAt:         r.JoinedAt,
 		})
 	}
 

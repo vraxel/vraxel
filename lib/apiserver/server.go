@@ -49,7 +49,33 @@ type Server struct {
 	modules []string
 	// patterns records every registered pattern for tests / debugging.
 	patterns []string
+	// routes records the resource routes with the metadata the OpenAPI
+	// generator needs. Public() routes are absent: they are not part of
+	// the resource model.
+	routes []RouteInfo
 }
+
+// RouteInfo describes one registered resource route. It is the
+// authoritative answer to "what does this server serve" -- the OpenAPI
+// generator consumes it instead of inferring endpoints from source-code
+// shape, which is how the spec came to advertise 405s and miss real
+// paths.
+type RouteInfo struct {
+	Method string
+	Path   string
+	// Kind is one of list/get/create/update/patch/delete/
+	// deleteCollection/action/verb.
+	Kind     string
+	Group    string
+	Resource string
+	// TypeName is the Go name of the payload type (ResourceDef's T).
+	TypeName string
+	// Name is the action / read-verb segment; empty for CRUD routes.
+	Name string
+}
+
+// Routes returns every registered resource route in registration order.
+func (s *Server) Routes() []RouteInfo { return append([]RouteInfo(nil), s.routes...) }
 
 // New creates an empty server.
 func New(cfg Config) *Server {
@@ -103,6 +129,16 @@ func (s *Server) handle(pattern string, m *routeMeta, h http.Handler) {
 	chain = s.auditMiddleware(m, chain)
 	s.mux.Handle(pattern, chain)
 	s.patterns = append(s.patterns, pattern)
+
+	method, path, _ := strings.Cut(pattern, " ")
+	info := RouteInfo{
+		Method: method, Path: path, Kind: m.Kind,
+		Group: m.Module, Resource: m.Resource, TypeName: m.TypeName,
+	}
+	if m.Kind == "action" || m.Kind == "verb" {
+		info.Name = path[strings.LastIndexByte(path, '/')+1:]
+	}
+	s.routes = append(s.routes, info)
 }
 
 // addResource records a registration; a duplicate path panics

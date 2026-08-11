@@ -78,7 +78,6 @@ const common = {
   "nav.roles": "角色管理",
   "nav.audit": "审计",
   "nav.auditLogs": "审计日志",
-  "nav.rolebindings": "角色绑定",
   "nav.kube": "Kubernetes",
   "nav.hosts": "主机",
   "nav.apiDocs": "API 文档",

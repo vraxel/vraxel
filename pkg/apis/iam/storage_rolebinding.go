@@ -1,7 +1,9 @@
 package iam
 
 import (
+	"encoding/json"
 	"fmt"
+	"vraxel.io/vraxel/lib/runtime"
 
 	apierrors "vraxel.io/vraxel/lib/api/errors"
 	"vraxel.io/vraxel/lib/apiserver"
@@ -26,7 +28,7 @@ func RoleBindingsDef(rbStore modstore.RoleBindingStore, roleStore modstore.RoleS
 		Group: "iam", Name: "rolebindings",
 		Ops: apiserver.Ops[RoleBinding]{
 			List:        o.list,
-			Create:      o.create,
+			CreateAny:   o.create,
 			Delete:      o.delete,
 			BatchDelete: o.batchDelete,
 		},
@@ -42,43 +44,91 @@ func (o roleBindingOps) list(ctx apiserver.Ctx, query list.Query) (*list.Result[
 	return roleBindingListResult(result), nil
 }
 
-// +openapi:summary=创建平台级角色绑定
-func (o roleBindingOps) create(ctx apiserver.Ctx, rb *RoleBinding) (*RoleBinding, error) {
-	if errs := ValidateRoleBindingCreate(&rb.Spec); errs.HasErrors() {
-		return nil, apierrors.NewBadRequest("validation failed", errs)
+// batchBindRole is the shared body of the three scoped create handlers.
+// A binding row is one (user, role) pair, so granting a role to N users
+// writes N rows -- CreateMany puts them in one transaction so a failure
+// halfway through cannot leave a partially authorized set.
+//
+// The role is resolved and scope-checked once, not per user: every row
+// in the request targets the same role, and rejecting the request as a
+// whole is clearer than reporting the same error N times.
+func batchBindRole(
+	ctx apiserver.Ctx,
+	rbStore modstore.RoleBindingStore,
+	roleStore modstore.RoleStore,
+	body json.RawMessage,
+	scope string,
+	workspaceID, namespaceID *int64,
+	checkRole func(role *modstore.RoleWithRulesRow) error,
+) (any, error) {
+	req, err := apiserver.DecodePatch[BatchRequest](body)
+	if err != nil {
+		return nil, err
+	}
+	if len(req.IDs) == 0 {
+		return nil, apierrors.NewBadRequest("ids is required", nil)
+	}
+	if req.RoleID == "" {
+		return nil, apierrors.NewBadRequest("roleId is required", nil)
 	}
 
-	roleID, err := parseID(rb.Spec.RoleID)
+	roleID, err := parseID(req.RoleID)
 	if err != nil {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid role ID: %s", rb.Spec.RoleID), nil)
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid role ID: %s", req.RoleID), nil)
 	}
-	role, err := o.roleStore.GetByID(ctx, roleID)
+	role, err := roleStore.GetByID(ctx, roleID)
 	if err != nil {
 		return nil, domainErr(err)
 	}
-	if role.Scope != modstore.ScopePlatform {
-		return nil, apierrors.NewBadRequest("role scope must be 'platform' for platform-level bindings", nil)
+	if err := checkRole(role); err != nil {
+		return nil, err
 	}
 
-	userID, err := parseID(rb.Spec.UserID)
-	if err != nil {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid user ID: %s", rb.Spec.UserID), nil)
+	inputs := make([]modstore.RoleBindingCreateInput, 0, len(req.IDs))
+	for _, raw := range req.IDs {
+		userID, err := parseID(raw)
+		if err != nil {
+			return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid user ID: %s", raw), nil)
+		}
+		inputs = append(inputs, modstore.RoleBindingCreateInput{
+			UserID:      userID,
+			RoleID:      roleID,
+			Scope:       scope,
+			WorkspaceID: workspaceID,
+			NamespaceID: namespaceID,
+		})
 	}
 
 	if ctx.DryRun {
-		return rb, nil
+		return &apiserver.BatchResult{
+			TypeMeta:     runtime.TypeMeta{Kind: "Result"},
+			SuccessCount: len(inputs),
+		}, nil
 	}
 
-	created, err := o.rbStore.Create(ctx, modstore.RoleBindingCreateInput{
-		UserID: userID,
-		RoleID: roleID,
-		Scope:  modstore.ScopePlatform,
-	})
+	created, err := rbStore.CreateMany(ctx, inputs)
 	if err != nil {
 		return nil, domainErr(err)
 	}
+	// Insertion is idempotent, so anything not newly created was already
+	// bound. That is not a failure -- report it separately so the UI can
+	// say "3 added, 2 already had this role" instead of claiming 5 grants.
+	return &apiserver.BatchResult{
+		TypeMeta:     runtime.TypeMeta{Kind: "Result"},
+		SuccessCount: created,
+		FailedCount:  len(inputs) - created,
+	}, nil
+}
 
-	return roleBindingToAPI(created, "", "", role.Name, role.DisplayName), nil
+// +openapi:summary=创建平台级角色绑定
+func (o roleBindingOps) create(ctx apiserver.Ctx, body json.RawMessage) (any, error) {
+	return batchBindRole(ctx, o.rbStore, o.roleStore, body, modstore.ScopePlatform, nil, nil,
+		func(role *modstore.RoleWithRulesRow) error {
+			if role.Scope != modstore.ScopePlatform {
+				return apierrors.NewBadRequest("role scope must be 'platform' for platform-level bindings", nil)
+			}
+			return nil
+		})
 }
 
 // +openapi:summary=删除平台级角色绑定
@@ -108,7 +158,7 @@ func WorkspaceRoleBindingsDef(rbStore modstore.RoleBindingStore, roleStore modst
 		Scopes: apiserver.ScopeWorkspace,
 		Ops: apiserver.Ops[RoleBinding]{
 			List:        o.list,
-			Create:      o.create,
+			CreateAny:   o.create,
 			Delete:      o.delete,
 			BatchDelete: o.batchDelete,
 		},
@@ -125,48 +175,18 @@ func (o workspaceRoleBindingOps) list(ctx apiserver.Ctx, query list.Query) (*lis
 }
 
 // +openapi:summary=创建租户级角色绑定
-func (o workspaceRoleBindingOps) create(ctx apiserver.Ctx, rb *RoleBinding) (*RoleBinding, error) {
-	if errs := ValidateRoleBindingCreate(&rb.Spec); errs.HasErrors() {
-		return nil, apierrors.NewBadRequest("validation failed", errs)
-	}
-
+func (o workspaceRoleBindingOps) create(ctx apiserver.Ctx, body json.RawMessage) (any, error) {
 	wsID := ctx.Scope.WorkspaceID
-
-	roleID, err := parseID(rb.Spec.RoleID)
-	if err != nil {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid role ID: %s", rb.Spec.RoleID), nil)
-	}
-	role, err := o.roleStore.GetByID(ctx, roleID)
-	if err != nil {
-		return nil, domainErr(err)
-	}
-	if role.Scope != modstore.ScopeWorkspace {
-		return nil, apierrors.NewBadRequest("role scope must be 'workspace' for workspace-level bindings", nil)
-	}
-	if role.WorkspaceID == nil || *role.WorkspaceID != wsID {
-		return nil, apierrors.NewBadRequest("role does not belong to this workspace", nil)
-	}
-
-	userID, err := parseID(rb.Spec.UserID)
-	if err != nil {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid user ID: %s", rb.Spec.UserID), nil)
-	}
-
-	if ctx.DryRun {
-		return rb, nil
-	}
-
-	created, err := o.rbStore.Create(ctx, modstore.RoleBindingCreateInput{
-		UserID:      userID,
-		RoleID:      roleID,
-		Scope:       modstore.ScopeWorkspace,
-		WorkspaceID: &wsID,
-	})
-	if err != nil {
-		return nil, domainErr(err)
-	}
-
-	return roleBindingToAPI(created, "", "", role.Name, role.DisplayName), nil
+	return batchBindRole(ctx, o.rbStore, o.roleStore, body, modstore.ScopeWorkspace, &wsID, nil,
+		func(role *modstore.RoleWithRulesRow) error {
+			if role.Scope != modstore.ScopeWorkspace {
+				return apierrors.NewBadRequest("role scope must be 'workspace' for workspace-level bindings", nil)
+			}
+			if role.WorkspaceID == nil || *role.WorkspaceID != wsID {
+				return apierrors.NewBadRequest("role does not belong to this workspace", nil)
+			}
+			return nil
+		})
 }
 
 // +openapi:summary=删除租户级角色绑定
@@ -197,7 +217,7 @@ func NamespaceRoleBindingsDef(rbStore modstore.RoleBindingStore, roleStore modst
 		Scopes: apiserver.ScopeNamespace,
 		Ops: apiserver.Ops[RoleBinding]{
 			List:        o.list,
-			Create:      o.create,
+			CreateAny:   o.create,
 			Delete:      o.delete,
 			BatchDelete: o.batchDelete,
 		},
@@ -216,56 +236,23 @@ func (o namespaceRoleBindingOps) list(ctx apiserver.Ctx, query list.Query) (*lis
 
 // +openapi:summary=创建项目级角色绑定
 // +openapi:summary.workspaces.namespaces.rolebindings=创建租户下项目的角色绑定
-func (o namespaceRoleBindingOps) create(ctx apiserver.Ctx, rb *RoleBinding) (*RoleBinding, error) {
-	if errs := ValidateRoleBindingCreate(&rb.Spec); errs.HasErrors() {
-		return nil, apierrors.NewBadRequest("validation failed", errs)
-	}
-
+func (o namespaceRoleBindingOps) create(ctx apiserver.Ctx, body json.RawMessage) (any, error) {
 	nsID := ctx.Scope.NamespaceID
-
-	// Look up namespace to get workspace ID
 	ns, err := o.nsStore.GetByID(ctx, nsID)
 	if err != nil {
 		return nil, domainErr(err)
 	}
 	wsID := ns.WorkspaceID
-
-	roleID, err := parseID(rb.Spec.RoleID)
-	if err != nil {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid role ID: %s", rb.Spec.RoleID), nil)
-	}
-	role, err := o.roleStore.GetByID(ctx, roleID)
-	if err != nil {
-		return nil, domainErr(err)
-	}
-	if role.Scope != modstore.ScopeNamespace {
-		return nil, apierrors.NewBadRequest("role scope must be 'namespace' for namespace-level bindings", nil)
-	}
-	if role.NamespaceID == nil || *role.NamespaceID != nsID {
-		return nil, apierrors.NewBadRequest("role does not belong to this namespace", nil)
-	}
-
-	userID, err := parseID(rb.Spec.UserID)
-	if err != nil {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid user ID: %s", rb.Spec.UserID), nil)
-	}
-
-	if ctx.DryRun {
-		return rb, nil
-	}
-
-	created, err := o.rbStore.Create(ctx, modstore.RoleBindingCreateInput{
-		UserID:      userID,
-		RoleID:      roleID,
-		Scope:       modstore.ScopeNamespace,
-		WorkspaceID: &wsID,
-		NamespaceID: &nsID,
-	})
-	if err != nil {
-		return nil, domainErr(err)
-	}
-
-	return roleBindingToAPI(created, "", "", role.Name, role.DisplayName), nil
+	return batchBindRole(ctx, o.rbStore, o.roleStore, body, modstore.ScopeNamespace, &wsID, &nsID,
+		func(role *modstore.RoleWithRulesRow) error {
+			if role.Scope != modstore.ScopeNamespace {
+				return apierrors.NewBadRequest("role scope must be 'namespace' for namespace-level bindings", nil)
+			}
+			if role.NamespaceID == nil || *role.NamespaceID != nsID {
+				return apierrors.NewBadRequest("role does not belong to this namespace", nil)
+			}
+			return nil
+		})
 }
 
 // +openapi:summary=删除项目级角色绑定

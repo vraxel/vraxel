@@ -25,6 +25,10 @@ type resourceReg struct {
 	Sensitive    bool   // resource-level body redaction for audit
 	IDParam      string // explicit item param name; "" derives from Name
 	StringID     bool   // item key is a name string; buildCtx skips the int64 parse
+	// TypeName is the Go name of the resource payload type (ResourceDef's
+	// T). Carried so Server.Routes can hand the spec generator the exact
+	// schema each route serves instead of guessing from the URL.
+	TypeName string
 
 	// ExtraAllow is the resource-level allowance hook; meta() binds each
 	// route's first permission code into the per-route closure.
@@ -101,10 +105,15 @@ func (rr *resourceReg) nameChain() []string {
 // registration. Authorization and audit read it directly — the v2
 // replacement for v1's URL reverse-parsing.
 type routeMeta struct {
-	Module     string // group name; audit "module" field
-	Resource   string // leaf resource name
-	Chain      string // v1 audit-compatible resource chain incl. scope segments
-	Verb       string // list/get/create/... or the action name
+	Module   string // group name; audit "module" field
+	Resource string // leaf resource name
+	Chain    string // v1 audit-compatible resource chain incl. scope segments
+	Verb     string // list/get/create/... or the action name
+	// Kind classifies the route for spec generation: a CRUD op name, or
+	// "action" / "verb". Verb alone is not enough -- read verbs reuse the
+	// parent's "get" code.
+	Kind       string
+	TypeName   string
 	ScopeLevel Scope
 	PermCodes  []string // codes checked by the authz link (may contain wildcards)
 	APIVersion string
@@ -164,6 +173,8 @@ func (rr *resourceReg) meta(s *Server, lv Scope, verb string, withID bool) *rout
 		Resource:     rr.Name,
 		Chain:        strings.Join(chainParts, ":"),
 		Verb:         verb,
+		Kind:         verb,
+		TypeName:     rr.TypeName,
 		ScopeLevel:   lv,
 		APIVersion:   rr.APIVersion,
 		MaxPageSize:  rr.MaxPageSize,

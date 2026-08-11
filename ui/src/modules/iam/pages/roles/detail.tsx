@@ -15,7 +15,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card"
 import { ConfirmDialog } from "@/shared/components/confirm-dialog"
 import { TruncateText } from "@/shared/components/truncate-text"
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/ui/form"
-import { updateRole, listAllPermissions, rolesApi } from "@/modules/iam/api/rbac"
+import {
+  updateRole,
+  listAllPermissions,
+  rolesApi,
+  listRoleBindings,
+  createRoleBindings,
+  deleteRoleBinding,
+} from "@/modules/iam/api/rbac"
+import { listUsers } from "@/modules/iam/api/users"
 import { rolesDef, permissionsDef } from "@/modules/iam/defs"
 import { qk } from "@/core/query/keys"
 import { useApiQuery } from "@/core/query/hooks"
@@ -26,6 +34,7 @@ import { useTranslation } from "@/i18n"
 import { usePermission } from "@/core/permission/use-permission"
 import { PermissionSelector, patternCovers } from "@/modules/iam/components/permission-selector"
 import { FormDialog } from "@/frameworks/form/form-dialog"
+import { RoleUsersSection } from "@/modules/iam/components/role-users-section"
 
 const SCOPE_VARIANT: Record<string, "default" | "secondary" | "outline"> = {
   platform: "default",
@@ -208,6 +217,23 @@ export default function RoleDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* users with this role */}
+      {hasPermission("iam:rolebindings:list") && (
+        <RoleUsersSection
+          config={{
+            roleId: role.metadata.id,
+            detailPrefix: "/iam",
+            listBindings: (params) => listRoleBindings(params),
+            listCandidates: (params) => listUsers(params),
+            assign: (ids) => createRoleBindings(ids, role.metadata.id),
+            revoke: (id) => deleteRoleBinding(id),
+            canAssign: hasPermission("iam:rolebindings:create"),
+            canRevoke: hasPermission("iam:rolebindings:delete"),
+            cacheKey: ["platform", role.metadata.id],
+          }}
+        />
+      )}
 
       {/* edit dialog */}
       {!role.spec.builtin && (

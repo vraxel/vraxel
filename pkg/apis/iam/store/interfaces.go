@@ -108,6 +108,13 @@ type RoleStore interface {
 // RoleBindingStore defines database operations on role bindings.
 type RoleBindingStore interface {
 	Create(ctx context.Context, input RoleBindingCreateInput) (*RoleBindingRow, error)
+	// CreateMany binds one role to many users in a single transaction:
+	// either every binding lands or none does, so a failure halfway
+	// through a 20-user grant cannot leave a partial authorization set.
+	// Insertion is idempotent (ON CONFLICT DO NOTHING), so re-granting an
+	// existing binding is a no-op rather than an error; the returned count
+	// is the number of rows actually inserted.
+	CreateMany(ctx context.Context, inputs []RoleBindingCreateInput) (int, error)
 	Delete(ctx context.Context, id int64) error
 	// DeleteByIDs batch-deletes non-owner bindings. Returns the count of rows
 	// actually deleted; bindings flagged is_owner=true are silently skipped

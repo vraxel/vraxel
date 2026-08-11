@@ -26,7 +26,7 @@ type UserWithNamespacesRow struct {
 // UserWithRoleRow bundles a user with their role in a namespace/workspace.
 type UserWithRoleRow struct {
 	UserRow
-	Role     string
+	Roles    []string
 	JoinedAt time.Time
 }
 
@@ -90,12 +90,12 @@ type WorkspaceWithOwnerRow struct {
 // WorkspaceWithOwnerAndRoleRow extends the owner view with the caller's role.
 type WorkspaceWithOwnerAndRoleRow struct {
 	WorkspaceRow
-	OwnerUsername   string
-	NamespaceCount  int64
-	MemberCount     int64
-	Role            string
-	RoleDisplayName string
-	JoinedAt        time.Time
+	OwnerUsername    string
+	NamespaceCount   int64
+	MemberCount      int64
+	Roles            []string
+	RoleDisplayNames []string
+	JoinedAt         time.Time
 }
 
 // WorkspaceCreateInput bundles CreateWorkspace inputs.
@@ -145,12 +145,12 @@ type NamespaceWithOwnerRow struct {
 // NamespaceWithOwnerAndRoleRow extends owner view with caller's role.
 type NamespaceWithOwnerAndRoleRow struct {
 	NamespaceRow
-	OwnerUsername   string
-	WorkspaceName   string
-	MemberCount     int64
-	Role            string
-	RoleDisplayName string
-	JoinedAt        time.Time
+	OwnerUsername    string
+	WorkspaceName    string
+	MemberCount      int64
+	Roles            []string
+	RoleDisplayNames []string
+	JoinedAt         time.Time
 }
 
 // NamespaceCreateInput bundles CreateNamespace inputs.

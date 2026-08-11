@@ -11,11 +11,8 @@ import UserListPage from "./users/list"
 import UserDetailPage from "./users/detail"
 import RoleListPage from "./roles/list"
 import RoleDetailPage from "./roles/detail"
-import RoleBindingListPage from "./rolebindings/list"
 import WorkspaceRolesTab from "./workspaces/roles-tab"
-import WorkspaceRoleBindingsTab from "./workspaces/rolebindings-tab"
 import NamespaceRolesTab from "./namespaces/roles-tab"
-import NamespaceRoleBindingsTab from "./namespaces/rolebindings-tab"
 import ScopedRoleDetailPage from "./roles/scoped-detail"
 import ScopedUserDetailPage from "./users/scoped-detail"
 
@@ -32,13 +29,11 @@ export const iamRoutes: RouteObject[] = [
       { path: "namespaces", element: <WorkspaceNamespacesPage /> },
       { path: "roles", element: <WorkspaceRolesTab /> },
       { path: "roles/:roleId", element: <ScopedRoleDetailPage /> },
-      { path: "rolebindings", element: <WorkspaceRoleBindingsTab /> },
       { path: "namespaces/:namespaceId", element: <NamespaceDetailPage /> },
       { path: "namespaces/:namespaceId/users", element: <NamespaceUsersPage /> },
       { path: "namespaces/:namespaceId/users/:userId", element: <ScopedUserDetailPage /> },
       { path: "namespaces/:namespaceId/roles", element: <NamespaceRolesTab /> },
       { path: "namespaces/:namespaceId/roles/:roleId", element: <ScopedRoleDetailPage /> },
-      { path: "namespaces/:namespaceId/rolebindings", element: <NamespaceRoleBindingsTab /> },
     ],
   },
   { path: "namespaces", element: <NamespaceListPage /> },
@@ -47,5 +42,4 @@ export const iamRoutes: RouteObject[] = [
   { path: "users/:userId", element: <UserDetailPage /> },
   { path: "roles", element: <RoleListPage /> },
   { path: "roles/:roleId", element: <RoleDetailPage /> },
-  { path: "rolebindings", element: <RoleBindingListPage /> },
 ]

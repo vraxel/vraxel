@@ -241,6 +241,10 @@ func (m *mockRoleBindingStore) GetUserRoleBindingsWithRules(ctx context.Context,
 func (m *mockRoleBindingStore) Create(context.Context, modstore.RoleBindingCreateInput) (*modstore.RoleBindingRow, error) {
 	panic("not implemented")
 }
+
+func (m *mockRoleBindingStore) CreateMany(context.Context, []modstore.RoleBindingCreateInput) (int, error) {
+	panic("not implemented")
+}
 func (m *mockRoleBindingStore) Delete(context.Context, int64) error { panic("not implemented") }
 func (m *mockRoleBindingStore) DeleteByIDs(context.Context, []int64) (int64, error) {
 	panic("not implemented")

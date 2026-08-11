@@ -1,7 +1,6 @@
 package openapi
 
 import (
-	"fmt"
 	"regexp"
 	"sort"
 	"strings"
@@ -20,6 +19,14 @@ type Generator struct {
 	info          Info
 	conflictTypes map[string]bool
 	pkgToGroup    map[string]string
+	routes        []Route
+}
+
+// SetRoutes supplies the apiserver's route table -- the sole source of
+// the spec's paths and methods.
+func (g *Generator) SetRoutes(routes []Route) {
+	g.routes = append([]Route(nil), routes...)
+	sortRoutes(g.routes)
 }
 
 // NewGenerator creates a new OpenAPI generator with the given API info.
@@ -56,6 +63,10 @@ func (g *Generator) Generate(groups []GroupInfo) *Document {
 		tags := g.processGroup(doc, group)
 		moduleTags[group.ModuleName] = append(moduleTags[group.ModuleName], tags...)
 	}
+
+	// Paths come from the route table, not from the parsed types: only
+	// registration knows what is actually served.
+	g.generateRoutePaths(doc, groups)
 
 	// Build document-level Tags and XTagGroups
 	for _, moduleName := range sortedKeys(moduleTags) {
@@ -181,14 +192,6 @@ func (g *Generator) processGroup(doc *Document, group GroupInfo) []Tag {
 	// Process standalone endpoints first
 	endpointTags := g.processEndpoints(doc, group.Endpoints)
 
-	// Build base path
-	var basePath string
-	if group.GroupName == "" {
-		basePath = "/api/" + group.GroupVersion
-	} else {
-		basePath = "/api/" + group.GroupName + "/" + group.GroupVersion
-	}
-
 	// Collect all type names to identify which are Spec types (not standalone resources)
 	specTypes := map[string]bool{}
 	for _, t := range group.Types {
@@ -203,40 +206,22 @@ func (g *Generator) processGroup(doc *Document, group GroupInfo) []Tag {
 		doc.Components.Schemas[g.schemaKey(group.GroupName, t.Name)] = schema
 	}
 
-	// Phase 2: Generate paths from +openapi:path annotations (or default)
-	tags := g.generateGroupPaths(doc, group, basePath, specTypes)
+	// Phase 2: collect the tags resource types contribute
+	tags := g.collectGroupTags(group, specTypes)
 
 	// Merge endpoint tags (deduplicated)
 	return mergeEndpointTags(tags, endpointTags)
 }
 
-// generateGroupPaths runs Phase 2 for a group: for every non-spec, non-list
-// resource type it emits paths (default or annotated) and collects the
-// standalone tags for types that did not override their tag.
-func (g *Generator) generateGroupPaths(doc *Document, group GroupInfo, basePath string, specTypes map[string]bool) []Tag {
+// collectGroupTags returns the standalone tags a group's resource types
+// contribute; types overriding their tag merge into an existing parent.
+func (g *Generator) collectGroupTags(group GroupInfo, specTypes map[string]bool) []Tag {
 	var tags []Tag
 	for _, t := range group.Types {
-		if t.IsListType || t.SchemaOnly || specTypes[t.Name] {
+		if t.IsListType || t.SchemaOnly || specTypes[t.Name] || t.Tag != "" {
 			continue
 		}
-
-		paths := t.Paths
-		if len(paths) == 0 {
-			// No annotation: derive default path from type name
-			paths = []string{"/" + strings.ToLower(t.Name) + "s"}
-		}
-
-		tag := t.Name
-		if t.Tag != "" {
-			tag = t.Tag
-		}
-		for _, p := range paths {
-			g.generatePathsForResource(doc, basePath, p, t, group.GroupName, group.GroupVersion, tag)
-		}
-		if t.Tag == "" {
-			// Only add as a standalone tag if not overridden (overridden tags merge into existing parent tags)
-			tags = append(tags, Tag{Name: t.Name, Description: t.Description})
-		}
+		tags = append(tags, Tag{Name: t.Name, Description: t.Description})
 	}
 	return tags
 }
@@ -431,6 +416,10 @@ func (g *Generator) goTypeToSchema(goType, currentGroup string) *Schema {
 		return &Schema{Type: "number", Format: "double"}
 	case "bool":
 		return &Schema{Type: "boolean"}
+	case "json.RawMessage", "RawMessage":
+		// Arbitrary JSON: emitting a $ref produced a dangling
+		// #/components/schemas/RawMessage and an invalid document.
+		return &Schema{}
 	default:
 		if strings.HasPrefix(goType, "[]") {
 			elemType := strings.TrimPrefix(goType, "[]")
@@ -448,373 +437,6 @@ func (g *Generator) goTypeToSchema(goType, currentGroup string) *Schema {
 		// Reference to another type — route through fieldRefName so
 		// conflict-affected types pick up the correct group prefix.
 		return &Schema{Ref: "#/components/schemas/" + g.fieldRefName(currentGroup, goType)}
-	}
-}
-
-// pathGenContext bundles the per-resource values shared across the path-emission
-// helpers of generatePathsForResource so each helper takes a single receiver
-// instead of a long parameter list. It carries no behavior beyond hasOp /
-// qualifiedSummary, which mirror the closures the original function used.
-type pathGenContext struct {
-	g            *Generator
-	doc          *Document
-	typeInfo     TypeInfo
-	resourcePath string
-	groupName    string
-	tag          string
-	typeName     string
-	itemPath     string
-	opSuffix     string
-	pathParams   []string
-	itemParams   []Parameter
-	ref          *Schema
-	listRef      *Schema
-}
-
-// hasOp reports whether the operation op should be generated for this path.
-// If PathOperations is defined for this path, only generate those operations.
-// If not defined (backward compat), generate all operations.
-func (c *pathGenContext) hasOp(op string) bool {
-	if c.typeInfo.PathOperations == nil {
-		return true
-	}
-	ops, ok := c.typeInfo.PathOperations[c.resourcePath]
-	if !ok {
-		return true
-	}
-	return ops[op]
-}
-
-// summary resolves an operation summary: use annotation if present, otherwise default.
-func (c *pathGenContext) summary(op, defaultSummary string) string {
-	if s, ok := c.typeInfo.OperationSummary[op]; ok {
-		return s
-	}
-	return defaultSummary
-}
-
-// qualifiedSummary resolves a summary using a qualified operation key for nested
-// resources (e.g., "workspaces.namespaces.list"), falling back to the plain key.
-func (c *pathGenContext) qualifiedSummary(op, defaultSummary string) string {
-	// Try qualified key first (e.g., "workspaces.users.list"), then plain key
-	qualifiedKey := c.resourcePath + "." + op
-	// Normalize: strip leading /, replace {param}/ segments
-	parts := strings.Split(strings.Trim(qualifiedKey, "/"), "/")
-	var segments []string
-	for _, p := range parts {
-		if !strings.HasPrefix(p, "{") {
-			segments = append(segments, p)
-		}
-	}
-	qualified := strings.Join(segments, ".") // e.g. "workspaces.namespaces.users.list"
-	if s, ok := c.typeInfo.OperationSummary[qualified]; ok {
-		return s
-	}
-	return c.summary(op, defaultSummary)
-}
-
-// generatePathsForResource generates collection and item paths for a resource
-// at the given resourcePath. It extracts path parameters from the path template
-// and uses a single tag for all operations.
-func (g *Generator) generatePathsForResource(doc *Document, basePath, resourcePath string, typeInfo TypeInfo, groupName, version, tag string) {
-	typeName := typeInfo.Name
-	ref := &Schema{Ref: fmt.Sprintf("#/components/schemas/%s", g.schemaKey(groupName, typeName))}
-	listRef := &Schema{Ref: fmt.Sprintf("#/components/schemas/%s", g.schemaKey(groupName, typeName+"List"))}
-
-	collectionPath := basePath + resourcePath
-	idParam := deriveIDParam(resourcePath)
-	itemPath := collectionPath + "/{" + idParam + "}"
-
-	// Extract all {param} from the resource path as path parameters
-	pathParams := extractPathParams(resourcePath)
-
-	// Build a unique operation ID suffix from path segments to avoid collisions
-	opSuffix := operationSuffix(resourcePath, typeName)
-
-	// Build item-level path parameters (used by item operations, actions, and custom verbs)
-	itemParams := make([]Parameter, 0, len(pathParams)+1)
-	for _, pp := range pathParams {
-		itemParams = append(itemParams, Parameter{
-			Name: pp, In: "path", Required: true, Schema: &Schema{Type: "string"},
-		})
-	}
-	itemParams = append(itemParams, Parameter{
-		Name: idParam, In: "path", Required: true, Schema: &Schema{Type: "string"},
-	})
-
-	c := &pathGenContext{
-		g:            g,
-		doc:          doc,
-		typeInfo:     typeInfo,
-		resourcePath: resourcePath,
-		groupName:    groupName,
-		tag:          tag,
-		typeName:     typeName,
-		itemPath:     itemPath,
-		opSuffix:     opSuffix,
-		pathParams:   pathParams,
-		itemParams:   itemParams,
-		ref:          ref,
-		listRef:      listRef,
-	}
-
-	c.generateCollectionOps(collectionPath)
-	c.generateItemOps()
-	c.generateActionOps()
-	c.generateCustomVerbOps()
-}
-
-// generateCollectionOps emits the list / create / deleteCollection operations on
-// the collection path, creating that path only when at least one of them exists.
-func (c *pathGenContext) generateCollectionOps(collectionPath string) {
-	// Collection operations — only create path if at least one collection operation exists
-	needCollectionPath := c.hasOp("list") || c.hasOp("create") || c.hasOp("deleteCollection")
-	var pathItem *PathItem
-	if needCollectionPath {
-		pathItem = getOrCreatePathItem(c.doc, collectionPath)
-	}
-
-	if c.hasOp("list") {
-		listParams := make([]Parameter, 0, len(c.pathParams)+4)
-		for _, pp := range c.pathParams {
-			listParams = append(listParams, Parameter{
-				Name: pp, In: "path", Required: true, Schema: &Schema{Type: "string"},
-			})
-		}
-		listParams = append(listParams,
-			Parameter{Name: "page", In: "query", Schema: &Schema{Type: "integer"}},
-			Parameter{Name: "pageSize", In: "query", Schema: &Schema{Type: "integer"}},
-			Parameter{Name: "sortBy", In: "query", Schema: &Schema{Type: "string"}},
-			Parameter{Name: "sortOrder", In: "query", Schema: &Schema{Type: "string", Enum: []string{"asc", "desc"}}},
-		)
-		pathItem.Get = &Operation{
-			Summary:     c.qualifiedSummary("list", fmt.Sprintf("List %s", lastSegment(c.resourcePath))),
-			OperationID: fmt.Sprintf("list%s", c.opSuffix),
-			Tags:        []string{c.tag},
-			Parameters:  listParams,
-			Responses: map[string]*Response{
-				"200": {
-					Description: "OK",
-					Content: map[string]MediaType{
-						"application/json": {Schema: c.listRef},
-					},
-				},
-			},
-		}
-	}
-
-	if c.hasOp("create") {
-		createParams := make([]Parameter, 0, len(c.pathParams))
-		for _, pp := range c.pathParams {
-			createParams = append(createParams, Parameter{
-				Name: pp, In: "path", Required: true, Schema: &Schema{Type: "string"},
-			})
-		}
-		pathItem.Post = &Operation{
-			Summary:     c.qualifiedSummary("create", fmt.Sprintf("Create a %s", c.typeName)),
-			OperationID: fmt.Sprintf("create%s", c.opSuffix),
-			Tags:        []string{c.tag},
-			Parameters:  createParams,
-			RequestBody: &RequestBody{
-				Required: true,
-				Content: map[string]MediaType{
-					"application/json": {Schema: c.ref},
-				},
-			},
-			Responses: map[string]*Response{
-				"201": {
-					Description: "Created",
-					Content: map[string]MediaType{
-						"application/json": {Schema: c.ref},
-					},
-				},
-			},
-		}
-	}
-
-	// Delete collection
-	if c.hasOp("deleteCollection") {
-		dcParams := make([]Parameter, 0, len(c.pathParams))
-		for _, pp := range c.pathParams {
-			dcParams = append(dcParams, Parameter{
-				Name: pp, In: "path", Required: true, Schema: &Schema{Type: "string"},
-			})
-		}
-		pathItem.Delete = &Operation{
-			Summary:     c.qualifiedSummary("deleteCollection", fmt.Sprintf("Batch delete %s", lastSegment(c.resourcePath))),
-			OperationID: fmt.Sprintf("deleteCollection%s", c.opSuffix),
-			Tags:        []string{c.tag},
-			Parameters:  dcParams,
-			RequestBody: &RequestBody{
-				Required: true,
-				Content: map[string]MediaType{
-					"application/json": {Schema: &Schema{
-						Type: "object",
-						Properties: map[string]*Schema{
-							"ids": {Type: "array", Items: &Schema{Type: "string"}},
-						},
-					}},
-				},
-			},
-			Responses: map[string]*Response{
-				"200": {Description: "OK"},
-			},
-		}
-	}
-}
-
-// generateItemOps emits the get / update / patch / delete operations on the item
-// path, creating that path only when at least one of them exists.
-func (c *pathGenContext) generateItemOps() {
-	// Item operations — only create the item path if at least one item operation exists
-	needItemPath := c.hasOp("get") || c.hasOp("update") || c.hasOp("patch") || c.hasOp("delete")
-	if needItemPath {
-		itemPathItem := getOrCreatePathItem(c.doc, c.itemPath)
-
-		if c.hasOp("get") {
-			itemPathItem.Get = &Operation{
-				Summary:     c.qualifiedSummary("get", fmt.Sprintf("Get a %s", c.typeName)),
-				OperationID: fmt.Sprintf("get%s", c.opSuffix),
-				Tags:        []string{c.tag},
-				Parameters:  c.itemParams,
-				Responses: map[string]*Response{
-					"200": {
-						Description: "OK",
-						Content: map[string]MediaType{
-							"application/json": {Schema: c.ref},
-						},
-					},
-				},
-			}
-		}
-		if c.hasOp("update") {
-			itemPathItem.Put = &Operation{
-				Summary:     c.qualifiedSummary("update", fmt.Sprintf("Update a %s", c.typeName)),
-				OperationID: fmt.Sprintf("update%s", c.opSuffix),
-				Tags:        []string{c.tag},
-				Parameters:  c.itemParams,
-				RequestBody: &RequestBody{
-					Required: true,
-					Content: map[string]MediaType{
-						"application/json": {Schema: c.ref},
-					},
-				},
-				Responses: map[string]*Response{
-					"200": {
-						Description: "OK",
-						Content: map[string]MediaType{
-							"application/json": {Schema: c.ref},
-						},
-					},
-				},
-			}
-		}
-		if c.hasOp("patch") {
-			itemPathItem.Patch = &Operation{
-				Summary:     c.qualifiedSummary("patch", fmt.Sprintf("Patch a %s", c.typeName)),
-				OperationID: fmt.Sprintf("patch%s", c.opSuffix),
-				Tags:        []string{c.tag},
-				Parameters:  c.itemParams,
-				RequestBody: &RequestBody{
-					Required: true,
-					Content: map[string]MediaType{
-						"application/json": {Schema: c.ref},
-					},
-				},
-				Responses: map[string]*Response{
-					"200": {
-						Description: "OK",
-						Content: map[string]MediaType{
-							"application/json": {Schema: c.ref},
-						},
-					},
-				},
-			}
-		}
-		if c.hasOp("delete") {
-			itemPathItem.Delete = &Operation{
-				Summary:     c.qualifiedSummary("delete", fmt.Sprintf("Delete a %s", c.typeName)),
-				OperationID: fmt.Sprintf("delete%s", c.opSuffix),
-				Tags:        []string{c.tag},
-				Parameters:  c.itemParams,
-				Responses: map[string]*Response{
-					"204": {Description: "No Content"},
-				},
-			}
-		}
-	}
-}
-
-// generateActionOps emits a POST operation per declared action under the item path.
-func (c *pathGenContext) generateActionOps() {
-	// Action operations
-	for actionName, actionSummary := range c.typeInfo.ActionSummary {
-		actionPath := c.itemPath + "/" + actionName
-		actionPathItem := getOrCreatePathItem(c.doc, actionPath)
-		actionPathItem.Post = &Operation{
-			Summary:     actionSummary,
-			OperationID: fmt.Sprintf("%s%s", toCamelCase(actionName), c.opSuffix),
-			Tags:        []string{c.tag},
-			Parameters:  c.itemParams,
-			RequestBody: &RequestBody{
-				Required: true,
-				Content: map[string]MediaType{
-					"application/json": {Schema: &Schema{Type: "object"}},
-				},
-			},
-			Responses: map[string]*Response{
-				"200": {Description: "OK"},
-			},
-		}
-	}
-}
-
-// generateCustomVerbOps emits GET {itemPath}:{verbName} operations for custom verbs.
-func (c *pathGenContext) generateCustomVerbOps() {
-	// Custom verb operations (GET {itemPath}:{verbName})
-	// Only generate on the primary resource path (single-segment, e.g. "/users"),
-	// not on sub-resource paths (e.g. "/workspaces/{workspaceId}/users").
-	isPrimaryPath := len(extractPathParams(c.resourcePath)) == 0
-	for verbName, verbSummary := range c.typeInfo.CustomVerbSummary {
-		if !isPrimaryPath {
-			continue
-		}
-		verbPath := c.itemPath + ":" + verbName
-		verbPathItem := getOrCreatePathItem(c.doc, verbPath)
-
-		// Use explicit response type if annotated, otherwise derive from verb name
-		var responseType string
-		if rt, ok := c.typeInfo.CustomVerbResponse[verbName]; ok && rt != "" {
-			responseType = rt
-		} else {
-			singular := strings.TrimSuffix(verbName, "s")
-			responseType = strings.ToUpper(singular[:1]) + singular[1:] + "List"
-		}
-		responseRef := &Schema{Ref: fmt.Sprintf("#/components/schemas/%s", c.g.schemaKey(c.groupName, responseType))}
-
-		verbParams := make([]Parameter, len(c.itemParams))
-		copy(verbParams, c.itemParams)
-		verbParams = append(verbParams,
-			Parameter{Name: "page", In: "query", Schema: &Schema{Type: "integer"}},
-			Parameter{Name: "pageSize", In: "query", Schema: &Schema{Type: "integer"}},
-			Parameter{Name: "sortBy", In: "query", Schema: &Schema{Type: "string"}},
-			Parameter{Name: "sortOrder", In: "query", Schema: &Schema{Type: "string", Enum: []string{"asc", "desc"}}},
-		)
-
-		verbPathItem.Get = &Operation{
-			Summary:     verbSummary,
-			OperationID: fmt.Sprintf("list%s%s", strings.ToUpper(verbName[:1])+verbName[1:], c.opSuffix),
-			Tags:        []string{c.tag},
-			Parameters:  verbParams,
-			Responses: map[string]*Response{
-				"200": {
-					Description: "OK",
-					Content: map[string]MediaType{
-						"application/json": {Schema: responseRef},
-					},
-				},
-			},
-		}
 	}
 }
 

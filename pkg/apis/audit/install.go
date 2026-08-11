@@ -7,18 +7,13 @@ import (
 	"vraxel.io/vraxel/pkg/db"
 )
 
-// ModuleResult holds the output of Audit module initialization.
-// Served by the v2 apiserver (strangler migration).
-type ModuleResult struct {
-	Register func(*apiserver.Server)
-}
-
-// NewModule initializes the Audit module.
-func NewModule(database *db.DB) ModuleResult {
+// Registrar returns the module's route-registration closure. Building
+// the stores only wraps the handle, so a nil database yields a registrar
+// that declares every route without touching Postgres -- that is what
+// lets openapi-gen read the real route table offline.
+func Registrar(database *db.DB) func(*apiserver.Server) {
 	stores := store.NewStores(database)
-	return ModuleResult{
-		Register: func(s *apiserver.Server) { register(s, stores) },
-	}
+	return func(s *apiserver.Server) { register(s, stores) }
 }
 
 // NewAuditWriter builds the async audit log writer. Kept in the audit

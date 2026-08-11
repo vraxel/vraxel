@@ -18,14 +18,13 @@ type TypeInfo struct {
 	Annotations        []Annotation
 	Description        string
 	IsListType         bool
-	SchemaOnly         bool                       // +openapi:schema — register in components/schemas but do not generate CRUD paths
-	Paths              []string                   // from +openapi:path annotations
-	OperationSummary   map[string]string          // from +openapi:summary.METHOD= (e.g. "list", "create", "get", "update", "patch", "delete", "deleteCollection")
-	ActionSummary      map[string]string          // from +openapi:action.NAME.summary= (e.g. "change-password")
-	CustomVerbSummary  map[string]string          // from +openapi:customverb= on standalone functions (e.g. "workspaces" → summary)
-	CustomVerbResponse map[string]string          // from +openapi:response= on custom verb functions (e.g. "rolebindings" → "RoleBindingList")
-	PathOperations     map[string]map[string]bool // path → set of implemented operations (e.g. "list", "create", "delete")
-	Tag                string                     // from +openapi:tag — override the default tag (type name) for grouping
+	SchemaOnly         bool              // +openapi:schema — register in components/schemas but do not generate CRUD paths
+	Paths              []string          // from +openapi:path annotations
+	OperationSummary   map[string]string // from +openapi:summary.METHOD= (e.g. "list", "create", "get", "update", "patch", "delete", "deleteCollection")
+	ActionSummary      map[string]string // from +openapi:action.NAME.summary= (e.g. "change-password")
+	CustomVerbSummary  map[string]string // from +openapi:customverb= on standalone functions (e.g. "workspaces" → summary)
+	CustomVerbResponse map[string]string // from +openapi:response= on custom verb functions (e.g. "rolebindings" → "RoleBindingList")
+	Tag                string            // from +openapi:tag — override the default tag (type name) for grouping
 	// AliasTarget is set when this TypeInfo represents a Go type alias
 	// (e.g. `type MySQLCloudSource = paasdeploy.CloudSource`) annotated
 	// with +openapi:schema. The generator emits the alias as a thin
@@ -224,8 +223,7 @@ func mergeStorageAnnotations(group *GroupInfo, pkgs map[string]*ast.Package) {
 	for _, pkg := range pkgs {
 		collectStorageTypes(pkg, storageTypes)
 		mergeStoragePaths(group, typeIndex, storageTypes)
-		storageOps := scanFuncAnnotations(pkg, group, typeIndex, storageTypes)
-		populatePathOperations(group, typeIndex, storageTypes, storageOps)
+		scanFuncAnnotations(pkg, group, typeIndex, storageTypes)
 	}
 }
 
@@ -303,18 +301,22 @@ func receiverTypeName(recv *ast.FieldList) string {
 	return ""
 }
 
-// methodToOperation maps Go method names to OpenAPI operation keys.
+// methodToOperation maps an Ops method name to its OpenAPI operation
+// key. Ops methods are unexported (o.list, o.batchDelete), so the lookup
+// is on the lower-camel form; the exported spelling stays accepted for
+// any handler still written as a method on an exported storage type.
 func methodToOperation(name string) (string, bool) {
 	ops := map[string]string{
-		"List":             "list",
-		"Create":           "create",
-		"Get":              "get",
-		"Update":           "update",
-		"Patch":            "patch",
-		"Delete":           "delete",
-		"DeleteCollection": "deleteCollection",
+		"list":             "list",
+		"create":           "create",
+		"get":              "get",
+		"update":           "update",
+		"patch":            "patch",
+		"delete":           "delete",
+		"deleteCollection": "deleteCollection",
+		"batchDelete":      "deleteCollection",
 	}
-	op, ok := ops[name]
+	op, ok := ops[strings.ToLower(name[:1])+name[1:]]
 	return op, ok
 }
 
