@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import { Link } from "react-router"
 import { NameCell } from "@/frameworks/list/name-cell"
 import { Plus, Trash2, Search } from "lucide-react"
 import { toast } from "sonner"
@@ -57,6 +58,19 @@ export interface RoleBindingListConfig {
   scopeParams?: Record<string, string>
 }
 
+/**
+ * Route prefix for the user / role a binding points at. A binding has no
+ * detail page of its own, and each scope's list only returns bindings of
+ * that scope (WHERE rb.scope = ...), so the view's scope is the row's
+ * scope. A namespace without a workspace is not a reachable route, so it
+ * degrades to the platform prefix.
+ */
+export function scopedDetailPrefix(workspaceId?: string, namespaceId?: string): string {
+  if (workspaceId && namespaceId) return `/iam/workspaces/${workspaceId}/namespaces/${namespaceId}`
+  if (workspaceId) return `/iam/workspaces/${workspaceId}`
+  return "/iam"
+}
+
 export function RoleBindingListView({ config }: { config: RoleBindingListConfig }) {
   const { t } = useTranslation()
   const { hasPermission } = usePermission()
@@ -65,6 +79,11 @@ export function RoleBindingListView({ config }: { config: RoleBindingListConfig 
   const [createOpen, setCreateOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<RoleBinding | null>(null)
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false)
+
+  const scopePrefix = scopedDetailPrefix(
+    config.scopeParams?.workspaceId,
+    config.scopeParams?.namespaceId,
+  )
 
   const canCreate = hasPermission(config.permCreate, config.scopeParams)
   const canDelete = hasPermission(config.permDelete, config.scopeParams)
@@ -135,10 +154,12 @@ export function RoleBindingListView({ config }: { config: RoleBindingListConfig 
       key: "username",
       header: t("user.username"),
       sortable: true,
-      // No link: the row's subject is the binding, not the user, and the
-      // user-detail route differs per scope.
       cell: (binding) => (
-        <NameCell displayName={binding.spec.userDisplayName} name={binding.spec.username ?? ""} />
+        <NameCell
+          to={`${scopePrefix}/users/${binding.spec.userId}`}
+          displayName={binding.spec.userDisplayName}
+          name={binding.spec.username ?? ""}
+        />
       ),
     },
     {
@@ -147,13 +168,15 @@ export function RoleBindingListView({ config }: { config: RoleBindingListConfig 
       sortable: true,
       className: "max-w-[150px]",
       cell: (binding) => (
-        <Badge variant="secondary" className="max-w-full">
-          <TruncateText>
-            {t(`role.${binding.spec.roleName}`, {
-              defaultValue: binding.spec.roleDisplayName || binding.spec.roleName || "",
-            })}
-          </TruncateText>
-        </Badge>
+        <Link to={`${scopePrefix}/roles/${binding.spec.roleId}`} className="max-w-full">
+          <Badge variant="secondary" className="max-w-full hover:underline">
+            <TruncateText>
+              {t(`role.${binding.spec.roleName}`, {
+                defaultValue: binding.spec.roleDisplayName || binding.spec.roleName || "",
+              })}
+            </TruncateText>
+          </Badge>
+        </Link>
       ),
     },
     {
