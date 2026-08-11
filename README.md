@@ -33,7 +33,7 @@ ui/src/modules/      per-module pages/api/defs (iam, audit)
 ## Quick start
 
 ```bash
-createdb vraxel        # or point DB_* env vars at an existing PG
+docker compose -f deployment/docker-compose.yaml up -d   # local PG (or bring your own)
 pnpm install
 make build             # frontend + release binary into bin/
 ./bin/vraxel-server -config ./app/vraxel-server/config.yaml
@@ -77,10 +77,14 @@ setup-hooks     Point git at .githooks (pre-commit: UI typecheck + layer guard)
 clean           Remove build output
 ```
 
-`make check` is the pre-commit gate. `make generate` must be run and its
-output committed after changing `pkg/db/query/*.sql`, a resource
-registration, or a Go API type -- `build` compiles committed sources and
-never regenerates.
+`make check` is the pre-commit gate; CI (.github/workflows/ci.yml) runs
+the same gate plus `go test -race` and `make build`. `make generate`
+must be run and its output committed after changing
+`pkg/db/query/*.sql`, a resource registration, or a Go API type --
+`build` compiles committed sources and never regenerates.
+
+A container build lives at `deployment/Dockerfile` (UI -> Go ->
+distroless, ~30MB image).
 
 ## API E2E
 
@@ -109,3 +113,17 @@ add the routes to `ui/src/app/routes.tsx`, the nav entries to
 `ui/src/core/registry/nav-config.ts`, the prefix to
 `ui/src/core/registry/modules.ts`, and a locale file per language under
 `ui/src/i18n/locales/`.
+
+## Operational notes
+
+- `/debug/pprof/*` is disabled unless `-pprofAuthKey` or `-httpAuth.*`
+  is configured -- it exposes heap contents and the command line, and
+  this server fronts the edge. `/metrics` stays open (Prometheus
+  convention); gate it with `-metricsAuthKey` if needed.
+- The API reference is a separate HTML entry (`/api-docs.html`, also
+  reachable as `/api-docs`): Scalar embeds a full Vue runtime, and the
+  split keeps it out of the SPA's first paint (~4.2MB -> ~1.1MB
+  pre-gzip).
+- The React Compiler is on (vite babel preset): components are
+  auto-memoized at build time, and the react-hooks v7 lint rules gate
+  compiler compatibility in `pnpm lint`.

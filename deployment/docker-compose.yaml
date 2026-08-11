@@ -1,0 +1,24 @@
+# Local development dependencies. The server itself runs on the host
+# (`make dev`); this only provides PostgreSQL with the default
+# credentials from app/vraxel-server/config.yaml.
+#
+#   docker compose -f deployment/docker-compose.yaml up -d
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: vraxel
+      POSTGRES_PASSWORD: vraxel
+      POSTGRES_DB: vraxel
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vraxel"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
