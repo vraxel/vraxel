@@ -185,7 +185,9 @@ func serve(addr string, rh RequestHandler, idx int, opts ServerOptions) {
 	}
 	logger.Infof("started http server on %s://%s/", scheme, ln.Addr())
 	if !opts.DisableBuiltinRoutes {
-		logger.Infof("pprof handlers are exposed at %s://%s/debug/pprof/", scheme, ln.Addr())
+		if pprofAuthKey.Get() != "" || *httpAuthUsername != "" {
+			logger.Infof("pprof handlers are exposed at %s://%s/debug/pprof/", scheme, ln.Addr())
+		}
 	}
 
 	serveWithListener(addr, ln, rh, opts.DisableBuiltinRoutes)
@@ -379,6 +381,15 @@ func builtinRoutesHandler(s *server, r *http.Request, w http.ResponseWriter, rh 
 func builtinDefaultRouteHandler(r *http.Request, w http.ResponseWriter) bool {
 	if strings.HasPrefix(r.URL.Path, "/debug/pprof/") {
 		pprofRequests.Inc()
+		// pprof exposes heap contents, goroutine stacks and the command
+		// line. This server fronts the public edge, so unlike the
+		// VictoriaMetrics lineage (internal-component assumption) the
+		// tree is OFF unless an auth gate is explicitly configured via
+		// -pprofAuthKey or -httpAuth.*.
+		if pprofAuthKey.Get() == "" && *httpAuthUsername == "" {
+			http.Error(w, "pprof is disabled; set -pprofAuthKey or -httpAuth.* to enable", http.StatusNotFound)
+			return true
+		}
 		if !CheckAuthFlag(w, r, pprofAuthKey) {
 			return true
 		}

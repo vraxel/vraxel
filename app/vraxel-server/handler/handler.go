@@ -93,6 +93,14 @@ func NewRootHandler(cfg RootHandlerConfig) func(http.ResponseWriter, *http.Reque
 func (rt *rootRouter) route(w http.ResponseWriter, r *http.Request) bool {
 	urlPath := r.URL.Path
 
+	// Baseline security headers on every response. CSP is intentionally
+	// absent: vite injects inline styles, so a policy would need
+	// unsafe-inline and add noise without adding protection.
+	h := w.Header()
+	h.Set("X-Content-Type-Options", "nosniff")
+	h.Set("X-Frame-Options", "DENY")
+	h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+
 	if rt.routeHealth(w, r, urlPath) {
 		return true
 	}
@@ -219,6 +227,20 @@ func serveFrontend(w http.ResponseWriter, r *http.Request, distFS fs.FS, staticH
 		setFrontendCacheHeaders(w, filePath)
 		staticHandler.ServeHTTP(w, r)
 		return
+	}
+
+	// Extensionless alias for secondary HTML entries: /api-docs ->
+	// api-docs.html. Checked before the SPA fallback so multi-entry pages
+	// keep clean URLs without being swallowed by index.html.
+	if !strings.Contains(path.Base(filePath), ".") {
+		htmlPath := filePath + ".html"
+		if f, err := distFS.Open(htmlPath); err == nil {
+			_ = f.Close()
+			r.URL.Path = "/" + htmlPath
+			setFrontendCacheHeaders(w, htmlPath)
+			staticHandler.ServeHTTP(w, r)
+			return
+		}
 	}
 
 	// SPA fallback: serve index.html for all non-file routes
