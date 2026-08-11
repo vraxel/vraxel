@@ -46,5 +46,8 @@ export async function getUserInfo(): Promise<OIDCUserInfo> {
 
 /** The effective permission set for one user across all three scopes. */
 export async function getUserPermissions(userId: string): Promise<UserPermissions> {
-  return apiRequest(api.get(`/api/iam/v1/users/${userId}/permissions`).json())
+  // Relative to the shared client's "/api" prefix. ky trims a leading
+  // slash off the input before joining, so passing the full
+  // "/api/iam/v1/..." here would request "/api/api/iam/v1/...".
+  return apiRequest(api.get(`iam/v1/users/${userId}/permissions`).json())
 }
