@@ -48,6 +48,10 @@ type Provider struct {
 
 	// pendingAuthorize stores pending authorization requests by request_id
 	pendingAuthorize PendingStore
+
+	// loginThrottle counts failed logins for brute-force lockout; nil
+	// disables throttling (see SetLoginThrottle).
+	loginThrottle LoginThrottleStore
 }
 
 // NewProvider creates a new OIDC provider.

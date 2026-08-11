@@ -11,6 +11,7 @@ import { loginWithCredentials, startAuthFlow } from "@/core/auth/auth"
 const loginErrorMap: Record<string, string> = {
   "invalid credentials": "login.error.invalidCredentials",
   "account is not active": "login.error.accountInactive",
+  "too many failed login attempts": "login.error.tooManyAttempts",
   "invalid or expired request_id": "login.error.sessionExpired",
 }
 

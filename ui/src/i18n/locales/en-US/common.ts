@@ -109,6 +109,7 @@ const common = {
   // login errors
   "login.error.invalidCredentials": "Invalid username or password",
   "login.error.accountInactive": "Account has been deactivated",
+  "login.error.tooManyAttempts": "Too many failed attempts; temporarily locked, try again later.",
   "login.error.sessionExpired": "Session expired, redirecting...",
   "login.error.failed": "Login failed, please try again",
 

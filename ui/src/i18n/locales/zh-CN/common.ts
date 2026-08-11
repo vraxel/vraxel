@@ -109,6 +109,7 @@ const common = {
   // login errors
   "login.error.invalidCredentials": "用户名或密码错误",
   "login.error.accountInactive": "账号已被停用",
+  "login.error.tooManyAttempts": "失败次数过多，账号已临时锁定，请稍后再试",
   "login.error.sessionExpired": "登录会话已过期，正在重新跳转...",
   "login.error.failed": "登录失败，请重试",
 

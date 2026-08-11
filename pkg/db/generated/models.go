@@ -33,6 +33,12 @@ type AuditLog struct {
 	CreatedAt      time.Time       `json:"created_at"`
 }
 
+type LoginThrottle struct {
+	Key         string    `json:"key"`
+	WindowStart time.Time `json:"window_start"`
+	FailCount   int32     `json:"fail_count"`
+}
+
 type Namespace struct {
 	ID          int64     `json:"id"`
 	Name        string    `json:"name"`

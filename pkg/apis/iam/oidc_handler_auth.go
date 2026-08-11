@@ -3,6 +3,7 @@ package iam
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"time"
 
 	"vraxel.io/vraxel/lib/audit"
@@ -138,12 +139,23 @@ func handleLogin(provider *oidc.Provider, auditLogger audit.Logger) http.Handler
 			return
 		}
 
+		// Brute-force lockout BEFORE the bcrypt check: a locked key is
+		// rejected without burning CPU on the hash and without leaking
+		// whether the password would have matched.
+		clientIP := audit.ClientIP(r)
+		if retryAfter, locked := provider.LoginLocked(r.Context(), req.Username, clientIP); locked {
+			loginHandleThrottled(w, r, auditLogger, req.Username, retryAfter)
+			return
+		}
+
 		session, _, err := provider.Login(r.Context(), req.Username, req.Password)
 		if err != nil {
+			provider.NoteLoginFailure(r.Context(), req.Username, clientIP)
 			loginHandleFailure(w, r, auditLogger, req.Username, err)
 			return
 		}
 
+		provider.NoteLoginSuccess(r.Context(), req.Username)
 		loginAuditSuccess(r, auditLogger, req.Username, session.UserID)
 
 		// If requestId provided, complete the authorization flow
@@ -185,6 +197,30 @@ func loginHandleFailure(w http.ResponseWriter, r *http.Request, auditLogger audi
 		})
 	}
 	oidcError(w, "invalid_grant", description, http.StatusUnauthorized)
+}
+
+// loginHandleThrottled 处理被暴破锁定拒绝的登录：写审计事件并返回 429 +
+// Retry-After。error_description 是固定字符串（前端 loginErrorMap 按整句
+// 匹配做本地化），具体等待秒数放在 Retry-After 头给程序化客户端。
+func loginHandleThrottled(w http.ResponseWriter, r *http.Request, auditLogger audit.Logger, username string, retryAfter time.Duration) {
+	logger.Infof("login throttled for user %q from %s (retry in %s)", username, audit.ClientIP(r), retryAfter.Round(time.Second))
+	if auditLogger != nil {
+		auditLogger.Log(audit.Event{
+			Username:   username,
+			EventType:  "authentication",
+			Action:     "login_throttled",
+			HTTPMethod: r.Method,
+			HTTPPath:   r.URL.Path,
+			StatusCode: http.StatusTooManyRequests,
+			ClientIP:   audit.ClientIP(r),
+			UserAgent:  r.UserAgent(),
+			Success:    false,
+			Detail:     audit.JSONString("too many failed login attempts"),
+			CreatedAt:  time.Now(),
+		})
+	}
+	w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())+1))
+	oidcError(w, "rate_limited", "too many failed login attempts", http.StatusTooManyRequests)
 }
 
 // loginAuditSuccess 在登录成功后写入审计事件（auditLogger 为 nil 时跳过）。

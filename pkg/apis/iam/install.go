@@ -127,6 +127,7 @@ func NewOIDCProvider(database *db.DB, result ModuleResult, cfg *config.OIDCConfi
 		sessionStore, codeStore, pendingStore,
 	)
 	provider.SetClients(oidc.ParseClients(cfg.Clients))
+	provider.SetLoginThrottle(oidc.NewPGLoginThrottleStore(database.Queries))
 
 	logger.Infof("OIDC provider initialized (issuer=%s)", cfg.Issuer)
 	return provider
