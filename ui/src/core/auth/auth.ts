@@ -215,6 +215,14 @@ export async function startAuthFlow(opts: { saveReturnTo?: boolean } = {}) {
   const params = new URLSearchParams({
     response_type: "code",
     client_id: CLIENT_ID,
+    // Pin the callback to THIS origin. Without it the server falls back to the
+    // client's first registered redirect_uri (the :9099 embedded frontend in
+    // dev), which is fatal for social login: the callback is a server-side 302
+    // to the full redirect_uri, so the browser lands on :9099 where the PKCE
+    // code_verifier (kept in :5199 sessionStorage) does not exist and the
+    // token exchange fails into a re-login loop. Password login masked this by
+    // stripping the host and navigating relative; social login cannot.
+    redirect_uri: `${window.location.origin}/auth/callback`,
     scope: "openid profile email phone",
     state,
     code_challenge: codeChallenge,
