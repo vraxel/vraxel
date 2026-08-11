@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/jackc/pgx/v5"
 	"vraxel.io/vraxel/pkg/db"
@@ -30,6 +31,11 @@ type SocialLoginInput struct {
 	DisplayName     string
 	AvatarURL       string
 	DefaultRoleName string
+	// AllowCreate gates provisioning a brand-new account. When false
+	// (self-registration disabled), an unknown social identity is refused
+	// instead of silently creating an account; already-linked or
+	// email-matched existing users can still sign in.
+	AllowCreate bool
 }
 
 type pgRegistrationStore struct {
@@ -48,6 +54,13 @@ func NewPGRegistrationStore(d *db.DB) RegistrationStore {
 // registration failures to 409 without importing pkg/db.
 func IsConflict(err error) bool {
 	return errors.Is(err, pgerrors.ErrConflict)
+}
+
+// IsForbidden reports whether err is a policy refusal (inactive account,
+// builtin-account link attempt, or social signup while registration is
+// disabled). Handlers map it to 403 without importing pkg/db.
+func IsForbidden(err error) bool {
+	return errors.Is(err, pgerrors.ErrForbidden)
 }
 
 func (s *pgRegistrationStore) RegisterLocal(ctx context.Context, in RegisterLocalInput) (*UserRow, error) {
@@ -72,10 +85,17 @@ func (s *pgRegistrationStore) RegisterLocal(ctx context.Context, in RegisterLoca
 
 func (s *pgRegistrationStore) FindOrCreateSocial(ctx context.Context, in SocialLoginInput) (*UserRow, error) {
 	return db.WithTxReturning(ctx, s.DB, func(ctx context.Context, q *generated.Queries) (*UserRow, error) {
-		// 1. Existing linked identity -> return its user.
+		// 1. Existing linked identity -> sign that user in (if still active).
 		ident, err := q.GetUserIdentity(ctx, generated.GetUserIdentityParams{Provider: in.Provider, ProviderSubject: in.Subject})
 		if err == nil {
-			return getUserRowByID(ctx, q, ident.UserID)
+			row, err := getUserRowByID(ctx, q, ident.UserID)
+			if err != nil {
+				return nil, err
+			}
+			if err := requireActive(row.Status, row.Username); err != nil {
+				return nil, err
+			}
+			return row, nil
 		}
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return nil, fmt.Errorf("get user identity: %w", err)
@@ -95,14 +115,28 @@ func (s *pgRegistrationStore) FindOrCreateSocial(ctx context.Context, in SocialL
 			case err == nil && u.Builtin:
 				return nil, fmt.Errorf("social identity matches builtin user %q by email: %w", u.Username, pgerrors.ErrForbidden)
 			case err == nil:
+				// Refuse to attach a social identity to a deactivated account,
+				// mirroring the password-login active check.
+				if err := requireActive(u.Status, u.Username); err != nil {
+					return nil, err
+				}
 				userID = u.ID
 			case !errors.Is(err, pgx.ErrNoRows):
 				return nil, fmt.Errorf("get user by email: %w", err)
 			}
 		}
 		if userID == 0 {
+			// Unknown identity + unknown email = a new signup. Gated by the
+			// same self-registration switch as password signup.
+			if !in.AllowCreate {
+				return nil, fmt.Errorf("social signups are disabled: %w", pgerrors.ErrForbidden)
+			}
+			username, err := uniqueUsername(ctx, q, in.Username)
+			if err != nil {
+				return nil, err
+			}
 			row, err := q.CreateUser(ctx, generated.CreateUserParams{
-				Username: in.Username, Email: in.Email, DisplayName: in.DisplayName,
+				Username: username, Email: in.Email, DisplayName: in.DisplayName,
 				Phone: "", AvatarUrl: in.AvatarURL, Status: "active",
 			})
 			if err != nil {
@@ -123,6 +157,40 @@ func (s *pgRegistrationStore) FindOrCreateSocial(ctx context.Context, in SocialL
 
 		return getUserRowByID(ctx, q, userID)
 	})
+}
+
+// requireActive rejects a login for a non-active account, matching the
+// password-login guard so a deactivated user cannot sign in via social either.
+func requireActive(status, username string) error {
+	if status != "active" {
+		return fmt.Errorf("account %q is not active: %w", username, pgerrors.ErrForbidden)
+	}
+	return nil
+}
+
+// uniqueUsername returns base if free, else base-2, base-3, ... The social
+// username is provider+subject (already globally unique per provider), so a
+// clash only happens against a human-picked name; the suffix keeps social
+// login from failing hard in that rare case. The candidate is trimmed to the
+// 50-char column limit before appending the suffix.
+func uniqueUsername(ctx context.Context, q *generated.Queries, base string) (string, error) {
+	candidate := base
+	for i := 2; i <= 20; i++ {
+		_, err := q.GetUserByUsername(ctx, candidate)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return candidate, nil
+		}
+		if err != nil {
+			return "", fmt.Errorf("check username availability: %w", err)
+		}
+		suffix := "-" + strconv.Itoa(i)
+		trimmed := base
+		if len(trimmed)+len(suffix) > 50 {
+			trimmed = trimmed[:50-len(suffix)]
+		}
+		candidate = trimmed + suffix
+	}
+	return "", fmt.Errorf("could not derive a unique username from %q", base)
 }
 
 func getUserRowByID(ctx context.Context, q *generated.Queries, id int64) (*UserRow, error) {

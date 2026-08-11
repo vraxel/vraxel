@@ -119,8 +119,16 @@ func handleSocialCallback(provider *oidc.Provider, extras authExtras, auditLogge
 			DisplayName:     profile.Name,
 			AvatarURL:       profile.AvatarURL,
 			DefaultRoleName: extras.defaultRole,
+			AllowCreate:     extras.selfRegistration,
 		})
 		if err != nil {
+			// Policy refusals (inactive account, builtin-link, signups disabled)
+			// are a 403, not a server error.
+			if store.IsForbidden(err) {
+				logger.Infof("social login refused (%s): %v", name, err)
+				http.Redirect(w, r, "/error?status=403", http.StatusFound)
+				return
+			}
 			logger.Errorf("provision social user (%s): %v", name, err)
 			http.Redirect(w, r, "/error?status=500", http.StatusFound)
 			return

@@ -61,6 +61,7 @@ func TestFindOrCreateSocial(t *testing.T) {
 	in := store.SocialLoginInput{
 		Provider: "github", Subject: "42", Email: "ghuser@example.com",
 		Username: "github_42", DisplayName: "GH User", DefaultRoleName: store.RolePlatformViewer,
+		AllowCreate: true,
 	}
 	u1, err := s.Registration.FindOrCreateSocial(ctx, in)
 	if err != nil {
@@ -80,7 +81,7 @@ func TestFindOrCreateSocial(t *testing.T) {
 	// existing user instead of creating a duplicate.
 	u3, err := s.Registration.FindOrCreateSocial(ctx, store.SocialLoginInput{
 		Provider: "google", Subject: "g-1", Email: "ghuser@example.com",
-		Username: "google_g-1", DefaultRoleName: store.RolePlatformViewer,
+		Username: "google_g-1", DefaultRoleName: store.RolePlatformViewer, AllowCreate: true,
 	})
 	if err != nil {
 		t.Fatalf("link by email: %v", err)
@@ -101,6 +102,61 @@ func TestFindOrCreateSocial(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatalf("expected refusal to link social identity to builtin user")
+	}
+}
+
+func TestFindOrCreateSocial_CreateGate(t *testing.T) {
+	s := store.NewStores(dbtest.New(t))
+	ctx := context.Background()
+	seedViewerRole(t, s)
+
+	// AllowCreate=false: an unknown identity/email is refused, not created.
+	_, err := s.Registration.FindOrCreateSocial(ctx, store.SocialLoginInput{
+		Provider: "github", Subject: "999", Email: "new@example.com",
+		Username: "github_999", DefaultRoleName: store.RolePlatformViewer, AllowCreate: false,
+	})
+	if !store.IsForbidden(err) {
+		t.Fatalf("expected forbidden when signups disabled, got %v", err)
+	}
+}
+
+func TestFindOrCreateSocial_InactiveRefused(t *testing.T) {
+	s := store.NewStores(dbtest.New(t))
+	ctx := context.Background()
+	seedViewerRole(t, s)
+
+	// Existing user, deactivated, matched by verified email -> refused.
+	u := newUser(t, s, "dormant-it")
+	inactive := "inactive"
+	if _, err := s.User.Patch(ctx, store.UserPatchInput{ID: u.ID, Status: &inactive}); err != nil {
+		t.Fatalf("deactivate: %v", err)
+	}
+	_, err := s.Registration.FindOrCreateSocial(ctx, store.SocialLoginInput{
+		Provider: "google", Subject: "g-dormant", Email: u.Email,
+		Username: "google_g-dormant", DefaultRoleName: store.RolePlatformViewer, AllowCreate: true,
+	})
+	if !store.IsForbidden(err) {
+		t.Fatalf("expected forbidden for inactive account, got %v", err)
+	}
+}
+
+func TestFindOrCreateSocial_UsernameCollisionSuffix(t *testing.T) {
+	s := store.NewStores(dbtest.New(t))
+	ctx := context.Background()
+	seedViewerRole(t, s)
+
+	// A human already owns the derived name "github_77"; the social signup
+	// must fall back to a suffixed username instead of failing.
+	taken := newUser(t, s, "github_77")
+	u, err := s.Registration.FindOrCreateSocial(ctx, store.SocialLoginInput{
+		Provider: "github", Subject: "77", Email: "collide@example.com",
+		Username: "github_77", DefaultRoleName: store.RolePlatformViewer, AllowCreate: true,
+	})
+	if err != nil {
+		t.Fatalf("social signup with taken username: %v", err)
+	}
+	if u.ID == taken.ID || u.Username == "github_77" {
+		t.Fatalf("expected a distinct suffixed username, got %q (id %d)", u.Username, u.ID)
 	}
 }
 
