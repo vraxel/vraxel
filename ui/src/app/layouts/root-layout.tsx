@@ -338,6 +338,17 @@ export default function RootLayout() {
     return null
   }
 
+  // Logout / 401-refresh clears identity (permissions -> null) and then kicks a
+  // full-page redirect to /oidc/authorize. That redirect is async (startAuthFlow
+  // awaits sha256), so a React re-render lands here first. Without this guard we
+  // flash /error?status=403 for a frame before the browser navigates away. The
+  // oidc_flow_pending marker (set synchronously by startAuthFlow before its
+  // await) means a handshake is in flight, so render nothing and let the
+  // imminent navigation take over.
+  if (!permissions && sessionStorage.getItem("oidc_flow_pending")) {
+    return null
+  }
+
   // Redirect to 403 if user has zero permissions (or fetchPermissions was never called)
   if (!permissions) {
     return <Navigate to="/error?status=403" replace />
