@@ -274,9 +274,11 @@ export function ScopedRoleFormDialog({
         control={form.control}
         name="rules"
         render={() => (
-          <FormItem className="col-span-2 -ml-5 flex min-h-0 flex-col border-l pl-5">
+          <FormItem className="relative col-span-2 -ml-5 flex min-h-0 flex-col pl-5 before:absolute before:inset-y-0 before:left-0 before:w-px before:bg-[linear-gradient(to_bottom,transparent,var(--color-border)_12%,var(--color-border)_88%,transparent)]">
             {/* -ml-5 + pl-5 park the divider in the middle of the gap-10 gutter
-                without shifting the column's content. */}
+                without shifting the column's content; the gradient fades it
+                out at both ends so it groups the columns instead of boxing
+                them in. */}
             <Label>
               {t("role.rules")}
               <span className="text-destructive ml-0.5">*</span>
