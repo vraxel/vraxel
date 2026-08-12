@@ -147,25 +147,11 @@
   }
 }
 
-/* Enter/exit animations for every Radix overlay. tw-animate-css defaults to
-   150ms with the Tailwind ease; these override per surface so the weight of
-   the motion matches the weight of the thing moving. */
-@layer components {
-  [data-slot="tooltip-content"] {
-    animation-duration: 100ms;
-    animation-timing-function: var(--ease-out-quint);
-  }
-  [data-slot="dropdown-menu-content"],
-  [data-slot="select-content"],
-  [data-slot="popover-content"] {
-    animation-duration: 120ms;
-    animation-timing-function: var(--ease-out-quint);
-  }
-  [data-slot="dialog-overlay"],
-  [data-slot="sheet-overlay"] {
-    animation-duration: 150ms;
-  }
-}
+/* Overlay timing lives on the components themselves as duration-*/ease-*
+   utilities, not here. tw-animate-css builds `animate-in` out of the
+   `animation` shorthand in the utilities layer, and a shorthand beats the
+   longhands a `@layer components` block can set -- an earlier attempt to tune
+   motion from this file compiled fine and did nothing. */
 
 @media (prefers-reduced-motion: reduce) {
   *,
