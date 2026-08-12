@@ -197,7 +197,7 @@ export default function NamespaceUsersPage() {
       </div>
 
       {/* table */}
-      <div className="overflow-hidden rounded-xl border shadow-sm">
+      <div className="border-border-subtle overflow-hidden rounded-xl border shadow-sm">
         <Table>
           <TableHeader>
             <TableRow>

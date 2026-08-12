@@ -18,15 +18,16 @@
      tooltips 100ms. Radix/shadcn defaults were 200-500ms, which reads slow. */
   --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
 
-  /* Radius scale. Previously only --radius existed and nothing consumed it,
-     so `rounded-md` fell back to Tailwind's 0.375rem while Card/Input carried
-     no radius class at all (square corners next to rounded buttons).
-     Overriding --radius-* wires every `rounded-*` utility to one scale. */
-  --radius: 0.5rem;
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  /* Radius scale, stated outright rather than derived as `radius - 4px`:
+     that shadcn formula collapses to 0 once the base is small, so a tight
+     scale has to be written down. Controls 4px, overlays 6px, surfaces 8px.
+     Small radii read as precision instruments; this is a console, not a
+     consumer app. */
+  --radius: 0.375rem;
+  --radius-sm: 0.125rem;
+  --radius-md: 0.25rem;
+  --radius-lg: 0.375rem;
+  --radius-xl: 0.5rem;
 
   /* Elevation. Cool-tinted and layered (contact shadow + ambient spread) so
      surfaces lift off the page instead of relying on a 1px border alone. */
@@ -60,6 +61,15 @@
   --color-muted: oklch(0.968 0.004 264);
   --color-muted-foreground: oklch(0.53 0.018 264);
 
+  /* Two tones between `foreground` and `muted-foreground`, which were the
+     only greys the app had. One near-black step for every kind of secondary
+     text made table values, subtitles, hints and labels all weigh the same.
+     `body` carries the bulk of the reading (table cells); `foreground` is
+     now reserved for titles and emphasis. `faint` is below muted, for text
+     that must be present without being read -- placeholders, empty markers. */
+  --color-body: oklch(0.4 0.018 264);
+  --color-faint: oklch(0.68 0.014 264);
+
   --color-accent: oklch(0.962 0.006 264);
   --color-accent-foreground: oklch(0.28 0.02 264);
 
@@ -69,7 +79,12 @@
   --color-success: oklch(0.6 0.14 155);
   --color-warning: oklch(0.72 0.16 70);
 
+  /* Two border weights. `border` is functional -- inputs, dividers, anything
+     that separates. `border-subtle` is for surfaces that already lift off the
+     page by background alone, where the line is only there to close the
+     shape; drawing those at full weight boxes the content in. */
   --color-border: oklch(0.923 0.005 264);
+  --color-border-subtle: oklch(0.948 0.004 264);
   --color-input: oklch(0.905 0.006 264);
   --color-ring: oklch(0.545 0.205 268);
 

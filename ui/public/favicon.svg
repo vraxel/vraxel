@@ -6,7 +6,7 @@
      lightest face disappears against dark browser chrome at 16px, and the tab
      strip's background is not ours to control. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <rect width="32" height="32" rx="7" fill="#3e60e5"/>
+  <rect width="32" height="32" rx="6" fill="#3e60e5"/>
   <g transform="translate(16 16) scale(0.72) translate(-16 -16)" fill="#ffffff">
     <path d="M16 16 L22.5 12.25 L29 16 L22.5 19.75 Z" opacity="0.85"/>
     <path d="M16 11.5 L22.5 7.75 L22.5 12.25 L16 16 Z" opacity="0.55"/>

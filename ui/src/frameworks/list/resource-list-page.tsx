@@ -117,7 +117,7 @@ export function ResourceListPage<T extends ListRow>({
       </div>
 
       {/* overflow-hidden so the muted table header clips to the rounded corners */}
-      <div className="overflow-hidden rounded-xl border shadow-sm">
+      <div className="border-border-subtle overflow-hidden rounded-xl border shadow-sm">
         <Table>
           <TableHeader>
             <TableRow>

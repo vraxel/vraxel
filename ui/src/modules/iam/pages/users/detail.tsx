@@ -289,7 +289,7 @@ function UserWorkspacesCard({ userId }: { userId: string }) {
         </div>
 
         {/* table */}
-        <div className="overflow-hidden rounded-xl border shadow-sm">
+        <div className="border-border-subtle overflow-hidden rounded-xl border shadow-sm">
           <Table>
             <TableHeader>
               <TableRow>
@@ -512,7 +512,7 @@ function UserNamespacesCard({ userId }: { userId: string }) {
         </div>
 
         {/* table */}
-        <div className="overflow-hidden rounded-xl border shadow-sm">
+        <div className="border-border-subtle overflow-hidden rounded-xl border shadow-sm">
           <Table>
             <TableHeader>
               <TableRow>
@@ -775,7 +775,7 @@ function UserRoleBindingsCard({ userId }: { userId: string }) {
             />
           </div>
         </div>
-        <div className="overflow-hidden rounded-xl border shadow-sm">
+        <div className="border-border-subtle overflow-hidden rounded-xl border shadow-sm">
           <Table>
             <TableHeader>
               <TableRow>
