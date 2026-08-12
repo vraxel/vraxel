@@ -22,21 +22,15 @@ export default defineConfig([
       globals: globals.browser,
     },
     rules: {
-      // The react-hooks v7 compiler-family rules fire ~400 times on the
-      // fetchData-in-useEffect idiom shared by every list/detail page.
-      // That idiom is removed wholesale by the data-layer migration
-      // (docs/frontend-refactor/plan.md, W2/W3); until it lands, keep
-      // these visible as warnings so new code still sees them. Ratchet
-      // back to error once the migration completes.
-      'react-hooks/set-state-in-effect': 'warn',
-      'react-hooks/refs': 'warn',
-      'react-hooks/purity': 'warn',
-      'react-hooks/immutability': 'warn',
-      'react-hooks/preserve-manual-memoization': 'warn',
-      // Pages currently export dialogs/helpers next to the page component
-      // (e.g. HostFormDialog inside hosts/list.tsx); W3/W5 moves them into
-      // module components/, then this returns to error.
-      'react-refresh/only-export-components': 'warn',
+      // The react-hooks v7 compiler-family rules and
+      // react-refresh/only-export-components used to be pinned to 'warn' here,
+      // carried over from the repo this UI was seeded from, where the
+      // fetchData-in-useEffect idiom fired them a few hundred times pending a
+      // data-layer migration. That does not describe this tree: every page
+      // reads through useApiQuery already, and eslint reports zero hits for
+      // all six rules. Holding them at 'warn' bought nothing and quietly
+      // licensed new code to reintroduce the idiom, so they stay at the
+      // recommended 'error'.
       // Unused imports are auto-removed by unused-imports (AST-safe
       // autofix, used heavily by the W3 migration to strip imports the
       // framework replaced). no-unused-imports subsumes the import half
