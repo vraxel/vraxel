@@ -10,6 +10,7 @@ import { Button } from "@/shared/ui/button"
 import { Badge } from "@/shared/ui/badge"
 import { Skeleton } from "@/shared/ui/skeleton"
 import { Input } from "@/shared/ui/input"
+import { Label } from "@/shared/ui/label"
 import { Textarea } from "@/shared/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs"
@@ -436,28 +437,19 @@ function EditRoleDialog({
     >
       {/* Left: basic fields */}
       <div className="col-span-1 -mx-1 space-y-4 overflow-y-auto px-1">
-        <div>
-          <label htmlFor={roleNameId} className="text-sm font-medium">
-            {t("role.name")}
-          </label>
-          <Input
-            id={roleNameId}
-            name="role-name"
-            value={role.spec.name}
-            disabled
-            className="mt-1"
-          />
+        {/* Not FormField-bound (both are read-only), so they mirror
+            FormItem's own "grid gap-2" instead of a one-off spacing. */}
+        <div className="grid grid-cols-1 gap-2">
+          <Label htmlFor={roleNameId}>{t("role.name")}</Label>
+          <Input id={roleNameId} name="role-name" value={role.spec.name} disabled />
         </div>
-        <div>
-          <label htmlFor={roleScopeId} className="text-sm font-medium">
-            {t("role.scope")}
-          </label>
+        <div className="grid grid-cols-1 gap-2">
+          <Label htmlFor={roleScopeId}>{t("role.scope")}</Label>
           <Input
             id={roleScopeId}
             name="role-scope"
             value={t(`role.scope.${role.spec.scope}`)}
             disabled
-            className="mt-1"
           />
         </div>
         <FormField
@@ -492,15 +484,18 @@ function EditRoleDialog({
         control={form.control}
         name="rules"
         render={() => (
-          <FormItem className="col-span-2 flex min-h-0 flex-col">
-            <div className="text-sm font-medium">
+          {/* -ml-3 + pl-3 park the divider in the middle of the gap-6 gutter
+              without shifting the column's content. */}
+          <FormItem className="col-span-2 flex min-h-0 flex-col md:-ml-3 md:border-l md:pl-3">
+            <Label>
               {t("role.rules")}
+              <span className="text-destructive ml-0.5">*</span>
               {selectedRules.length > 0 && (
-                <span className="text-muted-foreground ml-2 font-normal">
+                <span className="text-muted-foreground font-normal">
                   ({t("role.rulesCount", { count: selectedRules.length })})
                 </span>
               )}
-            </div>
+            </Label>
             <PermissionSelector
               permissions={permissions}
               value={selectedRules}
