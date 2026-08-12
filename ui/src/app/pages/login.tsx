@@ -84,13 +84,13 @@ export default function LoginPage() {
 
   return (
     <div
-      className="relative flex min-h-screen items-center justify-center bg-cover bg-center bg-no-repeat"
+      className="flex min-h-screen items-center justify-center bg-cover bg-center bg-no-repeat"
       style={{ backgroundImage: "url('/login-bg.svg')" }}
     >
-      <div className="absolute top-4 right-4">
-        <LanguageSwitcher />
-      </div>
-      <Card className="w-full max-w-sm shadow-lg">
+      <Card className="relative w-full max-w-sm shadow-lg">
+        <div className="absolute top-3 right-3">
+          <LanguageSwitcher />
+        </div>
         <CardHeader className="justify-items-center gap-3 text-center">
           <span className="bg-primary text-primary-foreground flex size-10 items-center justify-center rounded-xl">
             <LayoutDashboard className="h-5 w-5" />
