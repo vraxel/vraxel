@@ -37,7 +37,7 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-black/50 duration-150 ease-out data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
+        "fixed inset-0 z-50 bg-black/50",
         className
       )}
       {...props}
@@ -126,7 +126,7 @@ function DialogContent({
             e.currentTarget.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))
           }
         }}
-        className="group/dialog-content fixed inset-0 z-50 flex items-center justify-center p-4 outline-none pointer-events-none"
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 outline-none pointer-events-none"
         {...props}
       >
         <div
@@ -135,7 +135,12 @@ function DialogContent({
             // grid-cols-[minmax(0,1fr)]: grid item 默认 min-width:auto = min-content,
             // 长 whitespace-nowrap 文本(如 SelectTrigger 显示长凭证名)会撑大 grid track,
             // 突破 dialog 内容区。显式 minmax(0,1fr) 强制 track 收缩,溢出由子元素自己处理。
-            "relative grid grid-cols-[minmax(0,1fr)] w-full max-w-[calc(100%-2rem)] gap-4 rounded-xl border border-border-subtle bg-card p-6 shadow-xl duration-150 ease-out overflow-hidden pointer-events-auto group-data-[state=open]/dialog-content:animate-in group-data-[state=open]/dialog-content:fade-in-0 group-data-[state=open]/dialog-content:zoom-in-95 group-data-[state=closed]/dialog-content:animate-out group-data-[state=closed]/dialog-content:fade-out-0 group-data-[state=closed]/dialog-content:zoom-out-95 sm:max-w-lg",
+            // No enter/exit animation. A modal is a hard context switch, and
+            // any motion on it is time between the click and being able to
+            // type. Radix still drives data-state; nothing styles it here, so
+            // the close path unmounts immediately instead of waiting on
+            // animationend.
+            "relative grid grid-cols-[minmax(0,1fr)] w-full max-w-[calc(100%-2rem)] gap-4 rounded-xl border border-border-subtle bg-card p-6 shadow-xl overflow-hidden pointer-events-auto sm:max-w-lg",
             className
           )}
         >
