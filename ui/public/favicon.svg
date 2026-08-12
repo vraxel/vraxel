@@ -1,21 +1,17 @@
-<!-- Vraxel mark. Same geometry as src/shared/components/brand-mark.tsx, but on
-     a filled tile with the tones inverted: the component paints indigo on
-     white, where low opacity reads as light, while here white paints on
-     indigo, where low opacity reads as dark. Keeping the raw numbers would
-     have put the top face in shadow. A bare mark is not an option, because
-     its lightest face disappears against dark browser chrome at 16px and the
-     tab strip's background is not ours to control.
+<!-- Vraxel mark. Identical geometry and tones to
+     src/shared/components/brand-mark.tsx, with the component's currentColor
+     resolved to the sRGB of the primary token. No tile, transparent
+     background, so the tab icon is the same object as the one in the sidebar.
      Keep this comment free of consecutive hyphens. XML forbids them inside a
      comment, and a browser loading an SVG as an image parses it strictly, so
      a single stray pair makes the whole favicon fail to load and the tab
      silently falls back to whatever /favicon.ico serves. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <rect width="32" height="32" rx="6" fill="#3e60e5"/>
-  <g transform="translate(16 16) scale(0.72) translate(-16 -16)" fill="#ffffff">
-    <path d="M16 16 L22.5 12.25 L29 16 L22.5 19.75 Z" opacity="0.85"/>
-    <path d="M16 11.5 L22.5 7.75 L22.5 12.25 L16 16 Z" opacity="0.55"/>
-    <path d="M16 4 L3 11.5 L16 19 L22.5 15.25 L16 11.5 L22.5 7.75 Z"/>
-    <path d="M3 11.5 L16 19 L16 28 L3 20.5 Z" opacity="0.78"/>
-    <path d="M22.5 15.25 L16 19 L16 28 L29 20.5 L29 16 L22.5 19.75 Z" opacity="0.55"/>
+  <g fill="#3e60e5">
+    <path d="M16 16 L22.5 12.25 L29 16 L22.5 19.75 Z" opacity="0.55"/>
+    <path d="M16 11.5 L22.5 7.75 L22.5 12.25 L16 16 Z"/>
+    <path d="M16 4 L3 11.5 L16 19 L22.5 15.25 L16 11.5 L22.5 7.75 Z" opacity="0.45"/>
+    <path d="M3 11.5 L16 19 L16 28 L3 20.5 Z" opacity="0.7"/>
+    <path d="M22.5 15.25 L16 19 L16 28 L29 20.5 L29 16 L22.5 19.75 Z"/>
   </g>
 </svg>
