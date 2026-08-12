@@ -235,9 +235,7 @@ export default function NamespaceDetailPage() {
                 <span className="text-muted-foreground mb-1 block text-xs">
                   {t("common.created")}
                 </span>
-                <p className="font-medium">
-                  {formatDateTime(namespace.metadata.createdAt)}
-                </p>
+                <p className="font-medium">{formatDateTime(namespace.metadata.createdAt)}</p>
               </div>
               <div className="min-w-0">
                 <span className="text-muted-foreground mb-1 block text-xs">
@@ -251,9 +249,7 @@ export default function NamespaceDetailPage() {
                 <span className="text-muted-foreground mb-1 block text-xs">
                   {t("common.updated")}
                 </span>
-                <p className="font-medium">
-                  {formatDateTime(namespace.metadata.updatedAt)}
-                </p>
+                <p className="font-medium">{formatDateTime(namespace.metadata.updatedAt)}</p>
               </div>
             </div>
           </CardContent>

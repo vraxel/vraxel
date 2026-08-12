@@ -14,7 +14,7 @@ export function OverviewCard({ label, icon: Icon, value, loading, onClick }: Ove
     <Card
       className={
         onClick
-          ? "hover:border-primary/30 hover:shadow-md cursor-pointer transition-all duration-150 ease-out hover:-translate-y-0.5"
+          ? "hover:border-primary/30 cursor-pointer transition-all duration-150 ease-out hover:-translate-y-0.5 hover:shadow-md"
           : undefined
       }
       onClick={onClick}

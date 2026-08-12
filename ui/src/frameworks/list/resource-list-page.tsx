@@ -183,7 +183,9 @@ export function ResourceListPage<T extends ListRow>({
                 <TableRow key={i} className="hover:bg-transparent">
                   {Array.from({ length: colCount }).map((__, j) => (
                     <TableCell key={j}>
-                      <Skeleton className={cn("h-4", SKELETON_WIDTHS[(i + j) % SKELETON_WIDTHS.length])} />
+                      <Skeleton
+                        className={cn("h-4", SKELETON_WIDTHS[(i + j) % SKELETON_WIDTHS.length])}
+                      />
                     </TableCell>
                   ))}
                 </TableRow>
