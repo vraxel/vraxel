@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"vraxel.io/vraxel/lib/apiserver"
+	"vraxel.io/vraxel/lib/config"
 	"vraxel.io/vraxel/lib/openapi"
 	"vraxel.io/vraxel/pkg/apis"
 )
@@ -16,6 +17,15 @@ import (
 // the spec came to advertise operations answering 405 and to miss real
 // paths such as /api/audit/v1/logs.
 func routes() []openapi.Route {
+	// Registration may read the global config (e.g. a module stamps the
+	// deployment's server.name into a query helper at construction). It
+	// must never touch the database, but config is a legitimate global,
+	// always set in a running process -- so provide a defaulted one here
+	// rather than force every constructor to be config-free.
+	cfg := &config.Config{}
+	config.SetDefaults(cfg)
+	config.Set(cfg)
+
 	srv := apiserver.New(apiserver.Config{})
 	for _, register := range apis.Registrars() {
 		register(srv)
@@ -41,12 +51,17 @@ func main() {
 		version string
 	)
 
-	flag.StringVar(&apisDir, "apis-dir", "pkg/apis", "Directory containing API type definitions")
-	flag.StringVar(&output, "output", "", "Output file path (default: stdout)")
-	flag.StringVar(&format, "format", "json", "Output format: json or yaml")
-	flag.StringVar(&title, "title", "Vraxel API", "API title")
-	flag.StringVar(&version, "version", "v1", "API version")
-	flag.Parse()
+	// A private FlagSet, not the global flag.CommandLine: importing
+	// pkg/apis pulls in the VictoriaMetrics-lineage libraries, which
+	// register their own -version flag in init(). Sharing the global set
+	// would panic with "flag redefined: version" before main runs.
+	fs := flag.NewFlagSet("openapi-gen", flag.ExitOnError)
+	fs.StringVar(&apisDir, "apis-dir", "pkg/apis", "Directory containing API type definitions")
+	fs.StringVar(&output, "output", "", "Output file path (default: stdout)")
+	fs.StringVar(&format, "format", "json", "Output format: json or yaml")
+	fs.StringVar(&title, "title", "Vraxel API", "API title")
+	fs.StringVar(&version, "version", "v1", "API version")
+	_ = fs.Parse(os.Args[1:])
 
 	parser := openapi.NewParser(apisDir)
 	groups, err := parser.Parse()

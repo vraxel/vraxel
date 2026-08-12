@@ -337,7 +337,13 @@ func registerScopedRoutes[T any](s *Server, def ResourceDef[T], reg *resourceReg
 		s.handle("POST "+base, writeMeta("create", false), wrapCreate(s, def))
 	}
 	if def.Ops.CreateAny != nil {
-		s.handle("POST "+base, writeMeta("create", false), wrapCreateAny(s, def))
+		cm := writeMeta("create", false)
+		// Asymmetric create: request and response are handler-defined,
+		// not T. Mark the route so the spec generator emits generic
+		// shapes instead of a typed $ref that misdescribes the contract
+		// (a batch {ids,roleId} grant is not "create one RoleBinding").
+		cm.Kind = "createAny"
+		s.handle("POST "+base, cm, wrapCreateAny(s, def))
 	}
 	if def.Ops.Update != nil {
 		s.handle("PUT "+item, writeMeta("update", true), wrapUpdate(s, def))
