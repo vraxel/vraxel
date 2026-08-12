@@ -507,7 +507,7 @@ function AddMemberDialog({
         <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
           <div>
             <p className="mb-2 text-sm font-medium">{t("rolebinding.selectRole")}</p>
-            <div className="max-h-[120px] overflow-auto border rounded-lg">
+            <div className="max-h-[120px] overflow-auto rounded-lg border">
               {loading ? (
                 <div className="space-y-2 p-4">
                   {Array.from({ length: 2 }).map((_, i) => (
@@ -553,7 +553,7 @@ function AddMemberDialog({
                 className="pl-9"
               />
             </div>
-            <div className="max-h-[200px] overflow-auto border rounded-lg">
+            <div className="max-h-[200px] overflow-auto rounded-lg border">
               {loading ? (
                 <div className="space-y-2 p-4">
                   {Array.from({ length: 3 }).map((_, i) => (

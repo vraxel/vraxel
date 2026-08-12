@@ -209,10 +209,10 @@ export default function ScopedRoleDetailPage() {
               className="grid grid-cols-1 gap-6 md:grid-cols-2"
               style={{ height: "min(600px, 60vh)" }}
             >
-              <div className="overflow-y-auto border rounded-lg">
+              <div className="overflow-y-auto rounded-lg border">
                 <PermissionSelector permissions={permissions} value={role.spec.rules} readOnly />
               </div>
-              <div className="overflow-y-auto border rounded-lg">
+              <div className="overflow-y-auto rounded-lg border">
                 <MatchedRulesList rules={role.spec.rules} permissions={permissions} />
               </div>
             </div>

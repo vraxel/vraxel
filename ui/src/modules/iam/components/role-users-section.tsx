@@ -329,7 +329,7 @@ function AssignUsersDialog({
           />
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto border rounded-lg">
+        <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border">
           {candidatesQuery.isPending ? (
             <div className="space-y-2 p-2">
               {Array.from({ length: 4 }).map((_, i) => (

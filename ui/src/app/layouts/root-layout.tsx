@@ -293,7 +293,7 @@ export default function RootLayout() {
           // before:* draws the left brand rail on the active item; it is the
           // primary "you are here" signal, the tinted background only supports it.
           "relative flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors",
-          "before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-primary before:opacity-0",
+          "before:bg-primary before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:opacity-0",
           active
             ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium before:opacity-100"
             : "text-muted-foreground hover:bg-accent hover:text-foreground",

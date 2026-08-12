@@ -206,7 +206,10 @@ export function ResourceListPage<T extends ListRow>({
                 <TableCell colSpan={colCount} className="p-0 whitespace-normal">
                   {/* The header's create button doubles as the empty-state CTA:
                       when the table is empty it is the only thing to do here. */}
-                  <EmptyState title={emptyKey ? t(emptyKey) : t("common.noData")} action={createButton} />
+                  <EmptyState
+                    title={emptyKey ? t(emptyKey) : t("common.noData")}
+                    action={createButton}
+                  />
                 </TableCell>
               </TableRow>
             ) : (
