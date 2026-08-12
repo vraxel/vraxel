@@ -68,6 +68,14 @@ func (g *Generator) Generate(groups []GroupInfo) *Document {
 	// registration knows what is actually served.
 	g.generateRoutePaths(doc, groups)
 
+	// A list route responds with "<Type>List"; modules that declare an
+	// explicit annotated list type get a real component, but many list
+	// and read-verb responses name a wrapper (or a singularised verb type)
+	// that was never declared. Synthesise a standard {items,totalCount}
+	// envelope for any such referenced-but-missing *List so the spec
+	// carries no dangling $ref.
+	sealMissingListSchemas(doc)
+
 	// Build document-level Tags and XTagGroups
 	for _, moduleName := range sortedKeys(moduleTags) {
 		tags := moduleTags[moduleName]

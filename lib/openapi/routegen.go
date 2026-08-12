@@ -46,29 +46,38 @@ func (tl typeLookup) get(group, typeName string) (TypeInfo, bool) {
 	return t, ok
 }
 
-// generateRoutePaths emits one operation per registered route.
+// generateRoutePaths emits one operation per registered route. The route
+// table is authoritative for which endpoints exist; a route whose payload
+// type the AST parser never annotated is still emitted, with a generic
+// object schema in place of a $ref. Dropping it instead would silently
+// hide real endpoints (e.g. a whole module that ships no +openapi
+// annotations) -- the opposite of describing what the server serves.
 func (g *Generator) generateRoutePaths(doc *Document, groups []GroupInfo) {
 	tl := newTypeLookup(groups)
 	for _, r := range g.routes {
 		ti, ok := tl.get(r.Group, r.TypeName)
 		if !ok {
-			// A route whose payload type was not parsed cannot be
-			// described; skipping beats emitting a dangling $ref.
-			continue
+			// Unparsed payload: keep the Go type name for summaries and
+			// tags; the empty annotation maps just fall through to the
+			// generic fallbacks below.
+			ti = TypeInfo{Name: r.TypeName}
 		}
-		g.emitRoute(doc, r, ti)
+		g.emitRoute(doc, r, ti, ok)
 	}
 }
 
-func (g *Generator) emitRoute(doc *Document, r Route, ti TypeInfo) {
+func (g *Generator) emitRoute(doc *Document, r Route, ti TypeInfo, typed bool) {
 	item := getOrCreatePathItem(doc, r.Path)
 	op := &Operation{
 		Tags:       []string{typeTag(ti)},
 		Parameters: pathParameters(r.Path),
 	}
 
-	ref := g.schemaRef(r.Group, ti.Name)
-	listRef := g.schemaRef(r.Group, ti.Name+"List")
+	// A parsed type resolves to its component $ref; an unparsed one falls
+	// back to a generic object so the operation stays valid (no dangling
+	// $ref) while still advertising the endpoint.
+	ref := g.payloadRef(r.Group, ti.Name, typed)
+	listRef := g.payloadRef(r.Group, ti.Name+"List", typed)
 	suffix := operationIDSuffix(r)
 
 	switch r.Kind {
@@ -88,6 +97,15 @@ func (g *Generator) emitRoute(doc *Document, r Route, ti TypeInfo) {
 		op.OperationID = "create" + suffix
 		op.RequestBody = jsonBody(ref)
 		op.Responses = jsonResponse("201", "Created", ref)
+		item.Post = op
+	case "createAny":
+		// Ops.CreateAny: the request and response are handler-defined
+		// (e.g. a batch {ids,roleId} grant answering a Result envelope),
+		// so a typed $ref would document a contract that does not exist.
+		op.Summary = g.routeSummary(ti, r, "create", "Create "+resourceLabel(r))
+		op.OperationID = "create" + suffix
+		op.RequestBody = jsonBody(&Schema{Type: "object"})
+		op.Responses = jsonResponse("201", "Created", &Schema{Type: "object"})
 		item.Post = op
 	case "update":
 		op.Summary = g.routeSummary(ti, r, "update", "Update a "+ti.Name)
@@ -116,18 +134,38 @@ func (g *Generator) emitRoute(doc *Document, r Route, ti TypeInfo) {
 		op.Responses = map[string]*Response{"200": {Description: "OK"}}
 		item.Delete = op
 	case "action":
-		op.Summary = summaryOr(ti.ActionSummary[r.Name], toCamelCase(r.Name)+" "+ti.Name)
-		op.OperationID = toCamelCase(r.Name) + pascalSegments(routeQualifier(r.Path), r.Name)
-		op.RequestBody = jsonBody(&Schema{Type: "object"})
-		op.Responses = map[string]*Response{"200": {Description: "OK"}}
-		item.Post = op
+		g.fillActionOp(op, r, ti)
+		setPathOp(item, r.Method, op)
 	case "verb":
 		op.Summary = summaryOr(ti.CustomVerbSummary[r.Name], "Get "+r.Name+" of "+ti.Name)
 		op.OperationID = "list" + suffix
 		op.Parameters = append(op.Parameters, listQueryParameters()...)
-		op.Responses = jsonResponse("200", "OK", g.schemaRef(r.Group, verbResponseType(ti, r.Name)))
+		op.Responses = jsonResponse("200", "OK", g.payloadRef(r.Group, verbResponseType(ti, r.Name), typed))
 		item.Get = op
+	default:
+		// Not every action-registration path normalises Kind to "action";
+		// some leave the raw verb (scale / exec / invalidate) in Kind with
+		// an empty Name. An unrecognised but served Kind is still an
+		// action endpoint, so describe it as one rather than drop it.
+		g.fillActionOp(op, r, ti)
+		setPathOp(item, r.Method, op)
 	}
+}
+
+// fillActionOp populates op as an action: summary, id and body derived
+// from the action name (r.Name when the apiserver classified it, else the
+// verb that leaked into r.Kind). Read-only actions (GET) carry no body.
+func (g *Generator) fillActionOp(op *Operation, r Route, ti TypeInfo) {
+	name := r.Name
+	if name == "" {
+		name = r.Kind
+	}
+	op.Summary = summaryOr(ti.ActionSummary[name], toCamelCase(name)+" "+ti.Name)
+	op.OperationID = toCamelCase(name) + pascalSegments(routeQualifier(r.Path), name)
+	if r.Method == "POST" || r.Method == "PUT" || r.Method == "PATCH" {
+		op.RequestBody = jsonBody(&Schema{Type: "object"})
+	}
+	op.Responses = map[string]*Response{"200": {Description: "OK"}}
 }
 
 // routeSummary resolves an operation summary, preferring the annotation
@@ -210,6 +248,17 @@ func (g *Generator) schemaRef(group, typeName string) *Schema {
 	return &Schema{Ref: fmt.Sprintf("#/components/schemas/%s", g.schemaKey(group, typeName))}
 }
 
+// payloadRef returns a $ref to the parsed component schema when the type
+// was annotated, and a generic object otherwise -- a route table entry
+// for an unparsed type still gets a valid (if untyped) body/response
+// rather than a dangling $ref.
+func (g *Generator) payloadRef(group, typeName string, typed bool) *Schema {
+	if !typed {
+		return &Schema{Type: "object"}
+	}
+	return g.schemaRef(group, typeName)
+}
+
 func jsonBody(s *Schema) *RequestBody {
 	return &RequestBody{Required: true, Content: map[string]MediaType{"application/json": {Schema: s}}}
 }
@@ -252,6 +301,96 @@ func upperFirst(s string) string {
 		return s
 	}
 	return strings.ToUpper(s[:1]) + s[1:]
+}
+
+// setPathOp assigns an operation to the PathItem slot for its HTTP method.
+func setPathOp(item *PathItem, method string, op *Operation) {
+	switch method {
+	case "GET":
+		item.Get = op
+	case "POST":
+		item.Post = op
+	case "PUT":
+		item.Put = op
+	case "PATCH":
+		item.Patch = op
+	case "DELETE":
+		item.Delete = op
+	}
+}
+
+// sealMissingListSchemas fills in every "<X>List" component a path $refs
+// but that no schema pass produced, using the standard paginated envelope.
+// Items point at the <X> component when it exists, else a generic object
+// (e.g. a read verb whose response type was singularised from its name).
+func sealMissingListSchemas(doc *Document) {
+	if doc.Components == nil {
+		return
+	}
+	refs := map[string]struct{}{}
+	collectSchemaRefs(doc.Paths, refs)
+	for _, s := range doc.Components.Schemas {
+		collectSchemaRefs(s, refs)
+	}
+	for key := range refs {
+		if _, ok := doc.Components.Schemas[key]; ok || !strings.HasSuffix(key, "List") {
+			continue
+		}
+		items := &Schema{Type: "object"}
+		if itemKey := strings.TrimSuffix(key, "List"); doc.Components.Schemas[itemKey] != nil {
+			items = &Schema{Ref: "#/components/schemas/" + itemKey}
+		}
+		doc.Components.Schemas[key] = &Schema{
+			Type: "object",
+			Properties: map[string]*Schema{
+				"items":      {Type: "array", Items: items},
+				"totalCount": {Type: "integer"},
+			},
+		}
+	}
+}
+
+// collectSchemaRefs walks any spec value and records the bare schema keys
+// its $refs point at (the "#/components/schemas/" prefix stripped).
+func collectSchemaRefs(x any, out map[string]struct{}) {
+	switch v := x.(type) {
+	case *Schema:
+		if v == nil {
+			return
+		}
+		if v.Ref != "" {
+			out[strings.TrimPrefix(v.Ref, "#/components/schemas/")] = struct{}{}
+		}
+		collectSchemaRefs(v.Items, out)
+		for _, p := range v.Properties {
+			collectSchemaRefs(p, out)
+		}
+	case map[string]*PathItem:
+		for _, pi := range v {
+			collectSchemaRefs(pi, out)
+		}
+	case *PathItem:
+		if v == nil {
+			return
+		}
+		for _, op := range []*Operation{v.Get, v.Post, v.Put, v.Patch, v.Delete} {
+			collectSchemaRefs(op, out)
+		}
+	case *Operation:
+		if v == nil {
+			return
+		}
+		if v.RequestBody != nil {
+			for _, mt := range v.RequestBody.Content {
+				collectSchemaRefs(mt.Schema, out)
+			}
+		}
+		for _, resp := range v.Responses {
+			for _, mt := range resp.Content {
+				collectSchemaRefs(mt.Schema, out)
+			}
+		}
+	}
 }
 
 // sortRoutes gives the emitted spec a deterministic operation order.

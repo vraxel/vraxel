@@ -40,6 +40,12 @@ func TestSpecMatchesRouteTable(t *testing.T) {
 		t.Fatal("no routes registered -- the comparison would pass vacuously")
 	}
 	for _, r := range registered {
+		// HEAD / OPTIONS exist only on the k8s proxy passthrough, which
+		// forwards every method; the spec documents the standard verbs,
+		// not those two, so they are not expected to appear.
+		if r.Method == "HEAD" || r.Method == "OPTIONS" {
+			continue
+		}
 		key := strings.ToLower(r.Method) + " " + r.Path
 		if !inSpec[key] {
 			t.Errorf("route %s %s is served but absent from the committed spec (run `make generate`)", r.Method, r.Path)

@@ -172,3 +172,47 @@ Use this to migrate one module. Each step maps to one commit.
 
 8. **Verify.** `make lint-layers` must report zero entries for the migrated module.
 
+## OpenAPI generation & the Registrar convention
+
+The committed spec (`app/vraxel-server/apis/openapi.json`) is derived from
+the **apiserver route table**, not from the shape of the source:
+`openapi-gen` replays every module's registration onto a bare server and
+reads back the routes it declared. Registration is the only thing that
+knows what is served, so it is the input; the AST parser is left with what
+it alone knows — schemas and doc text. `cmd/openapi-gen`'s
+`TestSpecMatchesRouteTable` pins the two together, so a route added without
+re-running `make generate` fails the build instead of shipping a spec that
+lies about the API.
+
+This works only because registration obeys four rules ("static
+registration, lazy wiring"). A module that breaks one silently drops or
+mis-describes its endpoints:
+
+1. **Unconditional.** A module registers its full set of resources /
+   actions / verbs every time. Never gate a `Register` call on a runtime
+   dep (`if deps.X != nil { apiserver.Register(...) }`). Whether an
+   endpoint *exists* is a static fact; whether a deployment can *serve* it
+   is the handler's concern (return 503 when its backing dep is absent).
+2. **DB-free & side-effect-free.** The registration path constructs no
+   database/pool/queries resource and runs no seed / goroutine / pgnotify
+   subscribe. Constructors that dereference the DB at build time
+   (`tasktracker.NewWithDB`, `*.GetPool()`, event publishers) are built in
+   `NewModule` and threaded into the registrar; the registrar passes `nil`.
+   The global config *may* be read (openapi-gen initialises a default one).
+3. **Single source of truth.** `NewModule`'s `.V2` (real deps) and the
+   exported `Registrar(db)` (nil deps) call the *same* package-level
+   registration function, so the running server and the spec never drift.
+4. **Payload types stay honest.** A `list` route responds `<Type>List`; the
+   generator synthesises a `{items,totalCount}` envelope for any wrapper a
+   module never declared, and emits a generic object (not a dangling `$ref`)
+   for a payload the AST parser never annotated — so an under-annotated
+   module still gets its endpoints, just with looser schemas.
+
+**Per-module hook.** Every module exposes
+`func Registrar(database *db.DB) func(*apiserver.Server)`. `Registrars()`
+in `pkg/apis/install.go` lists all of them with a `nil` handle and is what
+openapi-gen replays; it MUST stay in lockstep with the module registrar
+list used by `NewModules`. A module that serves only anonymous
+machine-facing handlers (no `apiserver.Register`) has no route-table
+contribution and is omitted from `Registrars()`.
+

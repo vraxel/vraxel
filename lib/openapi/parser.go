@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -159,6 +160,35 @@ func (p *Parser) parseSubGroups(resourceDir, parentName string) ([]GroupInfo, er
 	return groups, nil
 }
 
+// sortedPkgs / sortedFiles order the go/ast maps by name. Type and tag
+// emission follows walk order, so an unordered walk makes every regen of
+// the committed spec dirty with tag/schema shuffles.
+func sortedPkgs(pkgs map[string]*ast.Package) []*ast.Package {
+	names := make([]string, 0, len(pkgs))
+	for n := range pkgs {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	out := make([]*ast.Package, 0, len(names))
+	for _, n := range names {
+		out = append(out, pkgs[n])
+	}
+	return out
+}
+
+func sortedFiles(pkg *ast.Package) []*ast.File {
+	names := make([]string, 0, len(pkg.Files))
+	for n := range pkg.Files {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	out := make([]*ast.File, 0, len(names))
+	for _, n := range names {
+		out = append(out, pkg.Files[n])
+	}
+	return out
+}
+
 func (p *Parser) parseGroup(dir string, dirName string) (*GroupInfo, error) {
 	fset := token.NewFileSet()
 	pkgs, err := parser.ParseDir(fset, dir, nil, parser.ParseComments)
@@ -170,7 +200,7 @@ func (p *Parser) parseGroup(dir string, dirName string) (*GroupInfo, error) {
 		ModuleName: dirName,
 	}
 
-	for _, pkg := range pkgs {
+	for _, pkg := range sortedPkgs(pkgs) {
 		applyPackageAnnotations(group, pkg)
 
 		collectGroupTypes(group, pkg)
@@ -185,6 +215,16 @@ func (p *Parser) parseGroup(dir string, dirName string) (*GroupInfo, error) {
 
 	if len(group.Types) == 0 {
 		return nil, nil
+	}
+
+	// The route table keys types by the apiserver Group, which is the
+	// module directory name. A package that omits the +openapi:group /
+	// groupVersion annotation still serves routes under that name, so
+	// default the group key to the directory rather than "" -- otherwise
+	// every such module's routes are silently dropped from the spec
+	// (they resolve against typeLookup[""] and miss).
+	if group.GroupName == "" {
+		group.GroupName = group.ModuleName
 	}
 
 	return group, nil
@@ -220,7 +260,7 @@ func mergeStorageAnnotations(group *GroupInfo, pkgs map[string]*ast.Package) {
 	// storageTypes accumulates across packages; each package's merge,
 	// func-annotation, and path-operation passes run against the running set.
 	storageTypes := make(map[string]*storageInfo)
-	for _, pkg := range pkgs {
+	for _, pkg := range sortedPkgs(pkgs) {
 		collectStorageTypes(pkg, storageTypes)
 		mergeStoragePaths(group, typeIndex, storageTypes)
 		scanFuncAnnotations(pkg, group, typeIndex, storageTypes)
@@ -333,7 +373,7 @@ func appendUnique(slice []string, val string) []string {
 // and builds EndpointInfo entries from them.
 func parseEndpointAnnotations(pkgs map[string]*ast.Package) []EndpointInfo {
 	var endpoints []EndpointInfo
-	for _, pkg := range pkgs {
+	for _, pkg := range sortedPkgs(pkgs) {
 		for _, fd := range funcDecls(pkg) {
 			if fd.Recv != nil {
 				continue

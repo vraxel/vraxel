@@ -8,7 +8,7 @@ import (
 // applyPackageAnnotations folds a package's doc.go +openapi: group metadata
 // (groupName / groupVersion / moduleName) into the group being built.
 func applyPackageAnnotations(group *GroupInfo, pkg *ast.Package) {
-	for _, file := range pkg.Files {
+	for _, file := range sortedFiles(pkg) {
 		pa := ParsePackageAnnotations(file)
 		if pa.GroupVersion != "" {
 			group.GroupName = pa.GroupName

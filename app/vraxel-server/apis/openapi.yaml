@@ -327,14 +327,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RoleBinding'
+              type: object
       responses:
         "201":
           description: Created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RoleBinding'
+                type: object
     delete:
       summary: 批量删除平台级角色绑定
       operationId: deleteCollectionRolebindings
@@ -1244,14 +1244,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RoleBinding'
+              type: object
       responses:
         "201":
           description: Created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RoleBinding'
+                type: object
     delete:
       summary: 批量删除租户下项目的角色绑定
       operationId: deleteCollectionWorkspacesNamespacesRolebindings
@@ -1560,14 +1560,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/User'
+              type: object
       responses:
         "201":
           description: Created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
+                type: object
     delete:
       summary: 批量移除租户下项目的成员
       operationId: deleteCollectionWorkspacesNamespacesUsers
@@ -1729,14 +1729,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RoleBinding'
+              type: object
       responses:
         "201":
           description: Created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RoleBinding'
+                type: object
     delete:
       summary: 批量删除租户级角色绑定
       operationId: deleteCollectionWorkspacesRolebindings
@@ -1995,14 +1995,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/User'
+              type: object
       responses:
         "201":
           description: Created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
+                type: object
     delete:
       summary: 批量移除租户成员
       operationId: deleteCollectionWorkspacesUsers

@@ -211,7 +211,12 @@ func registerNamedScoped[T any](s *Server, def NamedDef[T], reg *resourceReg, lv
 		}))
 	}
 	for _, v := range def.Verbs {
-		s.handle("GET "+item+"/"+v.Name, reg.meta(s, lv, "get", true), verbRoute(s, v.handler, reg.idParam()))
+		vm := reg.meta(s, lv, "get", true)
+		// Route-table kind, not the authz verb: without it the spec
+		// describes the verb route as a plain item get with the parent's
+		// response type.
+		vm.Kind = "verb"
+		s.handle("GET "+item+"/"+v.Name, vm, verbRoute(s, v.handler, reg.idParam()))
 	}
 	if def.Ops.Create != nil {
 		s.handle("POST "+base, writeMeta("create", false), namedCreate(s, def, label))
@@ -252,6 +257,10 @@ func registerNamedScoped[T any](s *Server, def NamedDef[T], reg *resourceReg, lv
 			pattern = a.Method + " " + base + "/" + a.Name
 		}
 		m := reg.meta(s, lv, a.Name, a.OnItem)
+		// Normalise the route-table kind: meta() seeds Kind with the raw
+		// verb (the action name), which the spec generator cannot
+		// classify. Verb keeps the action name for authz/audit.
+		m.Kind = "action"
 		m.PermCodes = a.Permission
 		m.StatusCode = a.StatusCode
 		m.Sensitive = a.Sensitive || def.Sensitive

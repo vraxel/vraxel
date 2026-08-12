@@ -28,7 +28,7 @@ type typeSpecWithDoc struct {
 // callers iterate once instead of nesting file -> decl -> spec.
 func typeSpecs(pkg *ast.Package) []typeSpecWithDoc {
 	var out []typeSpecWithDoc
-	for _, file := range pkg.Files {
+	for _, file := range sortedFiles(pkg) {
 		for _, decl := range file.Decls {
 			genDecl, ok := decl.(*ast.GenDecl)
 			if !ok || genDecl.Tok != token.TYPE {
@@ -47,7 +47,7 @@ func typeSpecs(pkg *ast.Package) []typeSpecWithDoc {
 // funcDecls flattens a package's function declarations into a single slice.
 func funcDecls(pkg *ast.Package) []*ast.FuncDecl {
 	var out []*ast.FuncDecl
-	for _, file := range pkg.Files {
+	for _, file := range sortedFiles(pkg) {
 		for _, decl := range file.Decls {
 			if fd, ok := decl.(*ast.FuncDecl); ok {
 				out = append(out, fd)
