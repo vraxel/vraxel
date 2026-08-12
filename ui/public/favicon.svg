@@ -2,9 +2,13 @@
      a filled tile with the tones inverted: the component paints indigo on
      white, where low opacity reads as light, while here white paints on
      indigo, where low opacity reads as dark. Keeping the raw numbers would
-     have put the top face in shadow. A bare mark is not an option -- its
-     lightest face disappears against dark browser chrome at 16px, and the tab
-     strip's background is not ours to control. -->
+     have put the top face in shadow. A bare mark is not an option, because
+     its lightest face disappears against dark browser chrome at 16px and the
+     tab strip's background is not ours to control.
+     Keep this comment free of consecutive hyphens. XML forbids them inside a
+     comment, and a browser loading an SVG as an image parses it strictly, so
+     a single stray pair makes the whole favicon fail to load and the tab
+     silently falls back to whatever /favicon.ico serves. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
   <rect width="32" height="32" rx="6" fill="#3e60e5"/>
   <g transform="translate(16 16) scale(0.72) translate(-16 -16)" fill="#ffffff">
