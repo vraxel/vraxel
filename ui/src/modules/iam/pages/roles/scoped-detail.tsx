@@ -147,9 +147,7 @@ export default function ScopedRoleDetailPage() {
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="mb-6">
           <TabsTrigger value="overview">{t("common.overview")}</TabsTrigger>
-          {canListBindings && (
-            <TabsTrigger value="users">{t("role.users")}</TabsTrigger>
-          )}
+          {canListBindings && <TabsTrigger value="users">{t("role.users")}</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
