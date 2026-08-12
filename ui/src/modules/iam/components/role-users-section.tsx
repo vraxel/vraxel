@@ -2,7 +2,6 @@ import { useMemo, useState } from "react"
 import { formatDateTime } from "@/shared/lib/format"
 import { Plus, Search, UserMinus } from "lucide-react"
 import { toast } from "sonner"
-import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card"
 import { Button } from "@/shared/ui/button"
 import { Input } from "@/shared/ui/input"
 import { Checkbox } from "@/shared/ui/checkbox"
@@ -113,102 +112,94 @@ export function RoleUsersSection({ config }: { config: RoleUsersConfig }) {
   }
 
   return (
-    <Card className="mb-6">
-      <CardHeader className="flex flex-row items-center justify-between gap-4">
-        <CardTitle>
-          {t("role.users")}
-          <span className="text-muted-foreground ml-2 text-sm font-normal">({total})</span>
-        </CardTitle>
+    <div>
+      <div className="mb-3 flex items-center justify-between gap-4">
+        <div className="relative max-w-xs flex-1">
+          <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
+          <Input
+            name="role-user-search"
+            placeholder={t("user.searchPlaceholder")}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="pl-9"
+          />
+        </div>
         {config.canAssign && (
           <Button size="sm" onClick={() => setAddOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             {t("role.assignUsers")}
           </Button>
         )}
-      </CardHeader>
-      <CardContent>
-        <div className="mb-3 max-w-xs">
-          <div className="relative">
-            <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
-            <Input
-              name="role-user-search"
-              placeholder={t("user.searchPlaceholder")}
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-        </div>
+      </div>
 
-        <div className="border-border-subtle overflow-hidden rounded-xl border shadow-sm">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("user.username")}</TableHead>
-                <TableHead className="whitespace-nowrap">{t("common.created")}</TableHead>
-                {config.canRevoke && <RowActionsHead>{t("common.actions")}</RowActionsHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                Array.from({ length: 3 }).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell colSpan={3}>
-                      <Skeleton className="h-5 w-full" />
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : bindings.length === 0 ? (
-                <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={3} className="p-0 whitespace-normal">
-                    <EmptyState title={search ? t("common.noSearchResults") : t("role.noUsers")} />
+      <div className="border-border-subtle overflow-hidden rounded-xl border shadow-sm">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t("user.username")}</TableHead>
+              <TableHead className="whitespace-nowrap">{t("common.created")}</TableHead>
+              {config.canRevoke && <RowActionsHead>{t("common.actions")}</RowActionsHead>}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell colSpan={3}>
+                    <Skeleton className="h-5 w-full" />
                   </TableCell>
                 </TableRow>
-              ) : (
-                bindings.map((b) => (
-                  <TableRow key={b.metadata.id}>
-                    <TableCell>
-                      <NameCell
-                        to={`${config.detailPrefix}/users/${b.spec.userId}`}
-                        displayName={b.spec.userDisplayName}
-                        name={b.spec.username ?? ""}
-                      />
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
-                      {formatDateTime(b.metadata.createdAt)}
-                    </TableCell>
-                    {config.canRevoke && (
-                      <RowActionsCell>
-                        {/* The owner's binding is structural and cannot be revoked here. */}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          disabled={!!b.spec.isOwner}
-                          title={
-                            b.spec.isOwner ? t("rolebinding.ownerLocked") : t("rolebinding.revoke")
-                          }
-                          onClick={() => setRevokeTarget(b)}
-                        >
-                          <UserMinus className="h-3.5 w-3.5" />
-                        </Button>
-                      </RowActionsCell>
-                    )}
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+              ))
+            ) : bindings.length === 0 ? (
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={3} className="p-0 whitespace-normal">
+                  <EmptyState title={search ? t("common.noSearchResults") : t("role.noUsers")} />
+                </TableCell>
+              </TableRow>
+            ) : (
+              bindings.map((b) => (
+                <TableRow key={b.metadata.id}>
+                  <TableCell>
+                    <NameCell
+                      to={`${config.detailPrefix}/users/${b.spec.userId}`}
+                      displayName={b.spec.userDisplayName}
+                      name={b.spec.username ?? ""}
+                    />
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+                    {formatDateTime(b.metadata.createdAt)}
+                  </TableCell>
+                  {config.canRevoke && (
+                    <RowActionsCell>
+                      {/* The owner's binding is structural and cannot be revoked here. */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        disabled={!!b.spec.isOwner}
+                        title={
+                          b.spec.isOwner ? t("rolebinding.ownerLocked") : t("rolebinding.revoke")
+                        }
+                        onClick={() => setRevokeTarget(b)}
+                      >
+                        <UserMinus className="h-3.5 w-3.5" />
+                      </Button>
+                    </RowActionsCell>
+                  )}
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
-        <Pagination
-          page={page}
-          pageSize={pageSize}
-          totalCount={total}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-        />
-      </CardContent>
+      <Pagination
+        page={page}
+        pageSize={pageSize}
+        totalCount={total}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+      />
 
       {config.canAssign && (
         <AssignUsersDialog
@@ -227,7 +218,7 @@ export function RoleUsersSection({ config }: { config: RoleUsersConfig }) {
         onConfirm={handleRevoke}
         confirmText={t("rolebinding.revoke")}
       />
-    </Card>
+    </div>
   )
 }
 

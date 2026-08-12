@@ -2,6 +2,7 @@ import type { Messages } from "../../types"
 
 const common = {
   // common
+  "common.overview": "Overview",
   "common.name": "Name",
   "common.displayName": "Display Name",
   "common.status": "Status",

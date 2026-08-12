@@ -122,7 +122,7 @@ const iam = {
   "role.noData": "No roles found.",
   "role.notFound": "Role not found.",
   "role.details": "Role Details",
-  "role.users": "Users with this role",
+  "role.users": "Assigned Users",
   "role.assignUsers": "Assign Users",
   "role.assignUsersHint": "Grant this role to the selected users.",
   "role.noUsers": "No users have this role yet.",

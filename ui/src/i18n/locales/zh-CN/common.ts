@@ -2,6 +2,7 @@ import type { Messages } from "../../types"
 
 const common = {
   // common
+  "common.overview": "概览",
   "common.name": "名称",
   "common.displayName": "显示名称",
   "common.status": "状态",
