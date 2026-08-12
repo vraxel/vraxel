@@ -79,7 +79,9 @@ export default function ScopedUserDetailPage() {
               </p>
             </div>
             <div className="min-w-0">
-              <span className="text-muted-foreground mb-1 block text-xs">{t("common.displayName")}</span>
+              <span className="text-muted-foreground mb-1 block text-xs">
+                {t("common.displayName")}
+              </span>
               <p className="font-medium">
                 <TruncateText>{user.spec.displayName || "-"}</TruncateText>
               </p>
@@ -105,11 +107,15 @@ export default function ScopedUserDetailPage() {
               </p>
             </div>
             <div>
-              <span className="text-muted-foreground mb-1 block text-xs">{t("common.created")}</span>
+              <span className="text-muted-foreground mb-1 block text-xs">
+                {t("common.created")}
+              </span>
               <p className="font-medium">{new Date(user.metadata.createdAt).toLocaleString()}</p>
             </div>
             <div>
-              <span className="text-muted-foreground mb-1 block text-xs">{t("common.updated")}</span>
+              <span className="text-muted-foreground mb-1 block text-xs">
+                {t("common.updated")}
+              </span>
               <p className="font-medium">{new Date(user.metadata.updatedAt).toLocaleString()}</p>
             </div>
           </div>

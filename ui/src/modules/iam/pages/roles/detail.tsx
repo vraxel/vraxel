@@ -146,7 +146,9 @@ export default function RoleDetailPage() {
               </p>
             </div>
             <div className="min-w-0">
-              <span className="text-muted-foreground mb-1 block text-xs">{t("common.displayName")}</span>
+              <span className="text-muted-foreground mb-1 block text-xs">
+                {t("common.displayName")}
+              </span>
               <p className="font-medium">
                 <TruncateText>
                   {t(`role.${role.spec.name}`, { defaultValue: role.spec.displayName || "-" })}
@@ -170,7 +172,9 @@ export default function RoleDetailPage() {
               </p>
             </div>
             <div className="col-span-2 min-w-0">
-              <span className="text-muted-foreground mb-1 block text-xs">{t("common.description")}</span>
+              <span className="text-muted-foreground mb-1 block text-xs">
+                {t("common.description")}
+              </span>
               <p className="font-medium">
                 <TruncateText lines={3}>
                   {t(`role.desc.${role.spec.name}`, { defaultValue: role.spec.description || "-" })}
@@ -178,11 +182,15 @@ export default function RoleDetailPage() {
               </p>
             </div>
             <div>
-              <span className="text-muted-foreground mb-1 block text-xs">{t("common.created")}</span>
+              <span className="text-muted-foreground mb-1 block text-xs">
+                {t("common.created")}
+              </span>
               <p className="font-medium">{new Date(role.metadata.createdAt).toLocaleString()}</p>
             </div>
             <div>
-              <span className="text-muted-foreground mb-1 block text-xs">{t("common.updated")}</span>
+              <span className="text-muted-foreground mb-1 block text-xs">
+                {t("common.updated")}
+              </span>
               <p className="font-medium">{new Date(role.metadata.updatedAt).toLocaleString()}</p>
             </div>
           </div>

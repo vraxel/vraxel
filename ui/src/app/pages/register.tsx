@@ -90,7 +90,7 @@ export default function RegisterPage() {
     <div
       className="relative flex min-h-screen items-center justify-center bg-cover bg-center bg-no-repeat"
       style={{ backgroundImage: "url('/login-bg.svg')" }}
-      >
+    >
       <div className="absolute top-4 right-4">
         <LanguageSwitcher />
       </div>
@@ -158,7 +158,8 @@ export default function RegisterPage() {
             </div>
             {error && <p className="text-destructive text-sm">{error}</p>}
             <Button className="w-full" type="submit" disabled={loading}>
-              {loading && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}{t("register.submit")}
+              {loading && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
+              {t("register.submit")}
             </Button>
           </form>
 

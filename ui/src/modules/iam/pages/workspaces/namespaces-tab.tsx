@@ -199,7 +199,10 @@ export default function WorkspaceNamespacesPage() {
                   />
                 </TableHead>
               )}
-              <TableHead className="hover:text-foreground cursor-pointer transition-colors select-none" onClick={() => handleSort("name")}>
+              <TableHead
+                className="hover:text-foreground cursor-pointer transition-colors select-none"
+                onClick={() => handleSort("name")}
+              >
                 {t("common.name")}
                 <SortIcon field="name" sortBy={sortBy} sortOrder={sortOrder} />
               </TableHead>

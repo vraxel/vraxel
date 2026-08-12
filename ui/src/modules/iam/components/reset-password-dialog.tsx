@@ -151,7 +151,8 @@ export function ResetPasswordDialog({
                 {t("common.cancel")}
               </Button>
               <Button type="submit" variant="destructive" disabled={loading}>
-                {loading && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}{t("user.resetPassword")}
+                {loading && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
+                {t("user.resetPassword")}
               </Button>
             </DialogFooter>
           </form>

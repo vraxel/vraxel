@@ -149,7 +149,9 @@ export default function NamespaceDetailPage() {
                 </p>
               </div>
               <div className="min-w-0">
-                <span className="text-muted-foreground mb-1 block text-xs">{t("common.displayName")}</span>
+                <span className="text-muted-foreground mb-1 block text-xs">
+                  {t("common.displayName")}
+                </span>
                 <p className="font-medium">
                   <TruncateText>
                     {namespace.spec.displayName ||
@@ -160,13 +162,17 @@ export default function NamespaceDetailPage() {
                 </p>
               </div>
               <div className="min-w-0">
-                <span className="text-muted-foreground mb-1 block text-xs">{t("namespace.owner")}</span>
+                <span className="text-muted-foreground mb-1 block text-xs">
+                  {t("namespace.owner")}
+                </span>
                 <p className="font-medium">
                   <TruncateText>{namespace.spec.ownerName || namespace.spec.ownerId}</TruncateText>
                 </p>
               </div>
               <div className="min-w-0">
-                <span className="text-muted-foreground mb-1 block text-xs">{t("namespace.workspaceName")}</span>
+                <span className="text-muted-foreground mb-1 block text-xs">
+                  {t("namespace.workspaceName")}
+                </span>
                 <p className="font-medium">
                   <TruncateText>
                     {namespace.spec.workspaceName || namespace.spec.workspaceId}
@@ -174,7 +180,9 @@ export default function NamespaceDetailPage() {
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground mb-1 block text-xs">{t("namespace.visibility")}</span>
+                <span className="text-muted-foreground mb-1 block text-xs">
+                  {t("namespace.visibility")}
+                </span>
                 <p>
                   <Badge variant={namespace.spec.visibility === "public" ? "default" : "secondary"}>
                     {namespace.spec.visibility === "public"
@@ -184,7 +192,9 @@ export default function NamespaceDetailPage() {
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground mb-1 block text-xs">{t("common.status")}</span>
+                <span className="text-muted-foreground mb-1 block text-xs">
+                  {t("common.status")}
+                </span>
                 <p>
                   <Badge variant={namespace.spec.status === "active" ? "default" : "secondary"}>
                     {namespace.spec.status === "active" ? t("common.active") : t("common.inactive")}
@@ -192,17 +202,23 @@ export default function NamespaceDetailPage() {
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground mb-1 block text-xs">{t("namespace.maxMembers")}</span>
+                <span className="text-muted-foreground mb-1 block text-xs">
+                  {t("namespace.maxMembers")}
+                </span>
                 <p className="font-medium">{namespace.spec.maxMembers || "\u221E"}</p>
               </div>
               <div>
-                <span className="text-muted-foreground mb-1 block text-xs">{t("namespace.memberCount")}</span>
+                <span className="text-muted-foreground mb-1 block text-xs">
+                  {t("namespace.memberCount")}
+                </span>
                 <p className="font-medium">
                   {namespace.spec.memberCount ?? 0}/{namespace.spec.maxMembers || "\u221E"}
                 </p>
               </div>
               <div className="col-span-2 min-w-0">
-                <span className="text-muted-foreground mb-1 block text-xs">{t("common.description")}</span>
+                <span className="text-muted-foreground mb-1 block text-xs">
+                  {t("common.description")}
+                </span>
                 <p className="font-medium">
                   <TruncateText lines={3}>
                     {namespace.spec.description ||
@@ -215,19 +231,25 @@ export default function NamespaceDetailPage() {
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground mb-1 block text-xs">{t("common.created")}</span>
+                <span className="text-muted-foreground mb-1 block text-xs">
+                  {t("common.created")}
+                </span>
                 <p className="font-medium">
                   {new Date(namespace.metadata.createdAt).toLocaleString()}
                 </p>
               </div>
               <div className="min-w-0">
-                <span className="text-muted-foreground mb-1 block text-xs">{t("common.createdBy")}</span>
+                <span className="text-muted-foreground mb-1 block text-xs">
+                  {t("common.createdBy")}
+                </span>
                 <p className="font-medium">
                   <TruncateText>{namespace.spec.createdByName || "-"}</TruncateText>
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground mb-1 block text-xs">{t("common.updated")}</span>
+                <span className="text-muted-foreground mb-1 block text-xs">
+                  {t("common.updated")}
+                </span>
                 <p className="font-medium">
                   {new Date(namespace.metadata.updatedAt).toLocaleString()}
                 </p>

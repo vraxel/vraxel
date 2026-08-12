@@ -142,19 +142,25 @@ export default function WorkspaceDetailPage() {
                 </p>
               </div>
               <div className="min-w-0">
-                <span className="text-muted-foreground mb-1 block text-xs">{t("common.displayName")}</span>
+                <span className="text-muted-foreground mb-1 block text-xs">
+                  {t("common.displayName")}
+                </span>
                 <p className="font-medium">
                   <TruncateText>{workspace.spec.displayName || "-"}</TruncateText>
                 </p>
               </div>
               <div className="min-w-0">
-                <span className="text-muted-foreground mb-1 block text-xs">{t("workspace.owner")}</span>
+                <span className="text-muted-foreground mb-1 block text-xs">
+                  {t("workspace.owner")}
+                </span>
                 <p className="font-medium">
                   <TruncateText>{workspace.spec.ownerName || workspace.spec.ownerId}</TruncateText>
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground mb-1 block text-xs">{t("common.status")}</span>
+                <span className="text-muted-foreground mb-1 block text-xs">
+                  {t("common.status")}
+                </span>
                 <p>
                   <Badge variant={workspace.spec.status === "active" ? "default" : "secondary"}>
                     {workspace.spec.status === "active" ? t("common.active") : t("common.inactive")}
@@ -162,25 +168,33 @@ export default function WorkspaceDetailPage() {
                 </p>
               </div>
               <div className="col-span-2 min-w-0">
-                <span className="text-muted-foreground mb-1 block text-xs">{t("common.description")}</span>
+                <span className="text-muted-foreground mb-1 block text-xs">
+                  {t("common.description")}
+                </span>
                 <p className="font-medium">
                   <TruncateText lines={3}>{workspace.spec.description || "-"}</TruncateText>
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground mb-1 block text-xs">{t("common.created")}</span>
+                <span className="text-muted-foreground mb-1 block text-xs">
+                  {t("common.created")}
+                </span>
                 <p className="font-medium">
                   {new Date(workspace.metadata.createdAt).toLocaleString()}
                 </p>
               </div>
               <div className="min-w-0">
-                <span className="text-muted-foreground mb-1 block text-xs">{t("common.createdBy")}</span>
+                <span className="text-muted-foreground mb-1 block text-xs">
+                  {t("common.createdBy")}
+                </span>
                 <p className="font-medium">
                   <TruncateText>{workspace.spec.createdByName || "-"}</TruncateText>
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground mb-1 block text-xs">{t("common.updated")}</span>
+                <span className="text-muted-foreground mb-1 block text-xs">
+                  {t("common.updated")}
+                </span>
                 <p className="font-medium">
                   {new Date(workspace.metadata.updatedAt).toLocaleString()}
                 </p>

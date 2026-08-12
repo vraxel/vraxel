@@ -140,13 +140,17 @@ export default function UserDetailPage() {
           <CardContent>
             <div className="grid grid-cols-1 gap-x-8 gap-y-4 text-sm md:grid-cols-2">
               <div className="min-w-0">
-                <span className="text-muted-foreground mb-1 block text-xs">{t("user.username")}</span>
+                <span className="text-muted-foreground mb-1 block text-xs">
+                  {t("user.username")}
+                </span>
                 <p className="font-medium">
                   <TruncateText>{user.spec.username}</TruncateText>
                 </p>
               </div>
               <div className="min-w-0">
-                <span className="text-muted-foreground mb-1 block text-xs">{t("common.displayName")}</span>
+                <span className="text-muted-foreground mb-1 block text-xs">
+                  {t("common.displayName")}
+                </span>
                 <p className="font-medium">
                   <TruncateText>{user.spec.displayName || "-"}</TruncateText>
                 </p>
@@ -158,13 +162,17 @@ export default function UserDetailPage() {
                 </p>
               </div>
               <div className="min-w-0">
-                <span className="text-muted-foreground mb-1 block text-xs">{t("common.phone")}</span>
+                <span className="text-muted-foreground mb-1 block text-xs">
+                  {t("common.phone")}
+                </span>
                 <p className="font-medium">
                   <TruncateText>{user.spec.phone || "-"}</TruncateText>
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground mb-1 block text-xs">{t("common.status")}</span>
+                <span className="text-muted-foreground mb-1 block text-xs">
+                  {t("common.status")}
+                </span>
                 <p>
                   <Badge variant={user.spec.status === "active" ? "default" : "secondary"}>
                     {user.spec.status === "active" ? t("common.active") : t("common.inactive")}
@@ -172,11 +180,15 @@ export default function UserDetailPage() {
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground mb-1 block text-xs">{t("common.created")}</span>
+                <span className="text-muted-foreground mb-1 block text-xs">
+                  {t("common.created")}
+                </span>
                 <p className="font-medium">{new Date(user.metadata.createdAt).toLocaleString()}</p>
               </div>
               <div>
-                <span className="text-muted-foreground mb-1 block text-xs">{t("common.updated")}</span>
+                <span className="text-muted-foreground mb-1 block text-xs">
+                  {t("common.updated")}
+                </span>
                 <p className="font-medium">{new Date(user.metadata.updatedAt).toLocaleString()}</p>
               </div>
             </div>

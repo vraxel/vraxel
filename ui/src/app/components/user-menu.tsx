@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { KeyRound, LogOut , Loader2 } from "lucide-react"
+import { KeyRound, LogOut, Loader2 } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { z } from "zod/v4"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -213,7 +213,8 @@ function ChangePasswordDialog({
                 {t("common.cancel")}
               </Button>
               <Button type="submit" disabled={loading}>
-                {loading && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}{t("common.confirm")}
+                {loading && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
+                {t("common.confirm")}
               </Button>
             </DialogFooter>
           </form>
