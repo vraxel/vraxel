@@ -484,9 +484,9 @@ function EditRoleDialog({
         control={form.control}
         name="rules"
         render={() => (
-          {/* -ml-3 + pl-3 park the divider in the middle of the gap-6 gutter
-              without shifting the column's content. */}
           <FormItem className="col-span-2 flex min-h-0 flex-col md:-ml-3 md:border-l md:pl-3">
+            {/* -ml-3 + pl-3 park the divider in the middle of the gap-6 gutter
+                without shifting the column's content. */}
             <Label>
               {t("role.rules")}
               <span className="text-destructive ml-0.5">*</span>
