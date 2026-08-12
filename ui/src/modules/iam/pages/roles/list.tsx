@@ -10,6 +10,7 @@ import { Button } from "@/shared/ui/button"
 import { Badge } from "@/shared/ui/badge"
 import { Checkbox } from "@/shared/ui/checkbox"
 import { Input } from "@/shared/ui/input"
+import { Label } from "@/shared/ui/label"
 import { Textarea } from "@/shared/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select"
 
@@ -559,16 +560,18 @@ function RoleFormDialog({
         control={form.control}
         name="rules"
         render={() => (
-          <FormItem className="col-span-2 flex min-h-0 flex-col">
-            <div className="text-sm font-medium">
+          {/* -ml-3 + pl-3 park the divider in the middle of the gap-6 gutter
+              without shifting the column's content. */}
+          <FormItem className="col-span-2 flex min-h-0 flex-col md:-ml-3 md:border-l md:pl-3">
+            <Label>
               {t("role.rules")}
               <span className="text-destructive ml-0.5">*</span>
               {selectedRules.length > 0 && (
-                <span className="text-muted-foreground ml-2 font-normal">
+                <span className="text-muted-foreground font-normal">
                   ({t("role.rulesCount", { count: selectedRules.length })})
                 </span>
               )}
-            </div>
+            </Label>
             <PermissionSelector
               permissions={permissions}
               value={selectedRules}
