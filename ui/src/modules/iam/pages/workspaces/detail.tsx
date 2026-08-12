@@ -90,7 +90,7 @@ export default function WorkspaceDetailPage() {
     <div className="p-6">
       <div className="mb-6 flex items-center justify-between gap-4">
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <h1 className="min-w-0 flex-1 text-2xl font-bold">
+          <h1 className="min-w-0 flex-1 text-xl font-semibold tracking-tight">
             <TruncateText>{workspace.metadata.name}</TruncateText>
           </h1>
           <Badge variant={workspace.spec.status === "active" ? "default" : "secondary"}>

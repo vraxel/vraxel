@@ -113,7 +113,7 @@ export default function ScopedRoleDetailPage() {
       {/* header */}
       <div className="mb-6 flex items-center justify-between gap-4">
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <h1 className="min-w-0 flex-1 text-2xl font-bold">
+          <h1 className="min-w-0 flex-1 text-xl font-semibold tracking-tight">
             <TruncateText>{role.spec.name}</TruncateText>
           </h1>
           <Badge variant={role.spec.builtin ? "secondary" : "outline"}>
@@ -209,10 +209,10 @@ export default function ScopedRoleDetailPage() {
               className="grid grid-cols-1 gap-6 md:grid-cols-2"
               style={{ height: "min(600px, 60vh)" }}
             >
-              <div className="overflow-y-auto border">
+              <div className="overflow-y-auto border rounded-lg">
                 <PermissionSelector permissions={permissions} value={role.spec.rules} readOnly />
               </div>
-              <div className="overflow-y-auto border">
+              <div className="overflow-y-auto border rounded-lg">
                 <MatchedRulesList rules={role.spec.rules} permissions={permissions} />
               </div>
             </div>

@@ -41,6 +41,7 @@ import { useTranslation } from "@/i18n"
 import { useListState, useListSelectionSync } from "@/frameworks/list/use-list-state"
 import { usePermission } from "@/core/permission/use-permission"
 import { SortIcon } from "@/shared/components/sort-icon"
+import { EmptyState } from "@/shared/components/empty-state"
 import { Pagination } from "@/shared/components/pagination"
 import { ConfirmDialog } from "@/shared/components/confirm-dialog"
 import { TruncateCell } from "@/shared/components/truncate-cell"
@@ -148,7 +149,7 @@ export default function WorkspaceNamespacesPage() {
     <div className="p-6">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">{t("namespace.title")}</h1>
+          <h1 className="text-xl font-semibold tracking-tight">{t("namespace.title")}</h1>
           <p className="text-muted-foreground text-sm">
             {t("namespace.manage", { count: totalCount })}
           </p>
@@ -180,7 +181,7 @@ export default function WorkspaceNamespacesPage() {
       </div>
 
       {/* table */}
-      <div className="border">
+      <div className="overflow-hidden rounded-xl border shadow-sm">
         <Table>
           <TableHeader>
             <TableRow>
@@ -286,9 +287,9 @@ export default function WorkspaceNamespacesPage() {
                 </TableRow>
               ))
             ) : namespaces.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={11} className="text-muted-foreground py-8 text-center">
-                  {t("namespace.noData")}
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={11} className="p-0 whitespace-normal">
+                  <EmptyState title={t("namespace.noData")} />
                 </TableCell>
               </TableRow>
             ) : (

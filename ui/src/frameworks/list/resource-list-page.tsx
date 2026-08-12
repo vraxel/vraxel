@@ -9,6 +9,7 @@ import { Skeleton } from "@/shared/ui/skeleton"
 import { SortIcon } from "@/shared/components/sort-icon"
 import { FilterTableHead, type FilterOption } from "@/shared/components/filter-table-head"
 import { TruncateCell } from "@/shared/components/truncate-cell"
+import { EmptyState } from "@/shared/components/empty-state"
 import { Pagination } from "@/shared/components/pagination"
 import { useTranslation } from "@/i18n"
 import type { ListQuery, ListRow } from "./use-list-query"
@@ -86,10 +87,10 @@ export function ResourceListPage<T extends ListRow>({
 
   return (
     <div className="p-6">
-      <div className="mb-6 flex items-center justify-between gap-3">
+      <div className="mb-6 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold">{t(titleKey)}</h1>
-          {subtitle != null && <p className="text-muted-foreground text-sm">{subtitle}</p>}
+          <h1 className="text-xl font-semibold tracking-tight">{t(titleKey)}</h1>
+          {subtitle != null && <p className="text-muted-foreground mt-1 text-sm">{subtitle}</p>}
         </div>
         {createButton}
       </div>
@@ -187,21 +188,25 @@ export function ResourceListPage<T extends ListRow>({
               // sets error but retains data) and the global toast already
               // reported it -- wiping a loaded table for a transient 502
               // was review finding C5.
-              <TableRow>
-                <TableCell colSpan={colCount} className="py-10 text-center">
-                  <div className="text-muted-foreground flex flex-col items-center gap-2">
-                    <AlertCircle className="h-6 w-6" />
-                    <span>{t("common.loadError")}</span>
-                    <Button variant="outline" size="sm" onClick={() => query.refetch()}>
-                      {t("common.retry")}
-                    </Button>
-                  </div>
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={colCount} className="p-0 whitespace-normal">
+                  <EmptyState
+                    icon={AlertCircle}
+                    title={t("common.loadError")}
+                    action={
+                      <Button variant="outline" size="sm" onClick={() => query.refetch()}>
+                        {t("common.retry")}
+                      </Button>
+                    }
+                  />
                 </TableCell>
               </TableRow>
             ) : rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={colCount} className="text-muted-foreground py-8 text-center">
-                  {emptyKey ? t(emptyKey) : t("common.noData")}
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={colCount} className="p-0 whitespace-normal">
+                  {/* The header's create button doubles as the empty-state CTA:
+                      when the table is empty it is the only thing to do here. */}
+                  <EmptyState title={emptyKey ? t(emptyKey) : t("common.noData")} action={createButton} />
                 </TableCell>
               </TableRow>
             ) : (

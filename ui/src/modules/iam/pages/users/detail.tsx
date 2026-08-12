@@ -6,6 +6,7 @@ import { z } from "zod/v4"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
 import { Button } from "@/shared/ui/button"
+import { EmptyState } from "@/shared/components/empty-state"
 import { Badge } from "@/shared/ui/badge"
 import { Skeleton } from "@/shared/ui/skeleton"
 import { Input } from "@/shared/ui/input"
@@ -101,7 +102,7 @@ export default function UserDetailPage() {
       {/* header */}
       <div className="mb-6 flex items-center justify-between gap-4">
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <h1 className="min-w-0 flex-1 text-2xl font-bold">
+          <h1 className="min-w-0 flex-1 text-xl font-semibold tracking-tight">
             <TruncateText>{user.spec.username}</TruncateText>
           </h1>
           <Badge variant={user.spec.status === "active" ? "default" : "secondary"}>
@@ -275,7 +276,7 @@ function UserWorkspacesCard({ userId }: { userId: string }) {
         </div>
 
         {/* table */}
-        <div className="border">
+        <div className="overflow-hidden rounded-xl border shadow-sm">
           <Table>
             <TableHeader>
               <TableRow>
@@ -373,9 +374,9 @@ function UserWorkspacesCard({ userId }: { userId: string }) {
                   </TableRow>
                 ))
               ) : workspaces.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={10} className="text-muted-foreground py-10 text-center">
-                    {t("user.noWorkspaces")}
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={10} className="p-0 whitespace-normal">
+                    <EmptyState title={t("user.noWorkspaces")} />
                   </TableCell>
                 </TableRow>
               ) : (
@@ -498,7 +499,7 @@ function UserNamespacesCard({ userId }: { userId: string }) {
         </div>
 
         {/* table */}
-        <div className="border">
+        <div className="overflow-hidden rounded-xl border shadow-sm">
           <Table>
             <TableHeader>
               <TableRow>
@@ -590,9 +591,9 @@ function UserNamespacesCard({ userId }: { userId: string }) {
                   </TableRow>
                 ))
               ) : namespaces.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={10} className="text-muted-foreground py-10 text-center">
-                    {t("user.noNamespaceRefs")}
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={10} className="p-0 whitespace-normal">
+                    <EmptyState title={t("user.noNamespaceRefs")} />
                   </TableCell>
                 </TableRow>
               ) : (
@@ -761,7 +762,7 @@ function UserRoleBindingsCard({ userId }: { userId: string }) {
             />
           </div>
         </div>
-        <div className="border">
+        <div className="overflow-hidden rounded-xl border shadow-sm">
           <Table>
             <TableHeader>
               <TableRow>
@@ -826,9 +827,9 @@ function UserRoleBindingsCard({ userId }: { userId: string }) {
                   </TableRow>
                 ))
               ) : bindings.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-muted-foreground py-8 text-center">
-                    {t("user.noRolebindings")}
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={4} className="p-0 whitespace-normal">
+                    <EmptyState title={t("user.noRolebindings")} />
                   </TableCell>
                 </TableRow>
               ) : (

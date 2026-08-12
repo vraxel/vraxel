@@ -26,6 +26,7 @@ import { useListState, useListSelectionSync } from "@/frameworks/list/use-list-s
 import { usePermission } from "@/core/permission/use-permission"
 import { usePermissionStore } from "@/core/permission/permission-store"
 import { SortIcon } from "@/shared/components/sort-icon"
+import { EmptyState } from "@/shared/components/empty-state"
 import { Pagination } from "@/shared/components/pagination"
 import { ConfirmDialog } from "@/shared/components/confirm-dialog"
 import { ScopedRoleFormDialog } from "@/modules/iam/components/scoped-role-form-dialog"
@@ -151,7 +152,7 @@ export default function NamespaceRolesTab() {
     <div className="p-6">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">{t("role.title")}</h1>
+          <h1 className="text-xl font-semibold tracking-tight">{t("role.title")}</h1>
           <p className="text-muted-foreground text-sm">{t("role.manage", { count: totalCount })}</p>
         </div>
         {canCreate && (
@@ -180,7 +181,7 @@ export default function NamespaceRolesTab() {
         )}
       </div>
 
-      <div className="border">
+      <div className="overflow-hidden rounded-xl border shadow-sm">
         <Table>
           <TableHeader>
             <TableRow>
@@ -229,12 +230,12 @@ export default function NamespaceRolesTab() {
                 </TableRow>
               ))
             ) : roles.length === 0 ? (
-              <TableRow>
+              <TableRow className="hover:bg-transparent">
                 <TableCell
                   colSpan={6 + (canDelete ? 1 : 0) + (canUpdate || canDelete ? 1 : 0)}
-                  className="text-muted-foreground py-8 text-center"
+                  className="p-0 whitespace-normal"
                 >
-                  {t("role.noData")}
+                  <EmptyState title={t("role.noData")} />
                 </TableCell>
               </TableRow>
             ) : (

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card"
 import { Button } from "@/shared/ui/button"
 import { Input } from "@/shared/ui/input"
 import { Checkbox } from "@/shared/ui/checkbox"
+import { EmptyState } from "@/shared/components/empty-state"
 import { Skeleton } from "@/shared/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/shared/ui/table"
 import {
@@ -132,7 +133,7 @@ export function RoleUsersSection({ config }: { config: RoleUsersConfig }) {
           </div>
         </div>
 
-        <div className="border">
+        <div className="overflow-hidden rounded-xl border shadow-sm">
           <Table>
             <TableHeader>
               <TableRow>
@@ -151,9 +152,9 @@ export function RoleUsersSection({ config }: { config: RoleUsersConfig }) {
                   </TableRow>
                 ))
               ) : bindings.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={3} className="text-muted-foreground py-8 text-center">
-                    {search ? t("common.noSearchResults") : t("role.noUsers")}
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={3} className="p-0 whitespace-normal">
+                    <EmptyState title={search ? t("common.noSearchResults") : t("role.noUsers")} />
                   </TableCell>
                 </TableRow>
               ) : (
@@ -328,7 +329,7 @@ function AssignUsersDialog({
           />
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto border">
+        <div className="min-h-0 flex-1 overflow-y-auto border rounded-lg">
           {candidatesQuery.isPending ? (
             <div className="space-y-2 p-2">
               {Array.from({ length: 4 }).map((_, i) => (

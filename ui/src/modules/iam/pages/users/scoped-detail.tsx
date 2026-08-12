@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react"
 import { useParams } from "react-router"
 import { Search } from "lucide-react"
+import { EmptyState } from "@/shared/components/empty-state"
 import { Badge } from "@/shared/ui/badge"
 import { Skeleton } from "@/shared/ui/skeleton"
 import { Input } from "@/shared/ui/input"
@@ -56,7 +57,7 @@ export default function ScopedUserDetailPage() {
     <div className="p-6">
       {/* header */}
       <div className="mb-6 flex items-center gap-3">
-        <h1 className="min-w-0 flex-1 text-2xl font-bold">
+        <h1 className="min-w-0 flex-1 text-xl font-semibold tracking-tight">
           <TruncateText>{user.spec.username}</TruncateText>
         </h1>
         <Badge variant={user.spec.status === "active" ? "default" : "secondary"}>
@@ -233,7 +234,7 @@ function ScopedRoleBindingsCard({
             />
           </div>
         </div>
-        <div className="border">
+        <div className="overflow-hidden rounded-xl border shadow-sm">
           <Table>
             <TableHeader>
               <TableRow>
@@ -266,9 +267,9 @@ function ScopedRoleBindingsCard({
                   </TableRow>
                 ))
               ) : bindings.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={3} className="text-muted-foreground py-8 text-center">
-                    {t("user.noRolebindings")}
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={3} className="p-0 whitespace-normal">
+                    <EmptyState title={t("user.noRolebindings")} />
                   </TableCell>
                 </TableRow>
               ) : (

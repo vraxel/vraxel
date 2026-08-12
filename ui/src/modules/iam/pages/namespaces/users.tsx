@@ -6,6 +6,7 @@ import { useParams, Navigate } from "react-router"
 import { Plus, UserMinus, Search, Filter } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/shared/ui/button"
+import { EmptyState } from "@/shared/components/empty-state"
 import { Badge } from "@/shared/ui/badge"
 import { Skeleton } from "@/shared/ui/skeleton"
 import { Input } from "@/shared/ui/input"
@@ -162,7 +163,7 @@ export default function NamespaceUsersPage() {
     <div className="p-6">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">{t("namespace.members")}</h1>
+          <h1 className="text-xl font-semibold tracking-tight">{t("namespace.members")}</h1>
           <p className="text-muted-foreground text-sm">
             {t("namespace.membersManage", { count: totalCount })}
           </p>
@@ -195,7 +196,7 @@ export default function NamespaceUsersPage() {
       </div>
 
       {/* table */}
-      <div className="border">
+      <div className="overflow-hidden rounded-xl border shadow-sm">
         <Table>
           <TableHeader>
             <TableRow>
@@ -283,9 +284,9 @@ export default function NamespaceUsersPage() {
                 </TableRow>
               ))
             ) : members.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={10} className="text-muted-foreground py-8 text-center">
-                  {t("namespace.noMembers")}
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={10} className="p-0 whitespace-normal">
+                  <EmptyState title={t("namespace.noMembers")} />
                 </TableCell>
               </TableRow>
             ) : (
@@ -506,7 +507,7 @@ function AddMemberDialog({
         <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
           <div>
             <p className="mb-2 text-sm font-medium">{t("rolebinding.selectRole")}</p>
-            <div className="max-h-[120px] overflow-auto border">
+            <div className="max-h-[120px] overflow-auto border rounded-lg">
               {loading ? (
                 <div className="space-y-2 p-4">
                   {Array.from({ length: 2 }).map((_, i) => (
@@ -552,7 +553,7 @@ function AddMemberDialog({
                 className="pl-9"
               />
             </div>
-            <div className="max-h-[200px] overflow-auto border">
+            <div className="max-h-[200px] overflow-auto border rounded-lg">
               {loading ? (
                 <div className="space-y-2 p-4">
                   {Array.from({ length: 3 }).map((_, i) => (
