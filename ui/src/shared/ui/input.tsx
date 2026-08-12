@@ -35,7 +35,12 @@ function Input({ className, type, ref, ...props }: React.ComponentProps<"input">
       type={type}
       data-slot="input"
       className={cn(
-        "h-9 w-full min-w-0 rounded-md border border-input bg-card px-3 py-1 text-base shadow-xs transition-[color,box-shadow,border-color] outline-none selection:bg-primary selection:text-primary-foreground file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-faint disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+        // text-ellipsis on both the field and its placeholder: a single-line
+        // input clips overflow hard by default, which cuts a CJK placeholder
+        // mid-glyph and reads as a rendering fault. `text-overflow` is one of
+        // the properties ::placeholder honours, but it has to be set on the
+        // element too -- the pseudo alone does not cover the value.
+        "h-9 w-full min-w-0 rounded-md border border-input bg-card px-3 py-1 text-base text-ellipsis shadow-xs transition-[color,box-shadow,border-color] outline-none selection:bg-primary selection:text-primary-foreground file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-faint placeholder:text-ellipsis disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
         "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/25",
         "aria-invalid:border-destructive aria-invalid:ring-destructive/20",
         className
