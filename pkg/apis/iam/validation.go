@@ -288,18 +288,6 @@ func ValidatePermissionPattern(pattern string) validation.ErrorList {
 	return errs
 }
 
-// ValidateRoleBindingCreate validates a RoleBindingSpec for creation.
-func ValidateRoleBindingCreate(spec *RoleBindingSpec) validation.ErrorList {
-	var errs validation.ErrorList
-	if spec.UserID == "" {
-		errs = append(errs, validation.FieldError{Field: "spec.userId", Message: "is required"})
-	}
-	if spec.RoleID == "" {
-		errs = append(errs, validation.FieldError{Field: "spec.roleId", Message: "is required"})
-	}
-	return errs
-}
-
 // ValidatePassword validates a password string.
 //
 // The 72-byte ceiling matches the hard limit of bcrypt

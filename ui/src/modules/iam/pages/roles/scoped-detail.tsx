@@ -232,10 +232,26 @@ export default function ScopedRoleDetailPage() {
               namespaceId
                 ? listNamespaceRoleBindings(workspaceId!, namespaceId, params)
                 : listWorkspaceRoleBindings(workspaceId!, params),
-            listCandidates: (params) =>
-              namespaceId
-                ? listNamespaceUsers(workspaceId!, namespaceId, { ...params, available: "true" })
-                : listWorkspaceUsers(workspaceId!, { ...params, available: "true" }),
+            // Candidates = current members + not-yet-members. Members must be
+            // included so an existing member can receive a second role; the
+            // dialog itself excludes users already holding THIS role.
+            listCandidates: async (params) => {
+              const list = (p?: typeof params) =>
+                namespaceId
+                  ? listNamespaceUsers(workspaceId!, namespaceId, p)
+                  : listWorkspaceUsers(workspaceId!, p)
+              const [members, nonMembers] = await Promise.all([
+                list(params),
+                list({ ...params, available: "true" }),
+              ])
+              const seen = new Set<string>()
+              const items = [...members.items, ...nonMembers.items].filter((u) => {
+                if (seen.has(u.metadata.id)) return false
+                seen.add(u.metadata.id)
+                return true
+              })
+              return { ...members, items, totalCount: items.length }
+            },
             assign: (ids) =>
               namespaceId
                 ? createNamespaceRoleBindings(workspaceId!, namespaceId, ids, role.metadata.id)

@@ -65,18 +65,19 @@ export function RoleUsersSection({ config }: { config: RoleUsersConfig }) {
 
   // Shared list state: debounced search (300ms) + page reset on search,
   // the same behavior every other list in the app has.
-  const { page, setPage, searchInput, setSearchInput, search } = useListState({
-    defaultPageSize: PAGE_SIZE,
-  })
+  const { page, setPage, pageSize, setPageSize, searchInput, setSearchInput, search } =
+    useListState({
+      defaultPageSize: PAGE_SIZE,
+    })
   const [addOpen, setAddOpen] = useState(false)
   const [revokeTarget, setRevokeTarget] = useState<RoleBinding | null>(null)
 
   const bindingsQuery = useApiQuery({
-    queryKey: ["iam", "role-users", ...config.cacheKey, page, search],
+    queryKey: ["iam", "role-users", ...config.cacheKey, page, pageSize, search],
     queryFn: () => {
       const params: ListParams = {
         page,
-        pageSize: PAGE_SIZE,
+        pageSize,
         role_id: config.roleId,
         sortBy: "created_at",
         sortOrder: "asc",
@@ -89,8 +90,13 @@ export function RoleUsersSection({ config }: { config: RoleUsersConfig }) {
   const total = bindingsQuery.data?.totalCount ?? 0
   const loading = bindingsQuery.isPending
 
-  const refresh = () =>
+  // Assign/revoke change both the bindings list and who still qualifies as
+  // a candidate (the holders query lives under the "role-users" prefix, so
+  // the first call covers it too).
+  const refresh = () => {
     qc.invalidateQueries({ queryKey: ["iam", "role-users", ...config.cacheKey] })
+    qc.invalidateQueries({ queryKey: ["iam", "role-assign-candidates", ...config.cacheKey] })
+  }
 
   const handleRevoke = async () => {
     if (!revokeTarget) return
@@ -193,17 +199,13 @@ export function RoleUsersSection({ config }: { config: RoleUsersConfig }) {
           </Table>
         </div>
 
-        {total > PAGE_SIZE && (
-          <div className="mt-3">
-            <Pagination
-              page={page}
-              pageSize={PAGE_SIZE}
-              totalCount={total}
-              onPageChange={setPage}
-              onPageSizeChange={() => {}}
-            />
-          </div>
-        )}
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          totalCount={total}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       </CardContent>
 
       {config.canAssign && (
@@ -248,7 +250,19 @@ function AssignUsersDialog({
     queryFn: () => config.listCandidates({ pageSize: 100 }),
     enabled: open,
   })
-  const users = useMemo(() => candidatesQuery.data?.items ?? [], [candidatesQuery.data])
+  // Users already holding THIS role are not candidates. Keyed under the
+  // "role-users" prefix so the section's refresh() invalidates it too.
+  // Exclusion is best-effort within the first page; server-side assign is
+  // idempotent, so any holder that slips through just counts as skipped.
+  const holdersQuery = useApiQuery({
+    queryKey: ["iam", "role-users", ...config.cacheKey, "assign-holders"],
+    queryFn: () => config.listBindings({ role_id: config.roleId, pageSize: 100 }),
+    enabled: open,
+  })
+  const users = useMemo(() => {
+    const held = new Set((holdersQuery.data?.items ?? []).map((b) => b.spec.userId))
+    return (candidatesQuery.data?.items ?? []).filter((u) => !held.has(u.metadata.id))
+  }, [candidatesQuery.data, holdersQuery.data])
 
   // Reset when the dialog opens (adjust-during-render, not an effect).
   const [prevOpen, setPrevOpen] = useState(open)
@@ -329,7 +343,7 @@ function AssignUsersDialog({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto border">
-          {candidatesQuery.isPending ? (
+          {candidatesQuery.isPending || holdersQuery.isPending ? (
             <div className="space-y-2 p-2">
               {Array.from({ length: 4 }).map((_, i) => (
                 <Skeleton key={i} className="h-8 w-full" />
