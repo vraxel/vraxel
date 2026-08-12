@@ -12,7 +12,11 @@ export function TruncateCell({
   children,
   text,
   className,
-  maxWidth = "max-w-[200px]",
+  // Deliberately px, not rem: the point of the cap is to bound a column in
+  // screen space, and keeping it fixed while the root font shrinks is what
+  // buys back characters. 200 was tight enough that ordinary descriptions
+  // clipped even on a wide table.
+  maxWidth = "max-w-[288px]",
 }: {
   children: React.ReactNode
   /** Plain text for the tooltip (defaults to children if not set) */

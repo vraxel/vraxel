@@ -268,7 +268,7 @@ export default function NamespaceRolesTab() {
                       {role.spec.builtin ? t("role.builtin") : t("role.custom")}
                     </Badge>
                   </TableCell>
-                  <TruncateCell className="text-sm" maxWidth="max-w-48">
+                  <TruncateCell>
                     {t(`role.desc.${role.spec.name}`, {
                       defaultValue: role.spec.description || "-",
                     })}

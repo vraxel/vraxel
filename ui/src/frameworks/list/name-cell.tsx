@@ -27,7 +27,7 @@ export interface NameCellProps {
  * or repeating the same string: a resource with no display name renders
  * just its name, still linked.
  */
-export function NameCell({ to, displayName, name, maxWidth = "max-w-[240px]" }: NameCellProps) {
+export function NameCell({ to, displayName, name, maxWidth = "max-w-[304px]" }: NameCellProps) {
   const primary = displayName?.trim() || name
   const secondary = primary === name ? null : name
   return (

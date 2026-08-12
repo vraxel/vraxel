@@ -124,6 +124,15 @@
   .recharts-default-tooltip .recharts-tooltip-label {
     color: var(--color-popover-foreground);
   }
+  /* 15px, not the browser's 16. Every rem in the design system scales off
+     this, so it is the one knob that trades the whole UI's size against how
+     much data fits on a screen -- `text-sm` lands at 13.1px, which is the
+     floor for comfortable CJK reading, and list rows gain roughly two
+     characters per column. Going to 14 would put body text at 12.25px, below
+     that floor. */
+  html {
+    font-size: 15px;
+  }
   body {
     @apply bg-background text-foreground antialiased;
     /* cv11: Inter's single-storey a/g. At UI sizes the double-storey default
