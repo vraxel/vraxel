@@ -137,7 +137,7 @@ function DateRangePicker({
               value={extractTime(value?.from)}
               onChange={(e) => handleFromTime(e.target.value)}
               disabled={!value?.from}
-              className="h-7 w-[110px] rounded-none text-xs"
+              className="h-7 w-auto rounded-none px-2 text-xs text-clip md:text-xs"
             />
           </div>
           <span className="text-muted-foreground">–</span>
@@ -152,7 +152,7 @@ function DateRangePicker({
               value={extractTime(value?.to)}
               onChange={(e) => handleToTime(e.target.value)}
               disabled={!value?.to}
-              className="h-7 w-[110px] rounded-none text-xs"
+              className="h-7 w-auto rounded-none px-2 text-xs text-clip md:text-xs"
             />
           </div>
           <div className="ml-auto">
