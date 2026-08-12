@@ -93,7 +93,10 @@ export function Pagination({
           return (
             <Button
               key={item}
-              variant={isCurrent ? "default" : "outline"}
+              // Ghost, not outline: a bordered box per page number turns the
+              // pager into a row of ten competing chips. Only the current
+              // page carries a fill.
+              variant={isCurrent ? "default" : "ghost"}
               size="icon-sm"
               aria-current={isCurrent ? "page" : undefined}
               aria-label={t("common.gotoPage", { page: item })}

@@ -20,9 +20,16 @@ export function LanguageSwitcher() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="gap-1.5">
+        {/* Icon-only: the current language is already legible from the UI
+            itself, and this sits next to two other icon-sized header
+            controls. */}
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="text-muted-foreground hover:text-foreground"
+          aria-label={current?.label}
+        >
           <Languages className="h-4 w-4" />
-          <span className="text-xs">{current?.label}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
@@ -30,7 +37,7 @@ export function LanguageSwitcher() {
           <DropdownMenuItem
             key={l.value}
             onClick={() => setLocale(l.value)}
-            className={locale === l.value ? "font-semibold" : ""}
+            className={locale === l.value ? "text-primary font-medium" : ""}
           >
             {l.label}
           </DropdownMenuItem>

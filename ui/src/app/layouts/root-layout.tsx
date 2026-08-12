@@ -377,7 +377,9 @@ export default function RootLayout() {
               <span>Vraxel Console</span>
             </Link>
           </div>
-          <div className="border-b px-1 py-1.5">
+          {/* px-2 + the selector's own px-1 + the trigger's px-2 puts the
+              scope labels on the same 20px text inset as the nav links. */}
+          <div className="border-b px-2 py-1.5">
             <ScopeSelector />
           </div>
           <div className="border-b px-2 py-1.5">

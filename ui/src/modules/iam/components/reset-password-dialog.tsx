@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { Loader2 } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { z } from "zod/v4"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -150,7 +151,7 @@ export function ResetPasswordDialog({
                 {t("common.cancel")}
               </Button>
               <Button type="submit" variant="destructive" disabled={loading}>
-                {loading ? "..." : t("user.resetPassword")}
+                {loading && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}{t("user.resetPassword")}
               </Button>
             </DialogFooter>
           </form>

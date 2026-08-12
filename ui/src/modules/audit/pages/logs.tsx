@@ -182,7 +182,7 @@ export default function AuditLogListPage() {
             </PopoverContent>
           </Popover>
           <button
-            className="cursor-pointer select-none"
+            className="hover:text-foreground cursor-pointer transition-colors select-none"
             onClick={() => query.handleSort("resource_type")}
           >
             <SortIcon field="resource_type" sortBy={query.sortBy} sortOrder={query.sortOrder} />

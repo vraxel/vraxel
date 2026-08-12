@@ -152,7 +152,7 @@ export function ResourceListPage<T extends ListRow>({
                     {col.sortable ? (
                       <button
                         type="button"
-                        className="inline-flex cursor-pointer items-center select-none"
+                        className="group/sort hover:text-foreground focus-visible:ring-ring/40 inline-flex cursor-pointer items-center rounded-sm transition-colors outline-none select-none focus-visible:ring-2"
                         onClick={() => query.handleSort(col.key)}
                       >
                         {col.header}
@@ -265,15 +265,13 @@ export function ResourceListPage<T extends ListRow>({
         </Table>
       </div>
 
-      <div className="mt-4">
-        <Pagination
-          page={query.page}
-          pageSize={query.pageSize}
-          totalCount={totalCount}
-          onPageChange={query.setPage}
-          onPageSizeChange={query.setPageSize}
-        />
-      </div>
+      <Pagination
+        page={query.page}
+        pageSize={query.pageSize}
+        totalCount={totalCount}
+        onPageChange={query.setPage}
+        onPageSizeChange={query.setPageSize}
+      />
 
       {children}
     </div>

@@ -136,7 +136,7 @@ export function ScopeSelector() {
   }, [hasPlatformScope, hasWorkspaceScope, namespaces, namespaceId])
 
   return (
-    <div className="space-y-1 overflow-hidden">
+    <div className="space-y-0.5 overflow-hidden px-1">
       <Select
         value={workspaceId ?? (hasPlatformScope ? ALL : "")}
         onValueChange={(v) => {
@@ -167,7 +167,7 @@ export function ScopeSelector() {
       >
         <SelectTrigger
           size="sm"
-          className="h-8 w-full min-w-0 gap-1.5 overflow-hidden rounded-none border-0 bg-transparent px-3 text-xs shadow-none"
+          className="hover:bg-accent h-8 w-full min-w-0 gap-1.5 overflow-hidden rounded-md border-0 bg-transparent px-2 text-xs shadow-none focus-visible:ring-0"
         >
           <Building2 className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
           {(() => {
@@ -229,7 +229,7 @@ export function ScopeSelector() {
       >
         <SelectTrigger
           size="sm"
-          className="h-8 w-full min-w-0 gap-1.5 overflow-hidden rounded-none border-0 bg-transparent px-3 text-xs shadow-none"
+          className="hover:bg-accent h-8 w-full min-w-0 gap-1.5 overflow-hidden rounded-md border-0 bg-transparent px-2 text-xs shadow-none focus-visible:ring-0"
         >
           <FolderKanban className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
           {(() => {

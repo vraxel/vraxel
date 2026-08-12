@@ -194,7 +194,7 @@ export default function WorkspaceRolesTab() {
                   />
                 </TableHead>
               )}
-              <TableHead className="cursor-pointer select-none" onClick={() => handleSort("name")}>
+              <TableHead className="hover:text-foreground cursor-pointer transition-colors select-none" onClick={() => handleSort("name")}>
                 {t("common.name")}
                 <SortIcon field="name" sortBy={sortBy} sortOrder={sortOrder} />
               </TableHead>
@@ -202,7 +202,7 @@ export default function WorkspaceRolesTab() {
               <TableHead>{t("common.description")}</TableHead>
               <TableHead>{t("role.rules")}</TableHead>
               <TableHead
-                className="cursor-pointer select-none"
+                className="hover:text-foreground cursor-pointer transition-colors select-none"
                 onClick={() => handleSort("created_at")}
               >
                 {t("common.created")}

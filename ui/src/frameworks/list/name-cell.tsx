@@ -34,7 +34,7 @@ export function NameCell({ to, displayName, name, maxWidth = "max-w-[240px]" }: 
     <div className={`${maxWidth} min-w-0`}>
       <TruncateText text={primary}>
         {to ? (
-          <Link to={to} className="font-medium hover:underline">
+          <Link to={to} className="hover:text-primary font-medium transition-colors">
             {primary}
           </Link>
         ) : (

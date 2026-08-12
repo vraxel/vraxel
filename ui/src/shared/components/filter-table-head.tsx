@@ -54,7 +54,7 @@ export function FilterTableHead<T extends string = string>({
       <span className="inline-flex items-center gap-1">
         <button
           type="button"
-          className="inline-flex cursor-pointer items-center select-none"
+          className="group/sort hover:text-foreground focus-visible:ring-ring/40 inline-flex cursor-pointer items-center rounded-sm transition-colors outline-none select-none focus-visible:ring-2"
           onClick={() => !hideSort && onSort(field)}
         >
           {children}
@@ -62,9 +62,19 @@ export function FilterTableHead<T extends string = string>({
         </button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button type="button" className="inline-flex items-center" aria-label="filter">
+            <button
+              type="button"
+              className="focus-visible:ring-ring/40 inline-flex items-center rounded-sm outline-none focus-visible:ring-2"
+              aria-label="filter"
+            >
+              {/* Like SortIcon: the funnel only advertises itself on header
+                  hover; an active filter is state and stays visible. */}
               <Filter
-                className={`h-3 w-3 ${isFiltered ? "fill-primary text-primary" : "opacity-40"}`}
+                className={
+                  isFiltered
+                    ? "fill-primary text-primary h-3 w-3"
+                    : "h-3 w-3 opacity-0 transition-opacity group-hover/thead:opacity-40"
+                }
               />
             </button>
           </DropdownMenuTrigger>

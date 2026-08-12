@@ -142,13 +142,13 @@ export default function ScopedRoleDetailPage() {
         <CardContent>
           <div className="grid grid-cols-1 gap-x-8 gap-y-4 text-sm md:grid-cols-2">
             <div className="min-w-0">
-              <span className="text-muted-foreground">{t("role.name")}</span>
+              <span className="text-muted-foreground mb-1 block text-xs">{t("role.name")}</span>
               <p className="font-medium">
                 <TruncateText>{role.spec.name}</TruncateText>
               </p>
             </div>
             <div className="min-w-0">
-              <span className="text-muted-foreground">{t("common.displayName")}</span>
+              <span className="text-muted-foreground mb-1 block text-xs">{t("common.displayName")}</span>
               <p className="font-medium">
                 <TruncateText>
                   {t(`role.${role.spec.name}`, { defaultValue: role.spec.displayName || "-" })}
@@ -156,7 +156,7 @@ export default function ScopedRoleDetailPage() {
               </p>
             </div>
             <div>
-              <span className="text-muted-foreground">{t("role.scope")}</span>
+              <span className="text-muted-foreground mb-1 block text-xs">{t("role.scope")}</span>
               <p>
                 <Badge variant={scope === "workspace" ? "secondary" : "outline"}>
                   {t(`role.scope.${scope}`)}
@@ -164,7 +164,7 @@ export default function ScopedRoleDetailPage() {
               </p>
             </div>
             <div>
-              <span className="text-muted-foreground">{t("role.builtin")}</span>
+              <span className="text-muted-foreground mb-1 block text-xs">{t("role.builtin")}</span>
               <p>
                 <Badge variant={role.spec.builtin ? "secondary" : "outline"}>
                   {role.spec.builtin ? t("role.builtin") : t("role.custom")}
@@ -172,7 +172,7 @@ export default function ScopedRoleDetailPage() {
               </p>
             </div>
             <div className="col-span-2 min-w-0">
-              <span className="text-muted-foreground">{t("common.description")}</span>
+              <span className="text-muted-foreground mb-1 block text-xs">{t("common.description")}</span>
               <p className="font-medium">
                 <TruncateText lines={3}>
                   {t(`role.desc.${role.spec.name}`, { defaultValue: role.spec.description || "-" })}
@@ -180,11 +180,11 @@ export default function ScopedRoleDetailPage() {
               </p>
             </div>
             <div>
-              <span className="text-muted-foreground">{t("common.created")}</span>
+              <span className="text-muted-foreground mb-1 block text-xs">{t("common.created")}</span>
               <p className="font-medium">{new Date(role.metadata.createdAt).toLocaleString()}</p>
             </div>
             <div>
-              <span className="text-muted-foreground">{t("common.updated")}</span>
+              <span className="text-muted-foreground mb-1 block text-xs">{t("common.updated")}</span>
               <p className="font-medium">{new Date(role.metadata.updatedAt).toLocaleString()}</p>
             </div>
           </div>

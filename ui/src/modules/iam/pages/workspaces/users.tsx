@@ -3,7 +3,7 @@ import { NameCell } from "@/frameworks/list/name-cell"
 import { useApiQuery } from "@/core/query/hooks"
 import { useQueryClient, keepPreviousData } from "@tanstack/react-query"
 import { useParams, Navigate } from "react-router"
-import { Plus, UserMinus, Search, Filter } from "lucide-react"
+import { Plus, UserMinus, Search, Filter , Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/shared/ui/button"
 import { EmptyState } from "@/shared/components/empty-state"
@@ -209,17 +209,17 @@ export default function WorkspaceUsersPage() {
                 )}
               </TableHead>
               <TableHead
-                className="cursor-pointer select-none"
+                className="hover:text-foreground cursor-pointer transition-colors select-none"
                 onClick={() => handleSort("username")}
               >
                 {t("user.username")}
                 <SortIcon field="username" sortBy={sortBy} sortOrder={sortOrder} />
               </TableHead>
-              <TableHead className="cursor-pointer select-none" onClick={() => handleSort("email")}>
+              <TableHead className="hover:text-foreground cursor-pointer transition-colors select-none" onClick={() => handleSort("email")}>
                 {t("user.email")}
                 <SortIcon field="email" sortBy={sortBy} sortOrder={sortOrder} />
               </TableHead>
-              <TableHead className="cursor-pointer select-none" onClick={() => handleSort("phone")}>
+              <TableHead className="hover:text-foreground cursor-pointer transition-colors select-none" onClick={() => handleSort("phone")}>
                 {t("common.phone")}
                 <SortIcon field="phone" sortBy={sortBy} sortOrder={sortOrder} />
               </TableHead>
@@ -248,14 +248,14 @@ export default function WorkspaceUsersPage() {
                 </DropdownMenu>
               </TableHead>
               <TableHead
-                className="cursor-pointer select-none"
+                className="hover:text-foreground cursor-pointer transition-colors select-none"
                 onClick={() => handleSort("created_at")}
               >
                 {t("common.created")}
                 <SortIcon field="created_at" sortBy={sortBy} sortOrder={sortOrder} />
               </TableHead>
               <TableHead
-                className="cursor-pointer select-none"
+                className="hover:text-foreground cursor-pointer transition-colors select-none"
                 onClick={() => handleSort("updated_at")}
               >
                 {t("common.updated")}
@@ -596,7 +596,7 @@ function AddMemberDialog({
             onClick={handleSubmit}
             disabled={selectedIds.size === 0 || !selectedRoleId || submitting}
           >
-            {submitting ? "..." : t("workspace.addMember")}{" "}
+            {submitting && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}{t("workspace.addMember")}{" "}
             {selectedIds.size > 0 && `(${selectedIds.size})`}
           </Button>
         </DialogFooter>

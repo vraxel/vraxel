@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react"
+import { Loader2, LayoutDashboard } from "lucide-react"
 import { Link, useSearchParams } from "react-router"
 import { Button } from "@/shared/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card"
 import { Input } from "@/shared/ui/input"
 import { Label } from "@/shared/ui/label"
 import { LanguageSwitcher } from "@/shared/components/language-switcher"
@@ -83,15 +84,19 @@ export default function LoginPage() {
 
   return (
     <div
-      className="flex min-h-screen items-center justify-center bg-cover bg-center bg-no-repeat"
+      className="relative flex min-h-screen items-center justify-center bg-cover bg-center bg-no-repeat"
       style={{ backgroundImage: "url('/login-bg.svg')" }}
-    >
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-2xl">{t("login.title")}</CardTitle>
-            <LanguageSwitcher />
-          </div>
+      >
+      <div className="absolute top-4 right-4">
+        <LanguageSwitcher />
+      </div>
+      <Card className="w-full max-w-sm shadow-lg">
+        <CardHeader className="justify-items-center gap-3 text-center">
+          <span className="bg-primary text-primary-foreground flex size-10 items-center justify-center rounded-xl">
+            <LayoutDashboard className="h-5 w-5" />
+          </span>
+          <CardTitle className="text-xl">{t("login.title")}</CardTitle>
+          <CardDescription>Vraxel Console</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -119,7 +124,7 @@ export default function LoginPage() {
             </div>
             {error && <p className="text-destructive text-sm">{error}</p>}
             <Button className="w-full" type="submit" disabled={loading}>
-              {loading ? "..." : t("login.signIn")}
+              {loading && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}{t("login.signIn")}
             </Button>
           </form>
 

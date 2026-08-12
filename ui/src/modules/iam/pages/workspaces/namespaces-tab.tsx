@@ -199,12 +199,12 @@ export default function WorkspaceNamespacesPage() {
                   />
                 </TableHead>
               )}
-              <TableHead className="cursor-pointer select-none" onClick={() => handleSort("name")}>
+              <TableHead className="hover:text-foreground cursor-pointer transition-colors select-none" onClick={() => handleSort("name")}>
                 {t("common.name")}
                 <SortIcon field="name" sortBy={sortBy} sortOrder={sortOrder} />
               </TableHead>
               <TableHead
-                className="cursor-pointer select-none"
+                className="hover:text-foreground cursor-pointer transition-colors select-none"
                 onClick={() => handleSort("description")}
               >
                 {t("common.description")}
@@ -265,7 +265,7 @@ export default function WorkspaceNamespacesPage() {
                 <SortIcon field="member_count" sortBy={sortBy} sortOrder={sortOrder} />
               </TableHead>
               <TableHead
-                className="cursor-pointer select-none"
+                className="hover:text-foreground cursor-pointer transition-colors select-none"
                 onClick={() => handleSort("created_at")}
               >
                 {t("common.created")}

@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { KeyRound, LogOut } from "lucide-react"
+import { KeyRound, LogOut , Loader2 } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { z } from "zod/v4"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -42,7 +42,7 @@ export function UserMenu() {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" className="gap-2">
+          <Button variant="ghost" size="sm" className="gap-2 pl-1">
             <Avatar size="sm">
               <AvatarFallback>{initials}</AvatarFallback>
             </Avatar>
@@ -213,7 +213,7 @@ function ChangePasswordDialog({
                 {t("common.cancel")}
               </Button>
               <Button type="submit" disabled={loading}>
-                {loading ? "..." : t("common.confirm")}
+                {loading && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}{t("common.confirm")}
               </Button>
             </DialogFooter>
           </form>
