@@ -112,7 +112,7 @@ const iam = {
   "role.noData": "暂无角色。",
   "role.notFound": "角色未找到。",
   "role.details": "角色详情",
-  "role.users": "拥有此角色的用户",
+  "role.users": "授权用户",
   "role.assignUsers": "授予用户",
   "role.assignUsersHint": "为选中的用户授予此角色。",
   "role.noUsers": "暂无用户拥有此角色。",

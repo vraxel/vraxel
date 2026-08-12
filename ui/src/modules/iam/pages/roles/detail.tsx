@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useState } from "react"
 import { formatDateTime } from "@/shared/lib/format"
-import { useParams, useNavigate } from "react-router"
+import { useParams, useNavigate, useSearchParams } from "react-router"
 import { Pencil, Trash2 } from "lucide-react"
 import { useForm, useWatch } from "react-hook-form"
 import { z } from "zod/v4"
@@ -12,6 +12,7 @@ import { Skeleton } from "@/shared/ui/skeleton"
 import { Input } from "@/shared/ui/input"
 import { Textarea } from "@/shared/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs"
 
 import { ConfirmDialog } from "@/shared/components/confirm-dialog"
 import { TruncateText } from "@/shared/components/truncate-text"
@@ -65,6 +66,14 @@ export default function RoleDetailPage() {
   const permissions = permsQuery.data ?? []
   const loading = detailQuery.isPending || permsQuery.isPending
   const invalidate = () => qc.invalidateQueries({ queryKey: qk.resource(rolesDef) })
+
+  // Tab lives in the URL so a refresh, a back-navigation from a user
+  // detail page, or a shared link all land on the same tab.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const canListBindings = hasPermission("iam:rolebindings:list")
+  const tab = searchParams.get("tab") === "users" && canListBindings ? "users" : "overview"
+  const setTab = (value: string) =>
+    setSearchParams(value === "overview" ? {} : { tab: value }, { replace: true })
 
   const handleEdit = () => {
     setEditOpen(true)
@@ -133,116 +142,138 @@ export default function RoleDetailPage() {
           )}
       </div>
 
-      {/* role info card */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>{t("role.details")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 gap-x-8 gap-y-4 text-sm md:grid-cols-2">
-            <div className="min-w-0">
-              <span className="text-muted-foreground mb-1 block text-xs">{t("role.name")}</span>
-              <p className="font-medium">
-                <TruncateText>{role.spec.name}</TruncateText>
-              </p>
-            </div>
-            <div className="min-w-0">
-              <span className="text-muted-foreground mb-1 block text-xs">
-                {t("common.displayName")}
-              </span>
-              <p className="font-medium">
-                <TruncateText>
-                  {t(`role.${role.spec.name}`, { defaultValue: role.spec.displayName || "-" })}
-                </TruncateText>
-              </p>
-            </div>
-            <div>
-              <span className="text-muted-foreground mb-1 block text-xs">{t("role.scope")}</span>
-              <p>
-                <Badge variant={SCOPE_VARIANT[role.spec.scope] ?? "outline"}>
-                  {t(`role.scope.${role.spec.scope}`)}
-                </Badge>
-              </p>
-            </div>
-            <div>
-              <span className="text-muted-foreground mb-1 block text-xs">{t("role.builtin")}</span>
-              <p>
-                <Badge variant={role.spec.builtin ? "secondary" : "outline"}>
-                  {role.spec.builtin ? t("role.builtin") : t("role.custom")}
-                </Badge>
-              </p>
-            </div>
-            <div className="col-span-2 min-w-0">
-              <span className="text-muted-foreground mb-1 block text-xs">
-                {t("common.description")}
-              </span>
-              <p className="font-medium">
-                <TruncateText lines={3}>
-                  {t(`role.desc.${role.spec.name}`, { defaultValue: role.spec.description || "-" })}
-                </TruncateText>
-              </p>
-            </div>
-            <div>
-              <span className="text-muted-foreground mb-1 block text-xs">
-                {t("common.created")}
-              </span>
-              <p className="font-medium">{formatDateTime(role.metadata.createdAt)}</p>
-            </div>
-            <div>
-              <span className="text-muted-foreground mb-1 block text-xs">
-                {t("common.updated")}
-              </span>
-              <p className="font-medium">{formatDateTime(role.metadata.updatedAt)}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* permission rules card */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>
-            {t("role.rules")}
-            <span className="text-muted-foreground ml-2 text-sm font-normal">
-              ({t("role.rulesCount", { count: role.spec.rules?.length ?? 0 })})
-            </span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!role.spec.rules || role.spec.rules.length === 0 ? (
-            <p className="text-muted-foreground text-sm">{t("role.noPermissions")}</p>
-          ) : (
-            <div
-              className="grid grid-cols-1 gap-6 md:grid-cols-2"
-              style={{ height: "min(600px, 60vh)" }}
-            >
-              <div className="overflow-y-auto rounded-lg border">
-                <PermissionSelector permissions={permissions} value={role.spec.rules} readOnly />
-              </div>
-              <div className="overflow-y-auto rounded-lg border">
-                <MatchedRulesList rules={role.spec.rules} permissions={permissions} />
-              </div>
-            </div>
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList className="mb-6">
+          <TabsTrigger value="overview">{t("common.overview")}</TabsTrigger>
+          {canListBindings && (
+            <TabsTrigger value="users">{t("role.users")}</TabsTrigger>
           )}
-        </CardContent>
-      </Card>
+        </TabsList>
 
-      {/* users with this role */}
-      {hasPermission("iam:rolebindings:list") && (
-        <RoleUsersSection
-          config={{
-            roleId: role.metadata.id,
-            detailPrefix: "/iam",
-            listBindings: (params) => listRoleBindings(params),
-            listCandidates: (params) => listUsers(params),
-            assign: (ids) => createRoleBindings(ids, role.metadata.id),
-            revoke: (id) => deleteRoleBinding(id),
-            canAssign: hasPermission("iam:rolebindings:create"),
-            canRevoke: hasPermission("iam:rolebindings:delete"),
-            cacheKey: ["platform", role.metadata.id],
-          }}
-        />
-      )}
+        <TabsContent value="overview" className="space-y-6">
+          {/* role info card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("role.details")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-x-8 gap-y-4 text-sm md:grid-cols-2">
+                <div className="min-w-0">
+                  <span className="text-muted-foreground mb-1 block text-xs">{t("role.name")}</span>
+                  <p className="font-medium">
+                    <TruncateText>{role.spec.name}</TruncateText>
+                  </p>
+                </div>
+                <div className="min-w-0">
+                  <span className="text-muted-foreground mb-1 block text-xs">
+                    {t("common.displayName")}
+                  </span>
+                  <p className="font-medium">
+                    <TruncateText>
+                      {t(`role.${role.spec.name}`, { defaultValue: role.spec.displayName || "-" })}
+                    </TruncateText>
+                  </p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground mb-1 block text-xs">
+                    {t("role.scope")}
+                  </span>
+                  <p>
+                    <Badge variant={SCOPE_VARIANT[role.spec.scope] ?? "outline"}>
+                      {t(`role.scope.${role.spec.scope}`)}
+                    </Badge>
+                  </p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground mb-1 block text-xs">
+                    {t("role.builtin")}
+                  </span>
+                  <p>
+                    <Badge variant={role.spec.builtin ? "secondary" : "outline"}>
+                      {role.spec.builtin ? t("role.builtin") : t("role.custom")}
+                    </Badge>
+                  </p>
+                </div>
+                <div className="col-span-2 min-w-0">
+                  <span className="text-muted-foreground mb-1 block text-xs">
+                    {t("common.description")}
+                  </span>
+                  <p className="font-medium">
+                    <TruncateText lines={3}>
+                      {t(`role.desc.${role.spec.name}`, {
+                        defaultValue: role.spec.description || "-",
+                      })}
+                    </TruncateText>
+                  </p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground mb-1 block text-xs">
+                    {t("common.created")}
+                  </span>
+                  <p className="font-medium">{formatDateTime(role.metadata.createdAt)}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground mb-1 block text-xs">
+                    {t("common.updated")}
+                  </span>
+                  <p className="font-medium">{formatDateTime(role.metadata.updatedAt)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* permission rules card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                {t("role.rules")}
+                <span className="text-muted-foreground ml-2 text-sm font-normal">
+                  ({t("role.rulesCount", { count: role.spec.rules?.length ?? 0 })})
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!role.spec.rules || role.spec.rules.length === 0 ? (
+                <p className="text-muted-foreground text-sm">{t("role.noPermissions")}</p>
+              ) : (
+                <div
+                  className="grid grid-cols-1 gap-6 md:grid-cols-2"
+                  style={{ height: "min(600px, 60vh)" }}
+                >
+                  <div className="overflow-y-auto rounded-lg border">
+                    <PermissionSelector
+                      permissions={permissions}
+                      value={role.spec.rules}
+                      readOnly
+                    />
+                  </div>
+                  <div className="overflow-y-auto rounded-lg border">
+                    <MatchedRulesList rules={role.spec.rules} permissions={permissions} />
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {canListBindings && (
+          <TabsContent value="users">
+            <RoleUsersSection
+              config={{
+                roleId: role.metadata.id,
+                detailPrefix: "/iam",
+                listBindings: (params) => listRoleBindings(params),
+                listCandidates: (params) => listUsers(params),
+                assign: (ids) => createRoleBindings(ids, role.metadata.id),
+                revoke: (id) => deleteRoleBinding(id),
+                canAssign: hasPermission("iam:rolebindings:create"),
+                canRevoke: hasPermission("iam:rolebindings:delete"),
+                cacheKey: ["platform", role.metadata.id],
+              }}
+            />
+          </TabsContent>
+        )}
+      </Tabs>
 
       {/* edit dialog */}
       {!role.spec.builtin && (
