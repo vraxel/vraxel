@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { Link, Navigate, Outlet, useLocation, useNavigate } from "react-router"
-import { LayoutDashboard, FileText, ChevronRight, Search } from "lucide-react"
+import { FileText, ChevronRight, Search } from "lucide-react"
+import { BrandMark } from "@/shared/components/brand-mark"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible"
 import { Input } from "@/shared/ui/input"
 import { cn } from "@/shared/lib/utils"
@@ -371,9 +372,7 @@ export default function RootLayout() {
         <aside className="bg-sidebar text-sidebar-foreground flex w-60 shrink-0 flex-col overflow-hidden border-r">
           <div className="flex h-14 items-center border-b px-4">
             <Link to={homePath} className="flex items-center gap-2.5 font-semibold tracking-tight">
-              <span className="bg-primary text-primary-foreground flex size-7 items-center justify-center rounded-md">
-                <LayoutDashboard className="h-4 w-4" />
-              </span>
+              <BrandMark className="text-primary size-7" />
               <span>Vraxel Console</span>
             </Link>
           </div>

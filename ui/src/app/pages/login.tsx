@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
-import { Loader2, LayoutDashboard } from "lucide-react"
+import { Loader2 } from "lucide-react"
+import { BrandMark } from "@/shared/components/brand-mark"
 import { Link, useSearchParams } from "react-router"
 import { Button } from "@/shared/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card"
@@ -92,9 +93,7 @@ export default function LoginPage() {
           <LanguageSwitcher />
         </div>
         <CardHeader className="justify-items-center gap-3 text-center">
-          <span className="bg-primary text-primary-foreground flex size-10 items-center justify-center rounded-xl">
-            <LayoutDashboard className="h-5 w-5" />
-          </span>
+          <BrandMark className="text-primary size-11" />
           <CardTitle className="text-xl">{t("login.title")}</CardTitle>
           <CardDescription>Vraxel Console</CardDescription>
         </CardHeader>
