@@ -362,8 +362,8 @@ export default function AuditLogListPage() {
                       <span
                         className={
                           (selectedLog.spec.statusCode ?? 0) < 400
-                            ? "text-green-600 dark:text-green-400"
-                            : "text-red-600 dark:text-red-400"
+                            ? "text-success"
+                            : "text-destructive"
                         }
                       >
                         {selectedLog.spec.statusCode ?? "-"}

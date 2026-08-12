@@ -3,55 +3,79 @@
 
 @plugin "@tailwindcss/typography";
 
-@custom-variant dark (&:is(.dark *));
-
 @theme {
   --font-sans: "Inter Variable", "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-mono: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace;
-  --radius: 0.625rem;
 
-  --color-background: oklch(1 0 0);
-  --color-foreground: oklch(0.145 0.004 285.823);
+  /* Radius scale. Previously only --radius existed and nothing consumed it,
+     so `rounded-md` fell back to Tailwind's 0.375rem while Card/Input carried
+     no radius class at all (square corners next to rounded buttons).
+     Overriding --radius-* wires every `rounded-*` utility to one scale. */
+  --radius: 0.5rem;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Elevation. Cool-tinted and layered (contact shadow + ambient spread) so
+     surfaces lift off the page instead of relying on a 1px border alone. */
+  --shadow-xs: 0 1px 2px 0 oklch(0.2 0.03 265 / 0.05);
+  --shadow-sm: 0 1px 2px -1px oklch(0.2 0.03 265 / 0.08), 0 1px 3px 0 oklch(0.2 0.03 265 / 0.06);
+  --shadow-md: 0 2px 4px -2px oklch(0.2 0.03 265 / 0.08), 0 4px 8px -2px oklch(0.2 0.03 265 / 0.08);
+  --shadow-lg: 0 4px 6px -4px oklch(0.2 0.03 265 / 0.1), 0 12px 20px -4px oklch(0.2 0.03 265 / 0.1);
+  --shadow-xl: 0 8px 10px -6px oklch(0.2 0.03 265 / 0.1),
+    0 24px 40px -8px oklch(0.2 0.03 265 / 0.12);
+
+  /* Surfaces. The page is a cool off-white; cards, sidebar and popovers are
+     pure white, so elevation reads without a heavy border. */
+  --color-background: oklch(0.984 0.003 264);
+  --color-foreground: oklch(0.21 0.02 264);
 
   --color-card: oklch(1 0 0);
-  --color-card-foreground: oklch(0.145 0.004 285.823);
+  --color-card-foreground: oklch(0.21 0.02 264);
 
   --color-popover: oklch(1 0 0);
-  --color-popover-foreground: oklch(0.145 0.004 285.823);
+  --color-popover-foreground: oklch(0.21 0.02 264);
 
-  --color-primary: oklch(0.205 0.006 285.885);
-  --color-primary-foreground: oklch(0.985 0.001 106.423);
+  /* Brand. Indigo -- carries primary buttons, active nav, focus rings and
+     accent icon wells. */
+  --color-primary: oklch(0.545 0.205 268);
+  --color-primary-foreground: oklch(0.99 0 0);
+  --color-primary-subtle: oklch(0.955 0.02 268);
 
-  --color-secondary: oklch(0.97 0.001 286.375);
-  --color-secondary-foreground: oklch(0.205 0.006 285.885);
+  --color-secondary: oklch(0.968 0.004 264);
+  --color-secondary-foreground: oklch(0.28 0.02 264);
 
-  --color-muted: oklch(0.97 0.001 286.375);
-  --color-muted-foreground: oklch(0.556 0.005 286.286);
+  --color-muted: oklch(0.968 0.004 264);
+  --color-muted-foreground: oklch(0.53 0.018 264);
 
-  --color-accent: oklch(0.97 0.001 286.375);
-  --color-accent-foreground: oklch(0.205 0.006 285.885);
+  --color-accent: oklch(0.962 0.006 264);
+  --color-accent-foreground: oklch(0.28 0.02 264);
 
-  --color-destructive: oklch(0.577 0.245 27.325);
-  --color-destructive-foreground: oklch(0.577 0.245 27.325);
+  --color-destructive: oklch(0.577 0.222 27.3);
+  --color-destructive-foreground: oklch(0.99 0 0);
 
-  --color-border: oklch(0.922 0.004 286.32);
-  --color-input: oklch(0.922 0.004 286.32);
-  --color-ring: oklch(0.87 0.006 286.277);
+  --color-success: oklch(0.6 0.14 155);
+  --color-warning: oklch(0.72 0.16 70);
 
-  --color-chart-1: oklch(0.646 0.222 41.116);
-  --color-chart-2: oklch(0.6 0.118 184.704);
-  --color-chart-3: oklch(0.398 0.07 227.392);
-  --color-chart-4: oklch(0.828 0.189 84.429);
-  --color-chart-5: oklch(0.769 0.188 70.08);
+  --color-border: oklch(0.923 0.005 264);
+  --color-input: oklch(0.905 0.006 264);
+  --color-ring: oklch(0.545 0.205 268);
 
-  --color-sidebar: oklch(0.985 0.001 286.375);
-  --color-sidebar-foreground: oklch(0.145 0.004 285.823);
-  --color-sidebar-primary: oklch(0.205 0.006 285.885);
-  --color-sidebar-primary-foreground: oklch(0.985 0.001 106.423);
-  --color-sidebar-accent: oklch(0.97 0.001 286.375);
-  --color-sidebar-accent-foreground: oklch(0.205 0.006 285.885);
-  --color-sidebar-border: oklch(0.922 0.004 286.32);
-  --color-sidebar-ring: oklch(0.87 0.006 286.277);
+  --color-chart-1: oklch(0.545 0.205 268);
+  --color-chart-2: oklch(0.65 0.14 195);
+  --color-chart-3: oklch(0.72 0.16 70);
+  --color-chart-4: oklch(0.62 0.19 340);
+  --color-chart-5: oklch(0.62 0.16 150);
+
+  --color-sidebar: oklch(1 0 0);
+  --color-sidebar-foreground: oklch(0.21 0.02 264);
+  --color-sidebar-primary: oklch(0.545 0.205 268);
+  --color-sidebar-primary-foreground: oklch(0.99 0 0);
+  --color-sidebar-accent: oklch(0.955 0.02 268);
+  --color-sidebar-accent-foreground: oklch(0.44 0.19 268);
+  --color-sidebar-border: oklch(0.929 0.005 264);
+  --color-sidebar-ring: oklch(0.545 0.205 268);
 }
 
 @layer base {
@@ -68,66 +92,25 @@
   .recharts-default-tooltip {
     background-color: var(--color-popover) !important;
     border: 1px solid var(--color-border) !important;
-    border-radius: calc(var(--radius) - 2px);
-    box-shadow: 0 4px 12px rgb(0 0 0 / 0.1);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
   }
   .recharts-default-tooltip .recharts-tooltip-label {
     color: var(--color-popover-foreground);
-  }
-  html {
-    font-size: 14px;
   }
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings:
       "rlig" 1,
-      "calt" 1;
+      "calt" 1,
+      "ss01" 1;
   }
-}
-
-.dark {
-  --color-background: oklch(0.145 0.004 285.823);
-  --color-foreground: oklch(0.985 0.001 106.423);
-
-  --color-card: oklch(0.145 0.004 285.823);
-  --color-card-foreground: oklch(0.985 0.001 106.423);
-
-  --color-popover: oklch(0.145 0.004 285.823);
-  --color-popover-foreground: oklch(0.985 0.001 106.423);
-
-  --color-primary: oklch(0.985 0.001 106.423);
-  --color-primary-foreground: oklch(0.205 0.006 285.885);
-
-  --color-secondary: oklch(0.269 0.006 285.885);
-  --color-secondary-foreground: oklch(0.985 0.001 106.423);
-
-  --color-muted: oklch(0.269 0.006 285.885);
-  --color-muted-foreground: oklch(0.711 0.007 286.286);
-
-  --color-accent: oklch(0.269 0.006 285.885);
-  --color-accent-foreground: oklch(0.985 0.001 106.423);
-
-  --color-destructive: oklch(0.396 0.141 25.723);
-  --color-destructive-foreground: oklch(0.637 0.237 25.331);
-
-  --color-border: oklch(0.269 0.006 285.885);
-  --color-input: oklch(0.269 0.006 285.885);
-  --color-ring: oklch(0.439 0.01 286.286);
-
-  --color-chart-1: oklch(0.488 0.243 264.376);
-  --color-chart-2: oklch(0.696 0.17 162.48);
-  --color-chart-3: oklch(0.769 0.188 70.08);
-  --color-chart-4: oklch(0.627 0.265 303.9);
-  --color-chart-5: oklch(0.645 0.246 16.439);
-
-  --color-sidebar: oklch(0.205 0.006 285.885);
-  --color-sidebar-foreground: oklch(0.985 0.001 106.423);
-  --color-sidebar-primary: oklch(0.488 0.243 264.376);
-  --color-sidebar-primary-foreground: oklch(0.985 0.001 106.423);
-  --color-sidebar-accent: oklch(0.269 0.006 285.885);
-  --color-sidebar-accent-foreground: oklch(0.985 0.001 106.423);
-  --color-sidebar-border: oklch(0.269 0.006 285.885);
-  --color-sidebar-ring: oklch(0.439 0.01 286.286);
+  /* Ids, counts and timestamps only align in a column when digits are
+     fixed-width; Inter's default figures are proportional. */
+  th,
+  td {
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 /* Toast close button: sonner's default translate(-35%, -35%) pushes the

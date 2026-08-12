@@ -109,7 +109,8 @@ export function ResourceListPage<T extends ListRow>({
         {query.selected.size > 0 && batchActions}
       </div>
 
-      <div className="rounded-md border">
+      {/* overflow-hidden so the muted table header clips to the rounded corners */}
+      <div className="overflow-hidden rounded-xl border shadow-sm">
         <Table>
           <TableHeader>
             <TableRow>

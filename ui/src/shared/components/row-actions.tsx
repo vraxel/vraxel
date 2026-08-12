@@ -26,12 +26,12 @@ const sizeClass: Record<Size, string> = {
 
 // Sticky-right so the actions column stays visible while the table scrolls
 // horizontally. Sticky cells need a fully opaque background in every row
-// state, including hover, to mask cells passing beneath them; `bg-muted/50`
-// would let the underlying scrolled column bleed through. TableRow's own
-// hover stays at /50 for the rest of the row; the slight contrast against
-// the opaque sticky cell is intentional and signals the column is pinned.
-// The left-edge shadow hints that content is scrolled underneath.
-const stickyHead = "sticky right-0 z-20 bg-background shadow-[-4px_0_6px_-4px_rgb(0_0_0/0.08)]"
+// state, including hover, to mask cells passing beneath them -- TableRow's
+// own hover is `bg-primary-subtle/60`, and a translucent sticky cell would
+// let the underlying scrolled column bleed through, so the sticky cell uses
+// the same tint at full opacity. The left-edge shadow hints that content is
+// scrolled underneath.
+const stickyHead = "sticky right-0 z-20 bg-card shadow-[-4px_0_6px_-4px_rgb(0_0_0/0.08)]"
 // Ghost-button hover overrides: the default ghost variant uses `hover:bg-accent`,
 // but in this theme `accent` and `muted` are the same color, so on hovered rows
 // (cell becomes `bg-muted`) the button hover is invisible. Inject a stronger
@@ -42,7 +42,7 @@ const stickyHead = "sticky right-0 z-20 bg-background shadow-[-4px_0_6px_-4px_rg
 // Exported for pages that need a custom-width sticky cell and can't use
 // `RowActionsCell` directly (e.g. `dev/issues/list.tsx` needs `w-[280px]`).
 export const rowActionStickyCell =
-  "sticky right-0 z-10 bg-background group-hover/row:bg-muted group-data-[state=selected]/row:bg-muted shadow-[-4px_0_6px_-4px_rgb(0_0_0/0.08)] " +
+  "sticky right-0 z-10 bg-card group-hover/row:bg-primary-subtle group-data-[state=selected]/row:bg-primary-subtle shadow-[-4px_0_6px_-4px_rgb(0_0_0/0.08)] " +
   "[&_[data-variant=ghost]:hover]:bg-foreground/10 [&_[data-variant=ghost].text-destructive:hover]:bg-destructive/10"
 
 interface Props {

@@ -135,7 +135,7 @@ function DialogContent({
             // grid-cols-[minmax(0,1fr)]: grid item 默认 min-width:auto = min-content,
             // 长 whitespace-nowrap 文本(如 SelectTrigger 显示长凭证名)会撑大 grid track,
             // 突破 dialog 内容区。显式 minmax(0,1fr) 强制 track 收缩,溢出由子元素自己处理。
-            "relative grid grid-cols-[minmax(0,1fr)] w-full max-w-[calc(100%-2rem)] gap-4 rounded-lg border bg-background p-6 shadow-lg duration-200 overflow-hidden pointer-events-auto group-data-[state=open]/dialog-content:animate-in group-data-[state=open]/dialog-content:zoom-in-95 group-data-[state=closed]/dialog-content:animate-out group-data-[state=closed]/dialog-content:zoom-out-95 sm:max-w-lg",
+            "relative grid grid-cols-[minmax(0,1fr)] w-full max-w-[calc(100%-2rem)] gap-4 rounded-xl border bg-card p-6 shadow-xl duration-200 overflow-hidden pointer-events-auto group-data-[state=open]/dialog-content:animate-in group-data-[state=open]/dialog-content:zoom-in-95 group-data-[state=closed]/dialog-content:animate-out group-data-[state=closed]/dialog-content:zoom-out-95 sm:max-w-lg",
             className
           )}
         >

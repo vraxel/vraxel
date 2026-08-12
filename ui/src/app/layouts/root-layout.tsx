@@ -153,7 +153,7 @@ function flattenVisibleItems(entries: NavEntry[], visible: (i: NavItem) => boole
 function highlightLabel(label: string, query: string): React.ReactNode {
   const q = query.trim().toLowerCase()
   if (!q) return label
-  const markCls = "rounded-sm bg-yellow-200 text-inherit dark:bg-yellow-500/40"
+  const markCls = "rounded-sm bg-warning/25 text-inherit"
   const idx = label.toLowerCase().indexOf(q)
   if (idx === -1) return <mark className={markCls}>{label}</mark>
   return (
