@@ -217,7 +217,7 @@ export function ScopedRoleFormDialog({
       onSubmit={onSubmit}
       submitting={loading}
       widthClass="sm:!max-w-none !w-auto min-w-[800px]"
-      bodyClassName="grid grid-cols-3 gap-6 min-h-0 flex-1"
+      bodyClassName="grid grid-cols-3 gap-10 min-h-0 flex-1"
     >
       <div className="col-span-1 -mx-1 space-y-4 overflow-y-auto px-1">
         <FormField
@@ -274,8 +274,8 @@ export function ScopedRoleFormDialog({
         control={form.control}
         name="rules"
         render={() => (
-          <FormItem className="col-span-2 -ml-3 flex min-h-0 flex-col border-l pl-3">
-            {/* -ml-3 + pl-3 park the divider in the middle of the gap-6 gutter
+          <FormItem className="col-span-2 -ml-5 flex min-h-0 flex-col border-l pl-5">
+            {/* -ml-5 + pl-5 park the divider in the middle of the gap-10 gutter
                 without shifting the column's content. */}
             <Label>
               {t("role.rules")}

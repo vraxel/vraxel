@@ -433,7 +433,7 @@ function EditRoleDialog({
       onSubmit={onSubmit}
       submitting={loading}
       widthClass="sm:!max-w-none !w-auto min-w-[800px]"
-      bodyClassName="grid grid-cols-1 md:grid-cols-3 gap-6 min-h-0 flex-1"
+      bodyClassName="grid grid-cols-1 md:grid-cols-3 gap-10 min-h-0 flex-1"
     >
       {/* Left: basic fields */}
       <div className="col-span-1 -mx-1 space-y-4 overflow-y-auto px-1">
@@ -484,8 +484,8 @@ function EditRoleDialog({
         control={form.control}
         name="rules"
         render={() => (
-          <FormItem className="col-span-2 flex min-h-0 flex-col md:-ml-3 md:border-l md:pl-3">
-            {/* -ml-3 + pl-3 park the divider in the middle of the gap-6 gutter
+          <FormItem className="col-span-2 flex min-h-0 flex-col md:-ml-5 md:border-l md:pl-5">
+            {/* -ml-5 + pl-5 park the divider in the middle of the gap-10 gutter
                 without shifting the column's content. */}
             <Label>
               {t("role.rules")}
