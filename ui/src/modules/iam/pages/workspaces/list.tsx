@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { formatDateTime } from "@/shared/lib/format"
 import { Plus, Pencil, Trash2 } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { z } from "zod/v4"
@@ -136,7 +137,7 @@ export default function WorkspaceListPage() {
       header: t("common.created"),
       sortable: true,
       className: "text-muted-foreground text-sm whitespace-nowrap",
-      cell: (ws) => new Date(ws.metadata.createdAt).toLocaleString(),
+      cell: (ws) => formatDateTime(ws.metadata.createdAt),
     },
     {
       key: "createdBy",
@@ -150,7 +151,7 @@ export default function WorkspaceListPage() {
       header: t("common.updated"),
       sortable: true,
       className: "text-muted-foreground text-sm whitespace-nowrap",
-      cell: (ws) => new Date(ws.metadata.updatedAt).toLocaleString(),
+      cell: (ws) => formatDateTime(ws.metadata.updatedAt),
     },
   ]
 

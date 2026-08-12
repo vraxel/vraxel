@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import { formatDateTime } from "@/shared/lib/format"
 import { Plus, Search, UserMinus } from "lucide-react"
 import { toast } from "sonner"
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card"
@@ -174,7 +175,7 @@ export function RoleUsersSection({ config }: { config: RoleUsersConfig }) {
                       />
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
-                      {new Date(b.metadata.createdAt).toLocaleString()}
+                      {formatDateTime(b.metadata.createdAt)}
                     </TableCell>
                     {config.canRevoke && (
                       <RowActionsCell>

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import { formatDateTime } from "@/shared/lib/format"
 import { useParams, useNavigate } from "react-router"
 import { Pencil, Trash2 } from "lucide-react"
 import { toast } from "sonner"
@@ -187,13 +188,13 @@ export default function ScopedRoleDetailPage() {
               <span className="text-muted-foreground mb-1 block text-xs">
                 {t("common.created")}
               </span>
-              <p className="font-medium">{new Date(role.metadata.createdAt).toLocaleString()}</p>
+              <p className="font-medium">{formatDateTime(role.metadata.createdAt)}</p>
             </div>
             <div>
               <span className="text-muted-foreground mb-1 block text-xs">
                 {t("common.updated")}
               </span>
-              <p className="font-medium">{new Date(role.metadata.updatedAt).toLocaleString()}</p>
+              <p className="font-medium">{formatDateTime(role.metadata.updatedAt)}</p>
             </div>
           </div>
         </CardContent>

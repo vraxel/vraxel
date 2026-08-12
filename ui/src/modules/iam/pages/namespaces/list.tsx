@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
+import { formatDateTime } from "@/shared/lib/format"
 import { useApiQuery } from "@/core/query/hooks"
 import { Link, useParams } from "react-router"
 import { Plus, Pencil, Trash2 } from "lucide-react"
@@ -183,7 +184,7 @@ export default function NamespaceListPage() {
       sortable: true,
       truncate: true,
       className: "text-muted-foreground text-sm",
-      cell: (ns) => new Date(ns.metadata.createdAt).toLocaleString(),
+      cell: (ns) => formatDateTime(ns.metadata.createdAt),
     },
     {
       key: "createdBy",

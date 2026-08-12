@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react"
+import { formatDateTime } from "@/shared/lib/format"
 import { Navigate, useSearchParams } from "react-router"
 import { Plus, Pencil, Trash2 } from "lucide-react"
 import { useForm, useWatch } from "react-hook-form"
@@ -213,7 +214,7 @@ export default function RoleListPage() {
       header: t("common.created"),
       sortable: true,
       className: "text-muted-foreground text-sm whitespace-nowrap",
-      cell: (role) => new Date(role.metadata.createdAt).toLocaleString(),
+      cell: (role) => formatDateTime(role.metadata.createdAt),
     },
   ]
 

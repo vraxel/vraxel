@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
+import { formatDateTime } from "@/shared/lib/format"
 import { NameCell } from "@/frameworks/list/name-cell"
 import { useApiQuery } from "@/core/query/hooks"
 import { useQueryClient, keepPreviousData } from "@tanstack/react-query"
@@ -345,7 +346,7 @@ export default function WorkspaceNamespacesPage() {
                     {ns.spec.memberCount ?? 0}/{ns.spec.maxMembers || "∞"}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
-                    {new Date(ns.metadata.createdAt).toLocaleString()}
+                    {formatDateTime(ns.metadata.createdAt)}
                   </TableCell>
                   <TruncateCell text={ns.spec.createdByName || "-"} className="text-sm">
                     {ns.spec.createdByName || "-"}

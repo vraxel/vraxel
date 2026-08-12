@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
+import { formatDateTime } from "@/shared/lib/format"
 import { NameCell } from "@/frameworks/list/name-cell"
 import { useApiQuery } from "@/core/query/hooks"
 import { useQueryClient, keepPreviousData } from "@tanstack/react-query"
@@ -273,7 +274,7 @@ export default function WorkspaceRolesTab() {
                     })}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
-                    {new Date(role.metadata.createdAt).toLocaleString()}
+                    {formatDateTime(role.metadata.createdAt)}
                   </TableCell>
                   {(canUpdate || canDelete) && (
                     <RowActionsCell>

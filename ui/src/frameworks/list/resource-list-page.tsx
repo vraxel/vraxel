@@ -11,8 +11,14 @@ import { FilterTableHead, type FilterOption } from "@/shared/components/filter-t
 import { TruncateCell } from "@/shared/components/truncate-cell"
 import { EmptyState } from "@/shared/components/empty-state"
 import { Pagination } from "@/shared/components/pagination"
+import { cn } from "@/shared/lib/utils"
 import { useTranslation } from "@/i18n"
 import type { ListQuery, ListRow } from "./use-list-query"
+
+// Placeholder bars all stretched to w-full read as a grey wall, which is the
+// one thing a skeleton must not do -- real text has ragged right edges.
+// Indexed by (row + column) so the raggedness is deterministic, not random.
+const SKELETON_WIDTHS = ["w-full", "w-3/4", "w-1/2", "w-5/6", "w-2/3"]
 
 export interface ColumnDef<T> {
   /** Sort field name and react key. */
@@ -174,10 +180,10 @@ export function ResourceListPage<T extends ListRow>({
           <TableBody>
             {isPending ? (
               Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
+                <TableRow key={i} className="hover:bg-transparent">
                   {Array.from({ length: colCount }).map((__, j) => (
                     <TableCell key={j}>
-                      <Skeleton className="h-5 w-full" />
+                      <Skeleton className={cn("h-4", SKELETON_WIDTHS[(i + j) % SKELETON_WIDTHS.length])} />
                     </TableCell>
                   ))}
                 </TableRow>
@@ -218,6 +224,9 @@ export function ResourceListPage<T extends ListRow>({
                 return (
                   <TableRow
                     key={id}
+                    // Without this the only sign a row is selected is its own
+                    // checkbox; TableRow already styles data-state=selected.
+                    data-state={query.selected.has(id) ? "selected" : undefined}
                     className={
                       [rowHref ? "cursor-pointer" : "", rowClassName?.(row) ?? ""]
                         .filter(Boolean)

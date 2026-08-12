@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
+import { formatDateTime } from "@/shared/lib/format"
 import { NameCell } from "@/frameworks/list/name-cell"
 import { useApiQuery } from "@/core/query/hooks"
 import { useQueryClient, keepPreviousData } from "@tanstack/react-query"
@@ -334,10 +335,10 @@ export default function NamespaceUsersPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
-                    {new Date(m.metadata.createdAt).toLocaleString()}
+                    {formatDateTime(m.metadata.createdAt)}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
-                    {new Date(m.metadata.updatedAt).toLocaleString()}
+                    {formatDateTime(m.metadata.updatedAt)}
                   </TableCell>
                   {hasPermission("iam:users:deleteCollection", { workspaceId, namespaceId }) && (
                     <RowActionsCell size="sm">

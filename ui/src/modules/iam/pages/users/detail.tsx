@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useState } from "react"
+import { formatDateTime } from "@/shared/lib/format"
 import { useParams, useNavigate, Link } from "react-router"
 import { Pencil, Trash2, Search, Filter, KeyRound } from "lucide-react"
 import { useForm } from "react-hook-form"
@@ -183,13 +184,13 @@ export default function UserDetailPage() {
                 <span className="text-muted-foreground mb-1 block text-xs">
                   {t("common.created")}
                 </span>
-                <p className="font-medium">{new Date(user.metadata.createdAt).toLocaleString()}</p>
+                <p className="font-medium">{formatDateTime(user.metadata.createdAt)}</p>
               </div>
               <div>
                 <span className="text-muted-foreground mb-1 block text-xs">
                   {t("common.updated")}
                 </span>
-                <p className="font-medium">{new Date(user.metadata.updatedAt).toLocaleString()}</p>
+                <p className="font-medium">{formatDateTime(user.metadata.updatedAt)}</p>
               </div>
             </div>
           </CardContent>
@@ -427,13 +428,13 @@ function UserWorkspacesCard({ userId }: { userId: string }) {
                       )}
                     </TableCell>
                     <TruncateCell className="text-muted-foreground text-sm">
-                      {ws.spec.joinedAt ? new Date(ws.spec.joinedAt).toLocaleString() : "-"}
+                      {ws.spec.joinedAt ? formatDateTime(ws.spec.joinedAt) : "-"}
                     </TruncateCell>
                     <TruncateCell className="text-muted-foreground text-sm">
-                      {new Date(ws.metadata.createdAt).toLocaleString()}
+                      {formatDateTime(ws.metadata.createdAt)}
                     </TruncateCell>
                     <TruncateCell className="text-muted-foreground text-sm">
-                      {new Date(ws.metadata.updatedAt).toLocaleString()}
+                      {formatDateTime(ws.metadata.updatedAt)}
                     </TruncateCell>
                   </TableRow>
                 ))
@@ -659,13 +660,13 @@ function UserNamespacesCard({ userId }: { userId: string }) {
                       )}
                     </TableCell>
                     <TruncateCell className="text-muted-foreground text-sm">
-                      {ns.spec.joinedAt ? new Date(ns.spec.joinedAt).toLocaleString() : "-"}
+                      {ns.spec.joinedAt ? formatDateTime(ns.spec.joinedAt) : "-"}
                     </TruncateCell>
                     <TruncateCell className="text-muted-foreground text-sm">
-                      {new Date(ns.metadata.createdAt).toLocaleString()}
+                      {formatDateTime(ns.metadata.createdAt)}
                     </TruncateCell>
                     <TruncateCell className="text-muted-foreground text-sm">
-                      {new Date(ns.metadata.updatedAt).toLocaleString()}
+                      {formatDateTime(ns.metadata.updatedAt)}
                     </TruncateCell>
                   </TableRow>
                 ))
@@ -892,7 +893,7 @@ function UserRoleBindingsCard({ userId }: { userId: string }) {
                       )}
                     </TableCell>
                     <TruncateCell className="text-muted-foreground text-sm">
-                      {new Date(b.metadata.createdAt).toLocaleString()}
+                      {formatDateTime(b.metadata.createdAt)}
                     </TruncateCell>
                   </TableRow>
                 ))

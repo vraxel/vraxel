@@ -12,7 +12,11 @@ interface OverviewCardProps {
 export function OverviewCard({ label, icon: Icon, value, loading, onClick }: OverviewCardProps) {
   return (
     <Card
-      className={onClick ? "hover:bg-muted/50 cursor-pointer transition-colors" : undefined}
+      className={
+        onClick
+          ? "hover:border-primary/30 hover:shadow-md cursor-pointer transition-all duration-150 ease-out hover:-translate-y-0.5"
+          : undefined
+      }
       onClick={onClick}
     >
       <CardContent className="flex items-center gap-4 p-4">

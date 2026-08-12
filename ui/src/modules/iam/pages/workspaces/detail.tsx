@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from "react"
+import { formatDateTime } from "@/shared/lib/format"
 import { useParams, useNavigate } from "react-router"
 import { Pencil, Trash2, FolderKanban, Users } from "lucide-react"
 import { useForm } from "react-hook-form"
@@ -180,7 +181,7 @@ export default function WorkspaceDetailPage() {
                   {t("common.created")}
                 </span>
                 <p className="font-medium">
-                  {new Date(workspace.metadata.createdAt).toLocaleString()}
+                  {formatDateTime(workspace.metadata.createdAt)}
                 </p>
               </div>
               <div className="min-w-0">
@@ -196,7 +197,7 @@ export default function WorkspaceDetailPage() {
                   {t("common.updated")}
                 </span>
                 <p className="font-medium">
-                  {new Date(workspace.metadata.updatedAt).toLocaleString()}
+                  {formatDateTime(workspace.metadata.updatedAt)}
                 </p>
               </div>
             </div>

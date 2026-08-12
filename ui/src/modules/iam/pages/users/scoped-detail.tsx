@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from "react"
+import { formatDateTime } from "@/shared/lib/format"
 import { useParams } from "react-router"
 import { Search } from "lucide-react"
 import { EmptyState } from "@/shared/components/empty-state"
@@ -110,13 +111,13 @@ export default function ScopedUserDetailPage() {
               <span className="text-muted-foreground mb-1 block text-xs">
                 {t("common.created")}
               </span>
-              <p className="font-medium">{new Date(user.metadata.createdAt).toLocaleString()}</p>
+              <p className="font-medium">{formatDateTime(user.metadata.createdAt)}</p>
             </div>
             <div>
               <span className="text-muted-foreground mb-1 block text-xs">
                 {t("common.updated")}
               </span>
-              <p className="font-medium">{new Date(user.metadata.updatedAt).toLocaleString()}</p>
+              <p className="font-medium">{formatDateTime(user.metadata.updatedAt)}</p>
             </div>
           </div>
         </CardContent>
@@ -292,7 +293,7 @@ function ScopedRoleBindingsCard({
                       <Badge variant={scopeVariant(b.spec.scope)}>{scopeLabel(b.spec.scope)}</Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
-                      {new Date(b.metadata.createdAt).toLocaleString()}
+                      {formatDateTime(b.metadata.createdAt)}
                     </TableCell>
                   </TableRow>
                 ))

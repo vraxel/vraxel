@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { formatDateTimeSeconds } from "@/shared/lib/format"
 import { Eye, Filter, X } from "lucide-react"
 import type { DateRange } from "react-day-picker"
 import { Button } from "@/shared/ui/button"
@@ -246,7 +247,7 @@ export default function AuditLogListPage() {
       header: t("audit.createdAt"),
       sortable: true,
       className: "text-muted-foreground text-sm whitespace-nowrap",
-      cell: (log) => new Date(log.spec.createdAt).toLocaleString(),
+      cell: (log) => formatDateTimeSeconds(log.spec.createdAt),
     },
   ]
 
@@ -322,7 +323,7 @@ export default function AuditLogListPage() {
                       </Badge>
                     </dd>
                     <dt className="text-muted-foreground">{t("audit.createdAt")}</dt>
-                    <dd>{new Date(selectedLog.spec.createdAt).toLocaleString()}</dd>
+                    <dd>{formatDateTimeSeconds(selectedLog.spec.createdAt)}</dd>
                   </dl>
                 </div>
 

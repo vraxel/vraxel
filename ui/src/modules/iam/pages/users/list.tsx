@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { formatDateTime } from "@/shared/lib/format"
 import { Navigate, useParams } from "react-router"
 import { Plus, Pencil, Trash2, KeyRound } from "lucide-react"
 import { useForm } from "react-hook-form"
@@ -167,14 +168,14 @@ export default function UserListPage() {
       header: t("common.created"),
       sortable: true,
       className: "text-muted-foreground text-sm whitespace-nowrap",
-      cell: (user) => new Date(user.metadata.createdAt).toLocaleString(),
+      cell: (user) => formatDateTime(user.metadata.createdAt),
     },
     {
       key: "updated_at",
       header: t("common.updated"),
       sortable: true,
       className: "text-muted-foreground text-sm whitespace-nowrap",
-      cell: (user) => new Date(user.metadata.updatedAt).toLocaleString(),
+      cell: (user) => formatDateTime(user.metadata.updatedAt),
     },
   ]
 
