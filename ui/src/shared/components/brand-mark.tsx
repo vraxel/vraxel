@@ -16,7 +16,7 @@ export function BrandMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 32 32" fill="none" aria-hidden="true" className={className}>
       {/* cavity floor, one sub-cube down */}
-      <path d="M16 16 L22.5 12.25 L29 16 L22.5 19.75 Z" fill="currentColor" opacity="0.45" />
+      <path d="M16 16 L22.5 12.25 L29 16 L22.5 19.75 Z" fill="currentColor" opacity="0.55" />
       {/* cavity wall left behind by the removed sub-cube */}
       <path d="M16 11.5 L22.5 7.75 L22.5 12.25 L16 16 Z" fill="currentColor" />
       {/* top face, minus the removed quadrant */}
