@@ -59,7 +59,7 @@ func (l *targetLoop) run() {
 func (l *targetLoop) round() {
 	if !l.s.acquire() {
 		l.s.cfg.Log.Warnf("scrape: worker pool full, skipping %s", l.target.URL)
-		l.s.record(l.target.URL, result{labels: l.target.Labels})
+		l.s.record(l, result{labels: l.target.Labels})
 		return
 	}
 	defer l.s.release()
@@ -69,7 +69,7 @@ func (l *targetLoop) round() {
 	if err != nil {
 		l.s.cfg.Log.Warnf("scrape: %s: %v", l.target.URL, err)
 	}
-	l.s.record(l.target.URL, result{
+	l.s.record(l, result{
 		labels:   l.target.Labels,
 		up:       err == nil,
 		duration: time.Since(start),
