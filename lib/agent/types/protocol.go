@@ -92,6 +92,20 @@ type Frame struct {
 	// RunningJobs lets a reconnecting agent tell the server which jobs
 	// it is still executing so they are not dispatched twice (Step 5).
 	RunningJobs []int64 `json:"runningJobs,omitempty"`
+	// BootNonce identifies the agent PROCESS, as opposed to the machine.
+	// Generated fresh at startup and held in memory only -- never written
+	// to the state file, which is the entire point: a cloned disk carries
+	// the machine id, the host id and the agent token, so nothing on disk
+	// can tell two clones apart. Two processes sharing one agent id then
+	// fight over a single host row, superseding each other forever while
+	// jobs land on whichever machine happens to hold the channel.
+	//
+	// The server keeps the last two nonces it saw and flags a conflict
+	// when one it has already retired comes back (see the agent gateway's
+	// identity check). A single agent reconnecting resends the same value;
+	// a restart changes it once; only two live processes can make an old
+	// value reappear.
+	BootNonce string `json:"bootNonce,omitempty"`
 
 	// --- hello + heartbeat ---
 	// ClockUnixMs is the agent's wall clock at send time. The server

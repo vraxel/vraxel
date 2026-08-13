@@ -28,6 +28,19 @@ const helloTimeout = 10 * time.Second
 // line: past this, metric timestamps are visibly wrong (design §4.2).
 const clockSkewWarnMs = 30_000
 
+// identityConflictCooldown is how long an agent id stays refused after two
+// live processes were caught claiming it (a cloned disk, almost always).
+//
+// It is a sliding window rather than a latch, so the host heals itself
+// once the duplicate is shut down: the survivor keeps reconnecting, stops
+// producing conflicts, and is admitted when the window lapses. A latch
+// would need an operator and an admin UI to clear, and would leave the
+// host unmanageable in the meantime.
+//
+// Long enough that both clones back off to their 60s ceiling and the
+// operator sees a steady stream of log lines rather than a blip.
+const identityConflictCooldown = 15 * time.Minute
+
 // handleChannel upgrades the persistent control channel. GET /api/agent/v1/channel.
 func (h *protocolHandler) handleChannel(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -56,6 +69,16 @@ func (h *protocolHandler) handleChannel(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		logger.Warnf("agentgw channel: agent %s hello: %v", claims.AgentID, err)
 		_ = conn.Close(ws.StatusInternalError, "hello required")
+		return
+	}
+
+	// Identity check before anything else observable happens. A contended
+	// agent id means two live processes are claiming it, and admitting
+	// either would mark the host online under a channel we cannot trust
+	// and let the reconciler fail the other one's running jobs.
+	if h.identityContended(sessCtx, claims, hello.BootNonce) {
+		_ = conn.Close(ws.StatusPolicyViolation,
+			"another agent is already using this identity; this host looks cloned from an onboarded one")
 		return
 	}
 
@@ -97,6 +120,36 @@ func (h *protocolHandler) handleChannel(w http.ResponseWriter, r *http.Request) 
 
 	h.readLoop(sessCtx, sess)
 	_ = conn.Close(ws.StatusNormalClosure, "")
+}
+
+// identityContended reports whether this agent id is currently claimed by
+// more than one live agent process.
+//
+// A store failure admits the connection. The check is a safety net against
+// a misconfigured fleet, not an authentication decision -- the bearer token
+// already settled that -- so a database blip must not disconnect every
+// agent in the deployment.
+func (h *protocolHandler) identityContended(ctx context.Context, claims *AgentClaims, bootNonce string) bool {
+	contended, err := h.agents.CheckIdentity(ctx, claims.HostID, bootNonce, identityConflictCooldown)
+	if err != nil {
+		logger.Warnf("agentgw channel: identity check for agent %s: %v", claims.AgentID, err)
+		return false
+	}
+	if contended {
+		logger.Warnf("agentgw channel: refusing agent %s (host %d): its identity is claimed by more than one "+
+			"live agent process. This host was most likely cloned from an onboarded one -- reset "+
+			"/etc/machine-id on the copies and re-onboard them. Retries are refused for %s.",
+			claims.AgentID, claims.HostID, identityConflictCooldown)
+		// The duplicate holding the channel has to go too, or it would
+		// simply keep it: it never reconnects, so it is never re-checked.
+		// Since a clone boots after the machine it was copied from, the
+		// incumbent is usually the copy -- leaving it in place would hand
+		// the host to the clone and lock the real one out.
+		if h.registry.Evict(claims.HostID, "this host's agent identity is contended") {
+			logger.Warnf("agentgw channel: also dropped the channel host %d was already holding", claims.HostID)
+		}
+	}
+	return contended
 }
 
 // issueSessionToken mints and delivers one session token for the epoch

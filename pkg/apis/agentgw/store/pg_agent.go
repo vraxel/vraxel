@@ -64,6 +64,24 @@ func (s *pgAgentStore) GetByHostID(ctx context.Context, hostID int64) (*AgentRow
 	return agentToDomain(&row), nil
 }
 
+func (s *pgAgentStore) CheckIdentity(ctx context.Context, hostID int64, bootNonce string, cooldown time.Duration) (bool, error) {
+	contended, err := s.Q().CheckHostAgentIdentity(ctx, generated.CheckHostAgentIdentityParams{
+		BootNonce:    clampBootNonce(bootNonce),
+		HostID:       hostID,
+		CooldownSecs: cooldown.Seconds(),
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, fmt.Errorf("host agent for host %d: %w", hostID, pgerrors.ErrNotFound)
+		}
+		return false, fmt.Errorf("check host agent identity: %w", err)
+	}
+	// The expression is NULL-free (conflict_at IS NOT NULL AND ...), so a
+	// nil pointer cannot happen; treating it as "not contended" keeps the
+	// admit path working if that ever changes.
+	return contended != nil && *contended, nil
+}
+
 func (s *pgAgentStore) MarkOnline(ctx context.Context, hostID int64, instanceID, version string, clockSkewMs int64) (time.Time, error) {
 	connectedAt, err := s.Q().MarkHostAgentOnline(ctx, generated.MarkHostAgentOnlineParams{
 		InstanceID:  instanceID,
@@ -134,6 +152,21 @@ func clampVersion(v string) string {
 		return v[:versionColumnWidth]
 	}
 	return v
+}
+
+// bootNonceColumnWidth is host_agents.boot_nonce's varchar width.
+const bootNonceColumnWidth = 64
+
+// clampBootNonce truncates an agent-reported boot nonce to the column
+// width. Off the wire and therefore attacker-controllable: an oversized
+// value would fail the UPDATE and take the whole channel down with it,
+// whereas a truncated one only ever weakens the comparison for the agent
+// that sent it. The honest agent sends 32 hex characters.
+func clampBootNonce(n string) string {
+	if len(n) > bootNonceColumnWidth {
+		return n[:bootNonceColumnWidth]
+	}
+	return n
 }
 
 // parseAgentUUID converts the canonical string form used above the store

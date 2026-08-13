@@ -278,6 +278,37 @@ func (r *Registry) GetByHost(hostID int64) *Session {
 	return r.byHost[hostID]
 }
 
+// Evict tears down this instance's channel for a host, if it holds one,
+// and reports whether it did.
+//
+// Used when the host's agent identity turns out to be contended. Refusing
+// the connection that exposed the conflict is not enough on its own: the
+// duplicate that already holds the channel would keep it, never
+// reconnecting and so never being re-checked, and since a clone almost
+// always boots AFTER the machine it was cloned from, the survivor would
+// usually be the copy while the real host sat locked out.
+//
+// Only this instance's sessions. A duplicate pinned to a sibling keeps
+// its channel until it next reconnects; closing that window needs the
+// dispatch path to refuse contended hosts, which belongs with the jobs
+// slice rather than here.
+//
+// The session's own read loop unwinds and runs Remove, so the durable
+// side is handled exactly as it is for a superseded channel.
+func (r *Registry) Evict(hostID int64, reason string) bool {
+	r.mu.RLock()
+	sess := r.byHost[hostID]
+	r.mu.RUnlock()
+	if sess == nil {
+		return false
+	}
+	sess.stop()
+	// Off the hot path for the same reason as the supersede close: the
+	// handshake blocks on a reply a dead peer never sends.
+	go closeSession(sess, reason)
+	return true
+}
+
 // Count reports how many channels this instance currently holds.
 func (r *Registry) Count() int {
 	r.mu.RLock()

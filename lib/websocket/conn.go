@@ -13,6 +13,9 @@ const (
 	StatusNormalClosure = cws.StatusNormalClosure
 	StatusGoingAway     = cws.StatusGoingAway
 	StatusInternalError = cws.StatusInternalError
+	// StatusPolicyViolation closes a session the server refuses to serve
+	// for a reason the peer cannot fix by retrying sooner.
+	StatusPolicyViolation = cws.StatusPolicyViolation
 )
 
 // Conn wraps a coder/websocket.Conn to isolate the third-party dependency.

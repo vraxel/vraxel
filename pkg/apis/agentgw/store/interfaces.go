@@ -18,6 +18,12 @@ type AgentStore interface {
 	GetByAgentID(ctx context.Context, agentID string) (*AgentRow, error)
 	GetByHostID(ctx context.Context, hostID int64) (*AgentRow, error)
 
+	// CheckIdentity records this connection's boot nonce and reports
+	// whether the agent id is contended -- two live agent processes
+	// claiming it, which a disk clone of an onboarded host produces.
+	// Called before the session is registered; a contended id must not
+	// reach MarkOnline.
+	CheckIdentity(ctx context.Context, hostID int64, bootNonce string, cooldown time.Duration) (contended bool, err error)
 	// MarkOnline flips the row online under instanceID and returns the
 	// connected_at it wrote -- the session token's connEpoch, which a
 	// later reconnect changes to invalidate stale tokens (design §4.1).

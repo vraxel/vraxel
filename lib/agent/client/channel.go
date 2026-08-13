@@ -2,6 +2,8 @@ package client
 
 import (
 	"context"
+	crand "crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/rand/v2"
@@ -38,6 +40,27 @@ const (
 	// messages) stays well inside MaxFrameBytes.
 	maxHeartbeatProbes = 128
 )
+
+// bootNonce identifies this agent process for the lifetime of the
+// process. Package level rather than per-Channel because that is exactly
+// its meaning: one running agent, one value, resent unchanged on every
+// reconnect so the server can tell a reconnect from a second process
+// claiming the same identity (see agenttypes.Frame.BootNonce).
+//
+// Never persisted. A value on disk would be copied by the disk clone it
+// exists to detect.
+var bootNonce = newBootNonce()
+
+func newBootNonce() string {
+	var b [16]byte
+	if _, err := crand.Read(b[:]); err != nil {
+		// crypto/rand failing is fatal for the process on every platform
+		// this runs on; degrading to a predictable value would silently
+		// turn clone detection off, which is worse than not starting.
+		panic("agent: cannot read crypto/rand for the boot nonce: " + err.Error())
+	}
+	return hex.EncodeToString(b[:])
+}
 
 // Logger is the minimal logging surface the channel needs, so this
 // package stays free of a logging dependency.
@@ -199,6 +222,7 @@ func (c *Channel) session(ctx context.Context) error {
 		AgentVersion: c.Version,
 		ClockUnixMs:  time.Now().UnixMilli(),
 		RunningJobs:  c.runningJobs(),
+		BootNonce:    bootNonce,
 	}); err != nil {
 		return fmt.Errorf("send hello: %w", err)
 	}
