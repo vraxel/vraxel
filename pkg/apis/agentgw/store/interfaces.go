@@ -29,7 +29,9 @@ type AgentStore interface {
 	// back, since every further beat would be a no-op.
 	Touch(ctx context.Context, hostID int64, instanceID string, clockSkewMs int64) (claimed bool, err error)
 	MarkOffline(ctx context.Context, hostID int64, instanceID string) error
-	MarkInstanceOffline(ctx context.Context, instanceID string) error
+	// MarkOrphansOffline clears rows left online by instances that no
+	// longer hold a lease, including this process's own previous life.
+	MarkOrphansOffline(ctx context.Context, staleAfter time.Duration) error
 	// MarkStaleOffline sweeps rows with no heartbeat for staleAfter. The
 	// cutoff is applied against the DB clock, not the caller's.
 	MarkStaleOffline(ctx context.Context, staleAfter time.Duration) error
@@ -43,9 +45,16 @@ type JoinTokenStore interface {
 	GetByID(ctx context.Context, id int64, sf scope.Filter) (*JoinTokenRow, error)
 	List(ctx context.Context, q list.Query) (*list.Result[JoinTokenRow], error)
 	Delete(ctx context.Context, id int64, sf scope.Filter) error
+	// Peek reports whether a token is live without claiming a use, so
+	// /register can reject an unauthenticated caller before doing
+	// anything else. Expired / exhausted / unknown hashes yield
+	// pgerrors.ErrNotFound.
+	Peek(ctx context.Context, tokenHash []byte) (*JoinTokenRow, error)
 	// Consume claims one use of a live token, returning the claimed row.
 	// Expired / exhausted / unknown hashes yield pgerrors.ErrNotFound.
 	Consume(ctx context.Context, tokenHash []byte) (*JoinTokenRow, error)
+	// Refund returns a claimed use after a registration failed downstream.
+	Refund(ctx context.Context, id int64) error
 }
 
 // Stores aggregates the gateway's stores. server_instances is

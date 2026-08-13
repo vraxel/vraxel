@@ -103,6 +103,12 @@ func (r *agentHostRegistrar) RegisterAgentHost(ctx context.Context, spec agentgw
 	return 0, fmt.Errorf("host name %q is taken and no disambiguated variant was free", base)
 }
 
+// UnregisterAgentHost removes a host row whose registration failed after
+// it was created.
+func (r *agentHostRegistrar) UnregisterAgentHost(ctx context.Context, hostID int64) error {
+	return r.store.Delete(ctx, hostID)
+}
+
 // rebindAuthorised reports whether a join token presented for spec may
 // take over an existing host with scope cur.
 //

@@ -37,17 +37,18 @@ func TestAgentLinksNoSSHStack(t *testing.T) {
 	}
 }
 
-// TestAgentLinksNoServerAPIs pins the other half: the agent is the
+// TestAgentLinksNoServerCode pins the other half: the agent is the
 // minimal binary shipped to every managed host and must not link any
-// server-side API/DB code. Any dependency on pkg/apis pulls the store
-// and REST layers into a process that only needs the wire protocol in
+// server-side code. The whole of pkg/ is banned, not just pkg/apis --
+// pkg/db would drag pgx and the sqlc-generated query surface into a
+// process that has no database and only needs the wire protocol in
 // lib/agent/types.
-func TestAgentLinksNoServerAPIs(t *testing.T) {
-	const banned = "vraxel.io/vraxel/pkg/apis"
+func TestAgentLinksNoServerCode(t *testing.T) {
+	const banned = "vraxel.io/vraxel/pkg"
 	for _, dep := range deps(t) {
 		if dep == banned || strings.HasPrefix(dep, banned+"/") {
 			t.Errorf("the agent links %s; the agent must depend only on lib/agent/* "+
-				"and the wire protocol in lib/agent/types, never on server-side APIs", dep)
+				"and the wire protocol in lib/agent/types, never on server-side code", dep)
 		}
 	}
 }

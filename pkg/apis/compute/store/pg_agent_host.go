@@ -65,6 +65,9 @@ type AgentHostStore interface {
 	// GetScope reads a host's tenancy. Returns pgerrors.ErrNotFound when
 	// the row is gone.
 	GetScope(ctx context.Context, hostID int64) (*AgentHostScope, error)
+	// Delete removes an agent host row. Used to roll back a registration
+	// that failed after the row was created.
+	Delete(ctx context.Context, hostID int64) error
 }
 
 type pgAgentHostStore struct {
@@ -109,6 +112,17 @@ func (s *pgAgentHostStore) GetScope(ctx context.Context, hostID int64) (*AgentHo
 		WorkspaceID: row.WorkspaceID,
 		NamespaceID: row.NamespaceID,
 	}, nil
+}
+
+func (s *pgAgentHostStore) Delete(ctx context.Context, hostID int64) error {
+	n, err := s.Q().DeleteAgentHost(ctx, hostID)
+	if err != nil {
+		return fmt.Errorf("delete agent host: %w", pgerrors.CheckPG(err))
+	}
+	if n == 0 {
+		return fmt.Errorf("host %d: %w", hostID, pgerrors.ErrNotFound)
+	}
+	return nil
 }
 
 func (s *pgAgentHostStore) UpdateFacts(ctx context.Context, hostID int64, in AgentHostFactsInput) error {

@@ -44,3 +44,9 @@ WHERE id = @id;
 -- scope of the join token presented has to be checked against the scope
 -- of the host being claimed.
 SELECT scope, workspace_id, namespace_id FROM hosts WHERE id = @id;
+
+-- name: DeleteAgentHost :execrows
+-- Roll back a host row created by a registration that then failed. Bound
+-- to connectivity_mode='agent' so this can never remove a host that was
+-- onboarded any other way.
+DELETE FROM hosts WHERE id = @id AND connectivity_mode = 'agent';

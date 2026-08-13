@@ -61,3 +61,21 @@ WHERE token_hash = @token_hash
   AND expires_at > now()
   AND used_count < max_uses
 RETURNING *;
+
+-- name: PeekHostAgentJoinToken :one
+-- Non-consuming liveness check, used by /register before it does any
+-- work an unauthenticated caller should not be able to trigger. It burns
+-- no use, so the atomic claim above stays the only thing that does.
+SELECT * FROM host_agent_join_tokens
+WHERE token_hash = @token_hash
+  AND expires_at > now()
+  AND used_count < max_uses;
+
+-- name: RefundHostAgentJoinToken :exec
+-- Give a use back when registration failed after the claim. The token is
+-- typically single-use, so without this a machine whose registration
+-- broke halfway can never retry: its token is spent and only an operator
+-- minting a new one gets it onboarded.
+UPDATE host_agent_join_tokens
+SET used_count = used_count - 1
+WHERE id = @id AND used_count > 0;

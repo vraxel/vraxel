@@ -1,6 +1,7 @@
 package agentgw
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -26,6 +27,23 @@ func (h *protocolHandler) handleRegister(w http.ResponseWriter, r *http.Request)
 	}
 	req, ok := decodeRegisterRequest(w, r)
 	if !ok {
+		return
+	}
+
+	// Validate the token before touching anything else, without claiming a
+	// use. Doing the machine lookup first (as this did) made /register an
+	// oracle for anyone with a guess at a machine id and no credential at
+	// all: 409 meant "that host is registered here and its agent is live",
+	// 401 meant it was not. It also spent a database round trip per
+	// unauthenticated request on a public endpoint.
+	tokenHash := HashToken(joinToken)
+	if _, err := h.joinTokens.Peek(r.Context(), tokenHash); err != nil {
+		if se := apierrors.FromDomain(err, "join token"); se != nil && apierrors.IsNotFound(se) {
+			http.Error(w, "invalid, expired or exhausted join-token", http.StatusUnauthorized)
+			return
+		}
+		logger.Warnf("agentgw register: check join token: %v", err)
+		http.Error(w, "check join-token", http.StatusInternalServerError)
 		return
 	}
 
@@ -61,7 +79,7 @@ func (h *protocolHandler) handleRegister(w http.ResponseWriter, r *http.Request)
 	// That is the intended trade: the alternative (register the host,
 	// then consume) lets a crash-looping agent onboard unboundedly many
 	// hosts from a max_uses=1 token.
-	token, err := h.joinTokens.Consume(r.Context(), HashToken(joinToken))
+	token, err := h.joinTokens.Consume(r.Context(), tokenHash)
 	if err != nil {
 		if se := apierrors.FromDomain(err, "join token"); se != nil && apierrors.IsNotFound(se) {
 			http.Error(w, "invalid, expired or exhausted join-token", http.StatusUnauthorized)
@@ -99,6 +117,7 @@ func (h *protocolHandler) handleRegister(w http.ResponseWriter, r *http.Request)
 	})
 	if err != nil {
 		logger.Warnf("agentgw register: register host for agent %s: %v", agentID, err)
+		h.undoRegistration(r.Context(), agentID, existingHostID, 0, token.ID)
 		// A rejected rebind is the caller's problem to fix (wrong token for
 		// that host), everything else is ours. Neither answer carries the
 		// underlying error: the peer holds nothing but a join token, and
@@ -114,6 +133,15 @@ func (h *protocolHandler) handleRegister(w http.ResponseWriter, r *http.Request)
 	row, err := h.agents.Upsert(r.Context(), hostID, agentID, req.AgentVersion)
 	if err != nil {
 		logger.Warnf("agentgw register: upsert agent %s: %v", agentID, err)
+		// The three writes behind /register cannot share a transaction:
+		// hosts belongs to another module and reaching it through anything
+		// but the interface would drag the store layer across a module
+		// boundary. So the failure is compensated instead. Without this the
+		// machine is stuck for good: its token is spent, its host row
+		// exists but is bound to nothing, and every retry with a fresh
+		// token creates yet another host, until all three candidate names
+		// are taken by its own orphans and registration fails outright.
+		h.undoRegistration(r.Context(), agentID, existingHostID, hostID, token.ID)
 		http.Error(w, "persist agent", http.StatusInternalServerError)
 		return
 	}
@@ -137,6 +165,26 @@ func (h *protocolHandler) handleRegister(w http.ResponseWriter, r *http.Request)
 		HostID:     hostID,
 		AgentToken: agentToken,
 	})
+}
+
+// undoRegistration compensates a registration that failed after the join
+// token was claimed: it gives the use back and, when this request was the
+// one that created the host row, deletes it again.
+//
+// Both steps are best-effort. If they fail the caller is no worse off
+// than before they existed, which is why nothing here changes the
+// response. A process killed mid-registration still leaves the residue
+// they clean up -- compensation is not atomicity -- but that window is
+// now a crash rather than any ordinary database error.
+func (h *protocolHandler) undoRegistration(ctx context.Context, agentID string, existingHostID, createdHostID, tokenID int64) {
+	if createdHostID > 0 && existingHostID == 0 {
+		if err := h.registrar.UnregisterAgentHost(ctx, createdHostID); err != nil {
+			logger.Warnf("agentgw register: roll back host %d for agent %s: %v", createdHostID, agentID, err)
+		}
+	}
+	if err := h.joinTokens.Refund(ctx, tokenID); err != nil {
+		logger.Warnf("agentgw register: refund join token %d: %v", tokenID, err)
+	}
 }
 
 // decodeRegisterRequest reads and validates the register body.

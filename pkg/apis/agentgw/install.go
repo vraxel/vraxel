@@ -87,11 +87,12 @@ func NewModule(ctx context.Context, database *db.DB, deps Deps) ModuleResult {
 	instanceID := serverinstance.BuildInstanceID(deps.ServerName)
 	registry := NewRegistry(stores.Agent, instanceID)
 
-	// Residue from this instance's previous life: rows still claiming
-	// status='online' under our instance_id after a hard kill. Clear
-	// before serving so addressing never points at a dead socket.
-	if err := stores.Agent.MarkInstanceOffline(ctx, instanceID); err != nil {
-		logger.Warnf("agentgw: clear residual online agents for %s: %v", instanceID, err)
+	// Residue from any instance that died without closing its sockets,
+	// this process's own previous life included. Cleared before serving so
+	// addressing never points at a dead socket. Instances holding a live
+	// lease are left alone, so this is safe to run on every boot.
+	if err := stores.Agent.MarkOrphansOffline(ctx, serverinstance.StaleAfter); err != nil {
+		logger.Warnf("agentgw: clear residual online agents: %v", err)
 	}
 
 	runManager := &RunManager{}

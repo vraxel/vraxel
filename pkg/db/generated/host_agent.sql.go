@@ -131,16 +131,29 @@ func (q *Queries) MarkHostAgentOnline(ctx context.Context, arg MarkHostAgentOnli
 	return connected_at, err
 }
 
-const markInstanceHostAgentsOffline = `-- name: MarkInstanceHostAgentsOffline :exec
+const markOrphanedHostAgentsOffline = `-- name: MarkOrphanedHostAgentsOffline :exec
 UPDATE host_agents
 SET status = 'offline', updated_at = now()
-WHERE instance_id = $1 AND status = 'online'
+WHERE status = 'online'
+  AND instance_id NOT IN (
+      SELECT instance_id FROM server_instances
+      WHERE last_seen_at >= now() - make_interval(secs => $1::float8)
+  )
 `
 
-// Startup residue cleanup: an instance that died without closing its
-// sockets leaves rows claiming 'online' under its instance_id.
-func (q *Queries) MarkInstanceHostAgentsOffline(ctx context.Context, instanceID string) error {
-	_, err := q.db.Exec(ctx, markInstanceHostAgentsOffline, instanceID)
+// Startup residue cleanup: rows still claiming 'online' under an instance
+// that no longer holds a lease. That covers this process's own previous
+// life, which is the common case after a hard kill.
+//
+// Matching on the dead instance rather than on our own id is what makes
+// it work at all: instance_id carries the pid, so a restarted process
+// never shares an id with its predecessor and a self-targeted cleanup
+// could only ever match zero rows.
+//
+// Live siblings are excluded by the lease join, so this is safe to run on
+// every boot in a horizontally scaled deployment.
+func (q *Queries) MarkOrphanedHostAgentsOffline(ctx context.Context, staleAfterSecs float64) error {
+	_, err := q.db.Exec(ctx, markOrphanedHostAgentsOffline, staleAfterSecs)
 	return err
 }
 

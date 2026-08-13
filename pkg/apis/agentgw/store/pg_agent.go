@@ -75,7 +75,9 @@ func (s *pgAgentStore) MarkOnline(ctx context.Context, hostID int64, instanceID,
 		return time.Time{}, fmt.Errorf("mark host agent online: %w", err)
 	}
 	// connected_at was just SET to now() in the same statement, so the
-	// RETURNING value is never NULL; the guard is defensive only.
+	// RETURNING value is never NULL; the guard is defensive only. Callers
+	// read the zero time as "no claim", which is also what the error path
+	// above returns.
 	if connectedAt == nil {
 		return time.Time{}, nil
 	}
@@ -104,9 +106,9 @@ func (s *pgAgentStore) MarkOffline(ctx context.Context, hostID int64, instanceID
 	return nil
 }
 
-func (s *pgAgentStore) MarkInstanceOffline(ctx context.Context, instanceID string) error {
-	if err := s.Q().MarkInstanceHostAgentsOffline(ctx, instanceID); err != nil {
-		return fmt.Errorf("mark instance host agents offline: %w", err)
+func (s *pgAgentStore) MarkOrphansOffline(ctx context.Context, staleAfter time.Duration) error {
+	if err := s.Q().MarkOrphanedHostAgentsOffline(ctx, staleAfter.Seconds()); err != nil {
+		return fmt.Errorf("mark orphaned host agents offline: %w", err)
 	}
 	return nil
 }

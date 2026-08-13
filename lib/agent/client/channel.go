@@ -189,10 +189,6 @@ func (c *Channel) session(ctx context.Context) error {
 		return writeFrame(wctx, conn, f)
 	}
 
-	live := SendFunc(send)
-	c.live.Store(&live)
-	defer c.live.Store(nil)
-
 	// hello first: the server refuses to register the session until it
 	// arrives, because it carries the version and clock the host_agents
 	// row must be online with, plus the jobs still running so a reconnect
@@ -207,6 +203,14 @@ func (c *Channel) session(ctx context.Context) error {
 		return fmt.Errorf("send hello: %w", err)
 	}
 	c.Log.Infof("control channel: connected to %s", c.ServerURL)
+
+	// Published only now. Exposing the socket before hello let an
+	// unsolicited Send from elsewhere in the agent -- a probe verdict
+	// flipping at the wrong moment -- reach the server first, which reads
+	// it as a protocol violation and drops the connection.
+	live := SendFunc(send)
+	c.live.Store(&live)
+	defer c.live.Store(nil)
 
 	// A failed heartbeat tears the session down instead of merely stopping
 	// the beat: the read side of a half-open connection can stay blocked

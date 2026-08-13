@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	apierrors "vraxel.io/vraxel/lib/api/errors"
+	"vraxel.io/vraxel/lib/logger"
 	gwstore "vraxel.io/vraxel/pkg/apis/agentgw/store"
 )
 
@@ -146,7 +148,15 @@ func (h *protocolHandler) authSession(w http.ResponseWriter, r *http.Request) (i
 	}
 	row, err := h.agents.GetByHostID(r.Context(), claims.HostID)
 	if err != nil {
-		http.Error(w, "unknown agent", http.StatusUnauthorized)
+		// Same split as authAgent, for the same reason: a database outage
+		// must not answer every agent at once that its credential was
+		// rejected. Only a genuinely missing row is a 401.
+		if se := apierrors.FromDomain(err, "agent"); se != nil && apierrors.IsNotFound(se) {
+			http.Error(w, "unknown agent", http.StatusUnauthorized)
+		} else {
+			logger.Warnf("agentgw session: look up host %d: %v", claims.HostID, err)
+			http.Error(w, "agent lookup failed", http.StatusServiceUnavailable)
+		}
 		return 0, false
 	}
 	if !sessionRowValid(claims, row) {

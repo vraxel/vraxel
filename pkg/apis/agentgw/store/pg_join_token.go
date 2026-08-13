@@ -132,6 +132,24 @@ func (s *pgJoinTokenStore) Delete(ctx context.Context, id int64, sf scope.Filter
 	return nil
 }
 
+func (s *pgJoinTokenStore) Peek(ctx context.Context, tokenHash []byte) (*JoinTokenRow, error) {
+	row, err := s.Q().PeekHostAgentJoinToken(ctx, tokenHash)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("join token: %w", pgerrors.ErrNotFound)
+		}
+		return nil, fmt.Errorf("peek join token: %w", err)
+	}
+	return joinTokenToDomain(&row, ""), nil
+}
+
+func (s *pgJoinTokenStore) Refund(ctx context.Context, id int64) error {
+	if err := s.Q().RefundHostAgentJoinToken(ctx, id); err != nil {
+		return fmt.Errorf("refund join token: %w", err)
+	}
+	return nil
+}
+
 func (s *pgJoinTokenStore) Consume(ctx context.Context, tokenHash []byte) (*JoinTokenRow, error) {
 	row, err := s.Q().ConsumeHostAgentJoinToken(ctx, tokenHash)
 	if err != nil {

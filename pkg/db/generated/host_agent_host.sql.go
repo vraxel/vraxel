@@ -70,6 +70,21 @@ func (q *Queries) CreateAgentHost(ctx context.Context, arg CreateAgentHostParams
 	return id, err
 }
 
+const deleteAgentHost = `-- name: DeleteAgentHost :execrows
+DELETE FROM hosts WHERE id = $1 AND connectivity_mode = 'agent'
+`
+
+// Roll back a host row created by a registration that then failed. Bound
+// to connectivity_mode='agent' so this can never remove a host that was
+// onboarded any other way.
+func (q *Queries) DeleteAgentHost(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteAgentHost, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getAgentHostScope = `-- name: GetAgentHostScope :one
 SELECT scope, workspace_id, namespace_id FROM hosts WHERE id = $1
 `
