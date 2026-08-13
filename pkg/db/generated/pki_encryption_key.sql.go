@@ -9,23 +9,29 @@ import (
 	"context"
 )
 
-const createPKIEncryptionKey = `-- name: CreatePKIEncryptionKey :one
-INSERT INTO pki_encryption_keys (encryption_key)
-VALUES ($1)
-RETURNING id, encryption_key, created_at
+const createPKIEncryptionKey = `-- name: CreatePKIEncryptionKey :exec
+INSERT INTO pki_encryption_keys (id, encryption_key)
+VALUES (1, $1)
+ON CONFLICT (id) DO NOTHING
 `
 
-func (q *Queries) CreatePKIEncryptionKey(ctx context.Context, encryptionKey []byte) (PkiEncryptionKey, error) {
-	row := q.db.QueryRow(ctx, createPKIEncryptionKey, encryptionKey)
-	var i PkiEncryptionKey
-	err := row.Scan(&i.ID, &i.EncryptionKey, &i.CreatedAt)
-	return i, err
+// First-boot insert. DO NOTHING rather than an error on conflict: when
+// several instances boot against an empty database they each generate a
+// candidate key and race to insert it. Exactly one wins; the losers must
+// then READ the winner's key instead of using their own, or they would
+// sign agent tokens no other instance can verify. The store performs that
+// read unconditionally, which is why this statement returns nothing.
+func (q *Queries) CreatePKIEncryptionKey(ctx context.Context, encryptionKey []byte) error {
+	_, err := q.db.Exec(ctx, createPKIEncryptionKey, encryptionKey)
+	return err
 }
 
 const getPKIEncryptionKey = `-- name: GetPKIEncryptionKey :one
-SELECT id, encryption_key, created_at FROM pki_encryption_keys ORDER BY id LIMIT 1
+SELECT id, encryption_key, created_at FROM pki_encryption_keys WHERE id = 1
 `
 
+// The master key lives in exactly one row, pinned at id = 1 by
+// chk_pki_encryption_key_singleton.
 func (q *Queries) GetPKIEncryptionKey(ctx context.Context) (PkiEncryptionKey, error) {
 	row := q.db.QueryRow(ctx, getPKIEncryptionKey)
 	var i PkiEncryptionKey
