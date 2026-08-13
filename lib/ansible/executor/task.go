@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -9,6 +10,8 @@ import (
 	"time"
 
 	"errors"
+
+	"gopkg.in/yaml.v3"
 
 	"vraxel.io/vraxel/lib/ansible"
 	"vraxel.io/vraxel/lib/ansible/connector"
@@ -353,13 +356,69 @@ func (e *TaskExecutor) registerResults(task ansible.TaskSpec, results []ansible.
 		stdout := extractString(result.Output, "stdout")
 		stderr := extractString(result.Output, "stderr")
 
-		regVar["stdout"] = stdout
+		regVar["stdout"] = parseRegisterStdout(task.RegisterType, stdout)
 		regVar["stderr"] = stderr
 		regVar["rc"] = extractInt(result.Output, "rc")
 		regVar["failed"] = result.Error != "" || extractString(result.Output, "_ignored_error") != ""
 		regVar["skipped"] = result.Status == ansible.TaskStatusSkipped
 
 		e.variable.Merge(variable.MergeHostRuntimeVars(result.Host, map[string]any{task.Register: regVar}))
+	}
+}
+
+// parseRegisterStdout interprets the captured stdout according to the task's
+// register_type. For "json"/"yaml" the stdout string is decoded into a
+// structured value so downstream templates can index into it; on decode
+// failure it falls back to the raw string. Default keeps the raw string.
+func parseRegisterStdout(registerType, s string) any {
+	switch registerType {
+	case "json":
+		// Use UseNumber() to keep large-integer precision, then normalize
+		// json.Number back to int64/float64 so values are not later
+		// re-marshaled as strings.
+		decoder := json.NewDecoder(strings.NewReader(s))
+		decoder.UseNumber()
+		var out any
+		if err := decoder.Decode(&out); err != nil {
+			return s
+		}
+		return normalizeJSONNumbers(out)
+	case "yaml", "yml":
+		var out any
+		if err := yaml.Unmarshal([]byte(s), &out); err != nil {
+			return s
+		}
+		return out
+	default:
+		return s
+	}
+}
+
+// normalizeJSONNumbers recursively converts json.Number values (produced by a
+// decoder with UseNumber) to int64 or float64, preserving numeric types while
+// avoiding precision loss for large integers.
+func normalizeJSONNumbers(v any) any {
+	switch x := v.(type) {
+	case json.Number:
+		if i, err := x.Int64(); err == nil {
+			return i
+		}
+		if f, err := x.Float64(); err == nil {
+			return f
+		}
+		return x.String()
+	case map[string]any:
+		for k, vv := range x {
+			x[k] = normalizeJSONNumbers(vv)
+		}
+		return x
+	case []any:
+		for i, vv := range x {
+			x[i] = normalizeJSONNumbers(vv)
+		}
+		return x
+	default:
+		return v
 	}
 }
 

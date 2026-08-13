@@ -35,6 +35,7 @@ func BlockToTaskSpec(block ansible.Block, hosts []string, role string, moduleFin
 		Loop:         block.Loop,
 		LoopControl:  block.Task.LoopControl,
 		Register:     block.Register,
+		RegisterType: block.RegisterType,
 		Retries:      block.Retries,
 		Delay:        block.Delay,
 		Until:        block.Until.Data,

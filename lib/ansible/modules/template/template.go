@@ -3,7 +3,6 @@ package template
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"vraxel.io/vraxel/lib/ansible/modules/internal"
 	tmpl "vraxel.io/vraxel/lib/ansible/template"
@@ -44,43 +43,17 @@ func ModuleTemplate(ctx context.Context, opts internal.ExecOptions) (string, str
 	}
 
 	// 4. Upload rendered content.
-	if opts.Become {
-		// Write to temp file first, then sudo mv to avoid SFTP permission issues
-		tmpPath := fmt.Sprintf("/tmp/.ansible_tpl_%d", time.Now().UnixNano())
-		if err := opts.Connector.PutFile(ctx, rendered, tmpPath, mode); err != nil {
-			return "", "", fmt.Errorf("template: write temp %s: %w", tmpPath, err)
-		}
-		mvCmd := fmt.Sprintf("mv %s %s && chmod %04o %s", tmpPath, dest, mode, dest)
-		if _, _, err := opts.Connector.ExecuteCommand(ctx, mvCmd); err != nil {
-			return "", "", fmt.Errorf("template: move to %s: %w", dest, err)
-		}
-	} else {
-		if err := opts.Connector.PutFile(ctx, rendered, dest, mode); err != nil {
-			return "", "", fmt.Errorf("template: upload %s: %w", dest, err)
-		}
+	if err := internal.WriteFile(ctx, opts, rendered, dest, mode); err != nil {
+		return "", "", fmt.Errorf("template: %w", err)
 	}
 
 	// 5. Set ownership if specified.
-	if chownArg := buildChownArg(owner, group); chownArg != "" {
-		cmd := fmt.Sprintf("chown %s %s", chownArg, dest)
+	if chownArg := internal.ChownArg(owner, group); chownArg != "" {
+		cmd := fmt.Sprintf("chown %s %s", chownArg, internal.ShellQuote(dest))
 		if _, _, err := opts.Connector.ExecuteCommand(ctx, cmd); err != nil {
 			return "", "", fmt.Errorf("template: chown %s: %w", dest, err)
 		}
 	}
 
 	return fmt.Sprintf("templated %s -> %s", src, dest), "", nil
-}
-
-// buildChownArg builds the "owner:group" argument for chown.
-func buildChownArg(owner, group string) string {
-	if owner != "" && group != "" {
-		return owner + ":" + group
-	}
-	if owner != "" {
-		return owner
-	}
-	if group != "" {
-		return ":" + group
-	}
-	return ""
 }

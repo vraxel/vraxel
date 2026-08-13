@@ -3,6 +3,7 @@ package executor
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -218,6 +219,80 @@ func TestTaskExecutor_Register(t *testing.T) {
 	}
 	if failed != false {
 		t.Errorf("expected failed=false, got %v", failed)
+	}
+}
+
+func TestTaskExecutor_RegisterJSON(t *testing.T) {
+	executor, v := setupTestExecutor(t)
+
+	task := ansible.TaskSpec{
+		Name:  "register json task",
+		Hosts: []string{"localhost"},
+		Module: ansible.ModuleRef{
+			Name: "command",
+			Args: map[string]any{"cmd": `echo '{"name":"vraxel","count":3,"big":10000000000000001}'`},
+		},
+		Register:     "j",
+		RegisterType: "json",
+	}
+
+	executor.Exec(context.Background(), task)
+
+	vars := v.Get(variable.GetAllVariable("localhost")).(map[string]any)
+	stdout := vars["j"].(map[string]any)["stdout"]
+	m, ok := stdout.(map[string]any)
+	if !ok {
+		t.Fatalf("expected stdout parsed into map, got %T (%v)", stdout, stdout)
+	}
+	if m["name"] != "vraxel" {
+		t.Errorf("name = %v, want vraxel", m["name"])
+	}
+	// count must be numeric, not string.
+	if m["count"] != int64(3) {
+		t.Errorf("count = %v (%T), want int64(3)", m["count"], m["count"])
+	}
+	// large integer must keep precision as int64, not lose it to float64.
+	if m["big"] != int64(10000000000000001) {
+		t.Errorf("big = %v (%T), want int64(10000000000000001)", m["big"], m["big"])
+	}
+}
+
+func TestParseRegisterStdout(t *testing.T) {
+	// default: raw string preserved.
+	if got := parseRegisterStdout("", "plain\n"); got != "plain\n" {
+		t.Errorf("default: got %q, want %q", got, "plain\n")
+	}
+	// invalid json falls back to the raw string.
+	if got := parseRegisterStdout("json", "not json"); got != "not json" {
+		t.Errorf("json fallback: got %v, want raw string", got)
+	}
+	// yaml parses into a map.
+	got := parseRegisterStdout("yaml", "a: 1\nb: two")
+	m, ok := got.(map[string]any)
+	if !ok {
+		t.Fatalf("yaml: got %T, want map", got)
+	}
+	if m["a"] != 1 || m["b"] != "two" {
+		t.Errorf("yaml: got %v", m)
+	}
+}
+
+func TestNormalizeJSONNumbers(t *testing.T) {
+	in := map[string]any{
+		"i":   json.Number("42"),
+		"f":   json.Number("3.14"),
+		"arr": []any{json.Number("1"), json.Number("2")},
+	}
+	out := normalizeJSONNumbers(in).(map[string]any)
+	if out["i"] != int64(42) {
+		t.Errorf("i = %v (%T), want int64(42)", out["i"], out["i"])
+	}
+	if out["f"] != 3.14 {
+		t.Errorf("f = %v (%T), want float64(3.14)", out["f"], out["f"])
+	}
+	arr := out["arr"].([]any)
+	if arr[0] != int64(1) || arr[1] != int64(2) {
+		t.Errorf("arr = %v", arr)
 	}
 }
 

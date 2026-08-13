@@ -79,6 +79,47 @@ func TestModuleDebug_TemplateMsg(t *testing.T) {
 	}
 }
 
+func TestModuleDebug_VarTemplatePath(t *testing.T) {
+	opts := internal.ExecOptions{
+		Args:     map[string]any{"var": "{{ .cfg.name }}"},
+		Host:     "testhost",
+		Variable: newTestVariableWithVars("testhost", map[string]any{"cfg": map[string]any{"name": "vraxel"}}),
+	}
+	stdout, _, err := ModuleDebug(context.Background(), opts)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if stdout != "vraxel" {
+		t.Errorf("expected 'vraxel', got %q", stdout)
+	}
+}
+
+func TestModuleDebug_VarSimplePath(t *testing.T) {
+	opts := internal.ExecOptions{
+		Args:     map[string]any{"var": ".count"},
+		Host:     "testhost",
+		Variable: newTestVariableWithVars("testhost", map[string]any{"count": 7}),
+	}
+	stdout, _, err := ModuleDebug(context.Background(), opts)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(stdout, "7") {
+		t.Errorf("expected '7', got %q", stdout)
+	}
+}
+
+func TestModuleDebug_VarMustStartWithDot(t *testing.T) {
+	opts := internal.ExecOptions{
+		Args:     map[string]any{"var": "count"},
+		Host:     "testhost",
+		Variable: newTestVariable("testhost"),
+	}
+	if _, _, err := ModuleDebug(context.Background(), opts); err == nil {
+		t.Fatal("expected error for var path not starting with '.'")
+	}
+}
+
 func TestModuleDebug_MapMsg(t *testing.T) {
 	msgMap := map[string]any{
 		"key1": "value1",
@@ -134,7 +175,7 @@ func TestModuleDebug_NoMsg(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for missing msg argument, got nil")
 	}
-	if !strings.Contains(err.Error(), "msg argument required") {
+	if !strings.Contains(err.Error(), `either "msg" or "var" is required`) {
 		t.Errorf("unexpected error message: %v", err)
 	}
 }

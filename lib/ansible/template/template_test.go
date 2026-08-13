@@ -3,8 +3,42 @@ package template
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+// ---------------------------------------------------------------------------
+// Custom functions
+// ---------------------------------------------------------------------------
+
+func TestIsIP(t *testing.T) {
+	cases := map[string]bool{
+		"192.168.1.1":       true,
+		"2001:db8::1":       true,
+		"192.168.1.1:5000":  true,
+		"[2001:db8::1]:443": true,
+		"[2001:db8::1]":     true,
+		"example.com":       false,
+		"not-an-ip":         false,
+		"":                  false,
+	}
+	for in, want := range cases {
+		if got := isIP(in); got != want {
+			t.Errorf("isIP(%q) = %v, want %v", in, got, want)
+		}
+	}
+}
+
+func TestToTOML(t *testing.T) {
+	got := toTOML(map[string]any{"name": "vraxel", "count": 3})
+	if !strings.Contains(got, `name = "vraxel"`) || !strings.Contains(got, "count = 3") {
+		t.Errorf("toTOML output missing expected keys:\n%s", got)
+	}
+	// marshal error is swallowed to empty string.
+	if got := toTOML(func() {}); got != "" {
+		t.Errorf("toTOML(func) = %q, want empty", got)
+	}
+}
 
 // ---------------------------------------------------------------------------
 // Parse

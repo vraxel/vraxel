@@ -605,6 +605,7 @@ type TaskSpec struct {
 	Loop         any         `json:"loop,omitempty" yaml:"loop,omitempty"`
 	LoopControl  LoopControl `json:"loop_control,omitempty" yaml:"loop_control,omitempty"`
 	Register     string      `json:"register,omitempty" yaml:"register,omitempty"`
+	RegisterType string      `json:"register_type,omitempty" yaml:"register_type,omitempty"`
 	Retries      int         `json:"retries,omitempty" yaml:"retries,omitempty"`
 	Delay        int         `json:"delay,omitempty" yaml:"delay,omitempty"`
 	Until        []string    `json:"until,omitempty" yaml:"until,omitempty"`
