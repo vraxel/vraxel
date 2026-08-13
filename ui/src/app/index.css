@@ -153,52 +153,12 @@
   }
 }
 
-/* Overlay timing lives on the components themselves as duration-*/
-ease-* utilities,
-not
-  here.
-  tw-animate-css
-  builds
-  `animate-in`
-  out
-  of
-  the
-  `animation`
-  shorthand
-  in
-  the
-  utilities
-  layer,
-and
-  a
-  shorthand
-  beats
-  the
-  longhands
-  a
-  `@layer
-  components`
-  block
-  can
-  set
-  --
-  an
-  earlier
-  attempt
-  to
-  tune
-  motion
-  from
-  this
-  file
-  compiled
-  fine
-  and
-  did
-  nothing.
-  */
-  @media
-  (prefers-reduced-motion: reduce) {
+/* Overlay timing lives on the components themselves, as duration and ease
+   utility classes, not here. tw-animate-css builds `animate-in` out of the
+   `animation` shorthand in the utilities layer, and that shorthand beats any
+   longhand a `@layer components` block can set: an earlier attempt to tune
+   motion from this file compiled fine and did nothing. */
+@media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
