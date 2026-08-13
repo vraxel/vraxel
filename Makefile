@@ -50,7 +50,10 @@ check: ## Run all gates: gofmt, vet, layer guard, Go tests, UI typecheck/lint/te
 	go vet ./...
 	./scripts/check-layer-leak.sh
 	go test ./...
-	cd ui && pnpm typecheck && pnpm lint && pnpm test
+	node ./scripts/check-lint-config.mjs
+	pnpm -r typecheck
+	pnpm -r lint
+	pnpm -r --if-present test
 
 # The writing counterpart of `check`'s formatting gates (gofmt -l -s on the
 # Go side, prettier --check inside `pnpm lint` on the UI side).
