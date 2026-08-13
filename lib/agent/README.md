@@ -1,6 +1,6 @@
 # lib/agent
 
-The reusable half of lcp-agent: everything a host agent needs to be
+The reusable half of the agent: everything a host agent needs to be
 managed from a control plane it cannot be dialled from.
 
 Outbound only. The agent listens on nothing.
@@ -27,12 +27,12 @@ Outbound only. The agent listens on nothing.
 It imports nothing from `pkg/apis`, and that is enforced:
 
 ```
-go list -deps ./lib/agent/... | grep lcp/pkg/apis    # must be empty
+go list -deps ./lib/agent/... | grep pkg/apis    # must be empty
 ```
 
 Porting means copying `lib/agent/` and `lib/websocket/`, then writing a
 `main` that supplies the config below. Job execution is deliberately not
-here: `app/lcp-agent` owns it, because running ansible plays is an LCP
+here: the agent binary owns it, because running ansible plays is a platform
 decision, not something every agent needs.
 
 ## What the host program supplies

@@ -1,4 +1,4 @@
-// Package hostinfo collects the facts vr-agent reports about the machine
+// Package hostinfo collects the facts the agent reports about the machine
 // it runs on: the static hardware specs sent once at registration and the
 // default-route interface address.
 //
@@ -25,7 +25,7 @@ type Static struct {
 	// MemoryMB / DiskGB carry BINARY units: memTotalBytes()/1024^2 and
 	// diskTotalBytes()/1024^3, i.e. MiB / GiB. Named MB / GB (not MiB /
 	// GiB) on purpose -- that matches hosts.memory_mb / disk_gb, the rest
-	// of vraxel, and every OS tool (free -m, df -BG, VMware) that prints
+	// of the platform, and every OS tool (free -m, df -BG, VMware) that prints
 	// "MB/GB" while meaning binary. Display-only host inventory; no code
 	// does arithmetic that the MB-vs-MiB gap would break.
 	MemoryMB       int64

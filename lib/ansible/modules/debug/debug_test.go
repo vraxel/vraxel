@@ -83,14 +83,14 @@ func TestModuleDebug_VarTemplatePath(t *testing.T) {
 	opts := internal.ExecOptions{
 		Args:     map[string]any{"var": "{{ .cfg.name }}"},
 		Host:     "testhost",
-		Variable: newTestVariableWithVars("testhost", map[string]any{"cfg": map[string]any{"name": "vraxel"}}),
+		Variable: newTestVariableWithVars("testhost", map[string]any{"cfg": map[string]any{"name": "app"}}),
 	}
 	stdout, _, err := ModuleDebug(context.Background(), opts)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if stdout != "vraxel" {
-		t.Errorf("expected 'vraxel', got %q", stdout)
+	if stdout != "app" {
+		t.Errorf("expected 'app', got %q", stdout)
 	}
 }
 

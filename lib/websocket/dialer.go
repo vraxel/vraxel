@@ -8,7 +8,7 @@ import (
 )
 
 // DialOptions configures a client Dial. Kept minimal on purpose: the only
-// caller (lcp-agent's control channel) needs an Authorization header, and
+// caller (the agent's control channel) needs an Authorization header, and
 // exposing coder/websocket's full option surface would defeat the point of
 // this wrapper.
 type DialOptions struct {

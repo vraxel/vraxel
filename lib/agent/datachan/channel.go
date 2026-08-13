@@ -2,7 +2,7 @@
 // one persistent WSS per host, carrying every synchronous session as a
 // yamux logical stream.
 //
-// It has no vraxel dependencies beyond the wire contract in lib/agent/types
+// It has no platform dependencies beyond the wire contract in lib/agent/types
 // and the WebSocket wrapper, so the whole package ports to another
 // product by supplying a Config.
 package datachan
@@ -58,7 +58,7 @@ type Logger interface {
 
 // Config is everything the data channel needs from its host program.
 type Config struct {
-	// ServerURL is the vraxel-server base URL (http:// or https://).
+	// ServerURL is the server base URL (http:// or https://).
 	ServerURL string
 	// Token returns the current session token. Read per dial, because the
 	// token rotates on every control-channel reconnect.

@@ -104,7 +104,7 @@ func newExporter(t *testing.T, body string) string {
 	return srv.URL + "/metrics"
 }
 
-// startScraper wires a Scraper against a fake vraxel-server serving the
+// startScraper wires a Scraper against a fake server serving the
 // given targets response.
 func startScraper(t *testing.T, resp agenttypes.ScrapeTargetsResponse) *Scraper {
 	t.Helper()
@@ -408,7 +408,7 @@ func TestScrapeTargetsAreDialledByCheckedAddress(t *testing.T) {
 }
 
 // TestRemoteClientReachesNonLoopback is the counterpart, and the bug a
-// loopback-everywhere client hides: vraxel-server and VM are remote by
+// loopback-everywhere client hides: the server and VM are remote by
 // definition, so a single client carrying the exporter rule makes the
 // agent refuse to fetch its own target list. Every httptest server binds
 // 127.0.0.1, so no amount of end-to-end testing here would catch it --
@@ -428,7 +428,7 @@ func TestRemoteClientReachesNonLoopback(t *testing.T) {
 	cancel()
 	_, err := tr.DialContext(ctx, "tcp", "10.1.1.10:9100")
 	if err != nil && strings.Contains(err.Error(), "loopback") {
-		t.Fatalf("the remote client enforces the loopback rule, so it cannot reach vraxel-server or VM: %v", err)
+		t.Fatalf("the remote client enforces the loopback rule, so it cannot reach the server or VM: %v", err)
 	}
 	if s.remote == s.exporters {
 		t.Fatal("one client serves both loopback and remote targets")

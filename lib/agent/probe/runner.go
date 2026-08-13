@@ -1,6 +1,6 @@
 // Package probe runs the host's probes locally and reports verdicts.
 //
-// It carries no vraxel dependencies: the checks are twenty lines of net and
+// It carries no platform dependencies: the checks are twenty lines of net and
 // os/exec rather than a call into lib/probe, which would drag the ansible
 // executor in through its health helpers.
 package probe

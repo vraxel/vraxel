@@ -230,7 +230,7 @@ func TestTaskExecutor_RegisterJSON(t *testing.T) {
 		Hosts: []string{"localhost"},
 		Module: ansible.ModuleRef{
 			Name: "command",
-			Args: map[string]any{"cmd": `echo '{"name":"vraxel","count":3,"big":10000000000000001}'`},
+			Args: map[string]any{"cmd": `echo '{"name":"app","count":3,"big":10000000000000001}'`},
 		},
 		Register:     "j",
 		RegisterType: "json",
@@ -244,8 +244,8 @@ func TestTaskExecutor_RegisterJSON(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected stdout parsed into map, got %T (%v)", stdout, stdout)
 	}
-	if m["name"] != "vraxel" {
-		t.Errorf("name = %v, want vraxel", m["name"])
+	if m["name"] != "app" {
+		t.Errorf("name = %v, want app", m["name"])
 	}
 	// count must be numeric, not string.
 	if m["count"] != int64(3) {

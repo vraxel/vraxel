@@ -7,7 +7,7 @@ import "os"
 // DefaultRoute returns the default-route interface and its first
 // non-loopback IPv4.
 //
-// This address becomes hosts.reported_primary_ip. vraxel never dials it
+// This address becomes hosts.reported_primary_ip. The platform never dials it
 // (design §5.13) -- it is what the UI shows and what PaaS cluster members
 // use to reach each other inside the customer network, which is precisely
 // why "the address this host sends traffic from" is the right definition

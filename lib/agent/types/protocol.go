@@ -1,11 +1,10 @@
-// Package types is the vr-agent wire contract: the control-channel
+// Package types is the agent wire contract: the control-channel
 // frames and the /register request/response bodies, shared verbatim by
-// the server gateway (pkg/apis/agentgw) and the agent binary
-// (app/vr-agent).
+// the server gateway and the agent binary.
 //
 // It has zero dependencies, and that is the point. The agent runs on
 // customer machines; if it linked the gateway package it would compile
-// against vraxel's database layer, so every store change would rebuild the
+// against the platform's database layer, so every store change would rebuild the
 // agent.
 package types
 
@@ -116,7 +115,7 @@ type Frame struct {
 	// --- session.token ---
 	// Token is the short-lived session credential for every REST endpoint
 	// (design §4.1). Opaque to the agent: expiry and identity live inside,
-	// signed server-side, so validation works on any vraxel-server instance.
+	// signed server-side, so validation works on any server instance.
 	Token string `json:"token,omitempty"`
 
 	// --- probe.config (server->agent) / probe.report + heartbeat (agent->server) ---
@@ -133,7 +132,7 @@ type Frame struct {
 
 	// --- config.reload ---
 	// AllowedPorts narrows the data channel's port allowlist to the
-	// service ports vraxel knows it deployed on this host. Empty means any
+	// service ports the platform knows it deployed on this host. Empty means any
 	// loopback port; the loopback rule itself is not configurable.
 	AllowedPorts []int `json:"allowedPorts,omitempty"`
 
@@ -295,7 +294,7 @@ type RegisterRequest struct {
 	DiskGB   int64 `json:"diskGb"`
 	// DefaultRouteIP is the IPv4 on the default-route interface. It
 	// becomes hosts.reported_primary_ip: used for UI display and for
-	// PaaS cluster peer addresses, never for vraxel-initiated dials
+	// PaaS cluster peer addresses, never for platform-initiated dials
 	// (design §5.13).
 	DefaultRouteIP string `json:"defaultRouteIp"`
 	AgentVersion   string `json:"agentVersion,omitempty"`

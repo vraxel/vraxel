@@ -1,9 +1,9 @@
-// Package client is the agent-side half of the vr-agent protocol:
+// Package client is the agent-side half of the agent protocol:
 // join-token registration and the persistent control channel.
 //
-// It lives in lib/ (not app/vr-agent) so it depends on nothing but the
+// It lives in lib/ (not the agent binary) so it depends on nothing but the
 // wire contract in lib/agent/types -- the binary that runs on customer
-// machines must not link vraxel's business or database packages.
+// machines must not link the platform's business or database packages.
 package client
 
 import (

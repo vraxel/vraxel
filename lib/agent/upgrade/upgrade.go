@@ -68,7 +68,7 @@ type Manager struct {
 	RestartPoll time.Duration
 	// VersionOf reads the version out of the staged binary's -version
 	// output. It is a hook because the output format belongs to the host
-	// program: vr-agent prints its full build string while the server
+	// program: the agent prints its full build string while the server
 	// only ever names the short one. Defaults to the trimmed output.
 	VersionOf func(output string) string
 	Log       Logger
