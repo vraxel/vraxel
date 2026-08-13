@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { applyVerbGroupCascade } from "../permission-selector"
+import { applyVerbGroupCascade } from "../permission-rules"
 
 describe("applyVerbGroupCascade", () => {
   const credScope = [
