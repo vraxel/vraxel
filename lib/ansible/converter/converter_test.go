@@ -216,6 +216,57 @@ func TestBlockToTaskSpec(t *testing.T) {
 	}
 }
 
+func TestBlockToTaskSpec_LoopKinds(t *testing.T) {
+	moduleFinder := func(name string) bool { return name == "shell" }
+
+	cases := []struct {
+		name     string
+		set      func(*ansible.Block)
+		wantLoop any
+		wantKind ansible.LoopKind
+	}{
+		{"loop", func(b *ansible.Block) { b.Loop = []any{"a"} }, []any{"a"}, ansible.LoopKindLoop},
+		{"with_items", func(b *ansible.Block) { b.WithItems = "{{ .l }}" }, "{{ .l }}", ansible.LoopKindItems},
+		{"with_dict", func(b *ansible.Block) { b.WithDict = "{{ .m }}" }, "{{ .m }}", ansible.LoopKindDict},
+		{"none", func(*ansible.Block) {}, nil, ansible.LoopKindLoop},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			block := ansible.Block{}
+			block.UnknownField = map[string]any{"shell": "true"}
+			tc.set(&block)
+
+			spec := BlockToTaskSpec(block, []string{"h"}, "", moduleFinder)
+
+			if !reflect.DeepEqual(spec.Loop, tc.wantLoop) {
+				t.Errorf("Loop = %v, want %v", spec.Loop, tc.wantLoop)
+			}
+			if spec.LoopKind != tc.wantKind {
+				t.Errorf("LoopKind = %q, want %q", spec.LoopKind, tc.wantKind)
+			}
+		})
+	}
+}
+
+func TestBlockToTaskSpec_ChangedWhenAndEnvironment(t *testing.T) {
+	moduleFinder := func(name string) bool { return name == "shell" }
+
+	block := ansible.Block{}
+	block.UnknownField = map[string]any{"shell": "true"}
+	block.ChangedWhen = ansible.When{Data: []string{"{{ false }}"}}
+	block.Environment = map[string]any{"HTTP_PROXY": "http://p"}
+
+	spec := BlockToTaskSpec(block, []string{"h"}, "", moduleFinder)
+
+	if !reflect.DeepEqual(spec.ChangedWhen, []string{"{{ false }}"}) {
+		t.Errorf("ChangedWhen = %v", spec.ChangedWhen)
+	}
+	if !reflect.DeepEqual(spec.Environment, map[string]any{"HTTP_PROXY": "http://p"}) {
+		t.Errorf("Environment = %v", spec.Environment)
+	}
+}
+
 func TestBlockToTaskSpec_MapArgs(t *testing.T) {
 	block := ansible.Block{}
 	block.Name = "copy file"

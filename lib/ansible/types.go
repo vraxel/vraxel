@@ -27,15 +27,19 @@ type Base struct {
 	Vars Vars `yaml:"vars,omitempty"`
 
 	// flags and misc. settings
-	Environment    []map[string]string `yaml:"environment,omitempty"`
-	NoLog          bool                `yaml:"no_log,omitempty"`
-	RunOnce        bool                `yaml:"run_once,omitempty"`
-	IgnoreErrors   *bool               `yaml:"ignore_errors,omitempty"`
-	CheckMode      bool                `yaml:"check_mode,omitempty"`
-	Diff           bool                `yaml:"diff,omitempty"`
-	AnyErrorsFatal bool                `yaml:"any_errors_fatal,omitempty"`
-	Throttle       int                 `yaml:"throttle,omitempty"`
-	Timeout        int                 `yaml:"timeout,omitempty"`
+	//
+	// Environment accepts the shapes Ansible allows: a mapping, a list of
+	// mappings, or a template string resolving to either. It stays untyped
+	// because the values are rendered per host at execution time.
+	Environment    any   `yaml:"environment,omitempty"`
+	NoLog          bool  `yaml:"no_log,omitempty"`
+	RunOnce        bool  `yaml:"run_once,omitempty"`
+	IgnoreErrors   *bool `yaml:"ignore_errors,omitempty"`
+	CheckMode      bool  `yaml:"check_mode,omitempty"`
+	Diff           bool  `yaml:"diff,omitempty"`
+	AnyErrorsFatal bool  `yaml:"any_errors_fatal,omitempty"`
+	Throttle       int   `yaml:"throttle,omitempty"`
+	Timeout        int   `yaml:"timeout,omitempty"`
 
 	// Debugger invokes a debugger on tasks.
 	Debugger string `yaml:"debugger,omitempty"`
@@ -267,6 +271,8 @@ type Task struct {
 	Delay       int         `yaml:"delay,omitempty"`
 	FailedWhen  When        `yaml:"failed_when,omitempty"`
 	Loop        any         `yaml:"loop,omitempty"`
+	WithItems   any         `yaml:"with_items,omitempty"`
+	WithDict    any         `yaml:"with_dict,omitempty"`
 	LoopControl LoopControl `yaml:"loop_control,omitempty"`
 	Poll        int         `yaml:"poll,omitempty"`
 	Register    string      `yaml:"register,omitempty"`
@@ -595,6 +601,21 @@ type ModuleRef struct {
 	Args any    `json:"args,omitempty" yaml:"args,omitempty"`
 }
 
+// LoopKind records which directive produced TaskSpec.Loop. The directives
+// share one Loop field but not one item semantics, so the executor needs to
+// know which one was written: with_items flattens one level, with_dict turns
+// a mapping into key/value items, and plain loop iterates as-is.
+type LoopKind string
+
+const (
+	// LoopKindLoop is the plain "loop:" directive (iterate the list as-is).
+	LoopKindLoop LoopKind = ""
+	// LoopKindItems is "with_items:" (iterate the list flattened one level).
+	LoopKindItems LoopKind = "items"
+	// LoopKindDict is "with_dict:" (iterate a mapping as {key, value} items).
+	LoopKindDict LoopKind = "dict"
+)
+
 // TaskSpec is the internal specification of a task to be executed.
 type TaskSpec struct {
 	Name         string      `json:"name,omitempty" yaml:"name,omitempty"`
@@ -603,7 +624,10 @@ type TaskSpec struct {
 	When         []string    `json:"when,omitempty" yaml:"when,omitempty"`
 	FailedWhen   []string    `json:"failed_when,omitempty" yaml:"failed_when,omitempty"`
 	Loop         any         `json:"loop,omitempty" yaml:"loop,omitempty"`
+	LoopKind     LoopKind    `json:"loop_kind,omitempty" yaml:"loop_kind,omitempty"`
 	LoopControl  LoopControl `json:"loop_control,omitempty" yaml:"loop_control,omitempty"`
+	ChangedWhen  []string    `json:"changed_when,omitempty" yaml:"changed_when,omitempty"`
+	Environment  any         `json:"environment,omitempty" yaml:"environment,omitempty"`
 	Register     string      `json:"register,omitempty" yaml:"register,omitempty"`
 	RegisterType string      `json:"register_type,omitempty" yaml:"register_type,omitempty"`
 	Retries      int         `json:"retries,omitempty" yaml:"retries,omitempty"`

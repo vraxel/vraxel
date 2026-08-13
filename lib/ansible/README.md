@@ -232,7 +232,7 @@ inv := ansible.Inventory{
 
 > **推荐非 root 用户 + become**：使用普通用户 SSH 登录，需要 root 权限的操作通过 `become: true` 自动 sudo。要求目标主机 sudoers 配置允许该用户执行 sudo（可带密码或 NOPASSWD）。
 
-变量优先级（从低到高）：`Inventory.Vars` → 组变量 → `gather_facts` → 运行时变量 → 主机变量
+变量优先级（从低到高，与 Ansible 一致）：角色 `defaults` → `Inventory.Vars` → 组变量 → 主机变量 → `gather_facts` 采集的事实 → 运行时变量（`set_fact` / `include_vars` / block 与 role 的 `vars`）
 
 ## 内置模块
 
@@ -338,6 +338,70 @@ inv := ansible.Inventory{
     - /opt/app
     - /opt/logs
     - /opt/data
+```
+
+循环值可以是模板，按每台主机各自的变量求值：
+
+```yaml
+- name: 用变量里的列表循环
+  shell: "mkdir -p {{ .item }}"
+  loop: "{{ .app_dirs }}"          # 解析为列表本身，而非它渲染成的字符串
+```
+
+`with_items` 会额外展开一层嵌套列表，`with_dict` 把映射变成 `{key, value}` 条目（按 key 排序，保证可复现）：
+
+```yaml
+- name: with_items 展开一层
+  shell: "install {{ .item }}"
+  with_items: "{{ .pkg_groups }}"   # [[a, b], [c]] -> a, b, c
+
+- name: with_dict 遍历映射
+  shell: "set {{ .item.key }}={{ .item.value }}"
+  with_dict: "{{ .settings }}"
+```
+
+`loop_control` 可改写条目变量名与序号变量名：
+
+```yaml
+- name: 重命名循环变量
+  shell: "systemctl restart {{ .svc }}"
+  loop: "{{ .services }}"
+  loop_control:
+    loop_var: svc
+    index_var: idx
+```
+
+空列表（或解析为空的模板）不执行任何一次，任务记为 `skipped`。
+
+### 变更状态（changed_when）
+
+引擎不猜测模块是否产生变更：只有写了 `changed_when` 的任务才会被标记为 `changed`，其结果同时进入 `register` 变量的 `changed` 字段。
+
+```yaml
+- name: 只有真的改了才算变更
+  shell: "apply-config"
+  changed_when: '{{ not (contains "no change" .stdout) }}'
+  register: apply_out
+
+- name: 永不算变更
+  shell: "check-config"
+  changed_when: false
+```
+
+### 环境变量（environment）
+
+`environment` 支持映射、映射列表，或解析为二者之一的模板；值本身也会渲染。仅 `command` / `shell` 应用它——它们才是执行用户命令的模块。
+
+```yaml
+- name: 走代理下载
+  shell: "curl -O https://example.com/pkg.tar.gz"
+  environment:
+    http_proxy: "{{ .proxy_url }}"
+    https_proxy: "{{ .proxy_url }}"
+
+- name: 整个映射来自变量
+  shell: "make build"
+  environment: "{{ .build_env }}"
 ```
 
 ### 重试

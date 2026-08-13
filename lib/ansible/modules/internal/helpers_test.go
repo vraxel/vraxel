@@ -21,6 +21,21 @@ func TestShellQuote(t *testing.T) {
 	}
 }
 
+func TestEnvPrefix(t *testing.T) {
+	if got := EnvPrefix(nil); got != "" {
+		t.Errorf("EnvPrefix(nil) = %q, want empty", got)
+	}
+	// Sorted keys keep the emitted command byte-identical across runs.
+	got := EnvPrefix(map[string]string{"B": "2", "A": "a b"})
+	if got != "export A='a b'; export B='2'; " {
+		t.Errorf("EnvPrefix = %q", got)
+	}
+	// Values are shell-escaped, so a quote cannot break out of the export.
+	if got := EnvPrefix(map[string]string{"X": "a'; rm -rf /"}); !strings.Contains(got, `'a'\''; rm -rf /'`) {
+		t.Errorf("EnvPrefix did not escape the value: %q", got)
+	}
+}
+
 // captureConnector records the last shell command and put destination.
 type captureConnector struct {
 	lastCmd string

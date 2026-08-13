@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -61,10 +62,9 @@ func (e *TaskExecutor) Exec(ctx context.Context, task ansible.TaskSpec) []ansibl
 		return results
 	}
 
-	// 2. Resolve loop items
-	items := e.resolveLoop(task)
-
-	// 3. Execute on each host in parallel
+	// 2. Execute on each host in parallel. Loop items are resolved inside
+	// each host's goroutine because a templated loop ("{{ .list }}") can
+	// name a host-specific variable.
 	var mu sync.Mutex
 	results := make([]ansible.TaskResult, 0, len(task.Hosts))
 	var wg sync.WaitGroup
@@ -73,7 +73,7 @@ func (e *TaskExecutor) Exec(ctx context.Context, task ansible.TaskSpec) []ansibl
 		wg.Add(1)
 		go func(host string) {
 			defer wg.Done()
-			result := e.execTaskHost(ctx, task, host, moduleFn, items)
+			result := e.execTaskHost(ctx, task, host, moduleFn)
 			mu.Lock()
 			results = append(results, result)
 			mu.Unlock()
@@ -81,7 +81,7 @@ func (e *TaskExecutor) Exec(ctx context.Context, task ansible.TaskSpec) []ansibl
 	}
 	wg.Wait()
 
-	// 4. Register results if task.Register is set
+	// 3. Register results if task.Register is set
 	if task.Register != "" {
 		e.registerResults(task, results)
 	}
@@ -90,14 +90,20 @@ func (e *TaskExecutor) Exec(ctx context.Context, task ansible.TaskSpec) []ansibl
 }
 
 // execTaskHost executes task on a single host with loop/retry support.
-func (e *TaskExecutor) execTaskHost(ctx context.Context, task ansible.TaskSpec, host string, moduleFn modules.ModuleExecFunc, items []any) ansible.TaskResult {
+func (e *TaskExecutor) execTaskHost(ctx context.Context, task ansible.TaskSpec, host string, moduleFn modules.ModuleExecFunc) ansible.TaskResult {
 	result := ansible.TaskResult{Host: host, Status: ansible.TaskStatusOK}
 
+	items := e.resolveLoop(task, e.hostVars(host))
+
 	allSkipped := true
-	for _, item := range items {
-		loopResult := e.executeWithRetry(ctx, task, host, moduleFn, item)
+	for idx, item := range items {
+		loopResult := e.executeWithRetry(ctx, task, host, moduleFn, item, idx)
 
 		result.Output = mergeOutput(result.Output, loopResult)
+
+		if loopResult.Result.Changed {
+			result.Changed = true
+		}
 
 		if loopResult.Result.Status != ansible.TaskStatusSkipped {
 			allSkipped = false
@@ -119,15 +125,28 @@ func (e *TaskExecutor) execTaskHost(ctx context.Context, task ansible.TaskSpec, 
 		}
 	}
 
-	if allSkipped {
+	switch {
+	case allSkipped:
+		// An empty loop runs no iterations, which is a skip, not a success.
 		result.Status = ansible.TaskStatusSkipped
+	case result.Changed:
+		result.Status = ansible.TaskStatusChanged
 	}
 
 	return result
 }
 
+// hostVars returns the merged variable map for host, or an empty map when the
+// variable store holds something else.
+func (e *TaskExecutor) hostVars(host string) map[string]any {
+	if vars, ok := e.variable.Get(variable.GetAllVariable(host)).(map[string]any); ok {
+		return vars
+	}
+	return make(map[string]any)
+}
+
 // executeWithRetry executes module with retry logic.
-func (e *TaskExecutor) executeWithRetry(ctx context.Context, task ansible.TaskSpec, host string, moduleFn modules.ModuleExecFunc, item any) ansible.LoopResult {
+func (e *TaskExecutor) executeWithRetry(ctx context.Context, task ansible.TaskSpec, host string, moduleFn modules.ModuleExecFunc, item any, idx int) ansible.LoopResult {
 	retries := task.Retries
 	if retries == 0 {
 		retries = 1 // at least one attempt
@@ -146,7 +165,7 @@ func (e *TaskExecutor) executeWithRetry(ctx context.Context, task ansible.TaskSp
 			}
 		}
 
-		loopResult = e.executeModule(ctx, task, host, moduleFn, item)
+		loopResult = e.executeModule(ctx, task, host, moduleFn, item, idx)
 
 		if e.executeWithRetryShouldStop(host, attempt, retries, task, &loopResult) {
 			break
@@ -183,7 +202,7 @@ func (e *TaskExecutor) executeWithRetryShouldStop(host string, attempt, retries 
 }
 
 // executeModule executes the module once, handling when/failed_when.
-func (e *TaskExecutor) executeModule(ctx context.Context, task ansible.TaskSpec, host string, moduleFn modules.ModuleExecFunc, item any) ansible.LoopResult {
+func (e *TaskExecutor) executeModule(ctx context.Context, task ansible.TaskSpec, host string, moduleFn modules.ModuleExecFunc, item any, idx int) ansible.LoopResult {
 	result := ansible.LoopResult{
 		Item: item,
 		Result: ansible.TaskResult{
@@ -201,14 +220,24 @@ func (e *TaskExecutor) executeModule(ctx context.Context, task ansible.TaskSpec,
 		return result
 	}
 
-	// Set loop item variable
+	// Set loop item variable (honouring loop_control's loop_var/index_var)
 	if item != nil {
-		vars["item"] = item
+		loopVars := map[string]any{loopVarName(task): item}
+		if iv := task.LoopControl.IndexVar; iv != "" {
+			loopVars[iv] = idx
+		}
+		for k, v := range loopVars {
+			vars[k] = v
+		}
 		// Also merge into runtime vars temporarily
-		e.variable.Merge(variable.MergeHostRuntimeVars(host, map[string]any{"item": item}))
+		e.variable.Merge(variable.MergeHostRuntimeVars(host, loopVars))
 		defer func() {
-			// Clean up loop item variable after execution
-			e.variable.Merge(variable.MergeHostRuntimeVars(host, map[string]any{"item": nil}))
+			// Clean up loop item variables after execution
+			cleared := make(map[string]any, len(loopVars))
+			for k := range loopVars {
+				cleared[k] = nil
+			}
+			e.variable.Merge(variable.MergeHostRuntimeVars(host, cleared))
 		}()
 	}
 
@@ -233,13 +262,14 @@ func (e *TaskExecutor) executeModule(ctx context.Context, task ansible.TaskSpec,
 	// Execute module
 	conn := e.connectors.Get(host)
 	stdout, stderr, err := moduleFn(ctx, modules.ExecOptions{
-		Args:      args,
-		Host:      host,
-		Variable:  e.variable,
-		Connector: conn,
-		Source:    e.source,
-		LogOutput: e.logOutput,
-		Become:    task.Become,
+		Args:        args,
+		Host:        host,
+		Variable:    e.variable,
+		Connector:   conn,
+		Source:      e.source,
+		LogOutput:   e.logOutput,
+		Become:      task.Become,
+		Environment: resolveEnvironment(task.Environment, vars),
 	})
 
 	rc := 0
@@ -257,8 +287,32 @@ func (e *TaskExecutor) executeModule(ctx context.Context, task ansible.TaskSpec,
 	}
 
 	e.executeModuleApplyFailure(host, task, err, &result)
+	e.executeModuleApplyChanged(host, task, &result)
 
 	return result
+}
+
+// executeModuleApplyChanged evaluates changed_when and records the outcome on
+// the result. Without changed_when the engine has no per-module change
+// reporting, so Changed stays false rather than being guessed at.
+func (e *TaskExecutor) executeModuleApplyChanged(host string, task ansible.TaskSpec, result *ansible.LoopResult) {
+	if len(task.ChangedWhen) == 0 ||
+		result.Result.Status == ansible.TaskStatusFailed ||
+		result.Result.Status == ansible.TaskStatusSkipped {
+		return
+	}
+
+	vars := e.getVarsWithResult(host, *result)
+	ok, err := template.ParseBool(vars, task.ChangedWhen...)
+	if err != nil {
+		result.Result.Error = fmt.Sprintf("evaluate changed_when: %v", err)
+		result.Result.Status = ansible.TaskStatusFailed
+		return
+	}
+	result.Result.Changed = ok
+	if ok {
+		result.Result.Status = ansible.TaskStatusChanged
+	}
 }
 
 // executeModuleApplyFailure applies the pass/fail decision after a module
@@ -294,24 +348,169 @@ func (e *TaskExecutor) executeModuleApplyFailure(host string, task ansible.TaskS
 	}
 }
 
-// resolveLoop resolves loop items from task.
-func (e *TaskExecutor) resolveLoop(task ansible.TaskSpec) []any {
+// resolveLoop resolves the loop items for one host. The loop value is rendered
+// against that host's variables first, so "loop: {{ .list }}" iterates the
+// list the variable holds instead of the string it renders to.
+func (e *TaskExecutor) resolveLoop(task ansible.TaskSpec, vars map[string]any) []any {
 	if task.Loop == nil {
 		return []any{nil} // single execution, no loop
 	}
 
-	switch v := task.Loop.(type) {
+	val := resolveTemplatedValue(task.Loop, vars)
+
+	if task.LoopKind == ansible.LoopKindDict {
+		return dictItems(val)
+	}
+	items := toItemSlice(val)
+	if task.LoopKind == ansible.LoopKindItems {
+		items = flattenOnce(items)
+	}
+	return items
+}
+
+// toItemSlice normalises a resolved loop value into items. A nil value (an
+// unset or empty variable) yields no items, which surfaces as a skipped task
+// rather than one bogus run against a nil item.
+func toItemSlice(v any) []any {
+	switch x := v.(type) {
+	case nil:
+		return nil
 	case []any:
-		return v
+		return x
 	case []string:
-		items := make([]any, len(v))
-		for i, s := range v {
+		items := make([]any, len(x))
+		for i, s := range x {
 			items[i] = s
 		}
 		return items
 	default:
-		// If it's some other type, wrap it as a single-item loop
-		return []any{v}
+		return []any{x}
+	}
+}
+
+// flattenOnce implements with_items' one-level flattening.
+func flattenOnce(items []any) []any {
+	out := make([]any, 0, len(items))
+	for _, it := range items {
+		if nested, ok := it.([]any); ok {
+			out = append(out, nested...)
+			continue
+		}
+		out = append(out, it)
+	}
+	return out
+}
+
+// dictItems implements with_dict: a mapping becomes {key, value} items,
+// ordered by key so runs are reproducible.
+func dictItems(v any) []any {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return nil
+	}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	out := make([]any, 0, len(keys))
+	for _, k := range keys {
+		out = append(out, map[string]any{"key": k, "value": m[k]})
+	}
+	return out
+}
+
+// loopVarName returns the variable name a loop item is exposed under.
+func loopVarName(task ansible.TaskSpec) string {
+	if task.LoopControl.LoopVar != "" {
+		return task.LoopControl.LoopVar
+	}
+	return "item"
+}
+
+// resolveTemplatedValue renders raw against vars, preserving the value's real
+// type. A string that is exactly one "{{ ... }}" expression is evaluated
+// through toJson so lists and maps survive: rendering them directly would
+// stringify a list as "[a b c]", which cannot be turned back into items.
+// Anything else renders as an ordinary string.
+func resolveTemplatedValue(raw any, vars map[string]any) any {
+	s, ok := raw.(string)
+	if !ok {
+		return raw
+	}
+
+	if inner, single := singleTmplExpr(s); single {
+		out, err := template.ParseString(vars, "{{ toJson ("+inner+") }}")
+		if err == nil {
+			decoder := json.NewDecoder(strings.NewReader(out))
+			decoder.UseNumber()
+			var v any
+			if decoder.Decode(&v) == nil {
+				return normalizeJSONNumbers(v)
+			}
+		}
+		return s
+	}
+
+	if rendered, err := template.ParseString(vars, s); err == nil {
+		return rendered
+	}
+	return s
+}
+
+// singleTmplExpr reports whether s is exactly one "{{ ... }}" expression and
+// returns its inner pipeline, with any whitespace-trim markers removed.
+func singleTmplExpr(s string) (string, bool) {
+	t := strings.TrimSpace(s)
+	if !strings.HasPrefix(t, "{{") || !strings.HasSuffix(t, "}}") {
+		return "", false
+	}
+	inner := t[2 : len(t)-2]
+	if strings.Contains(inner, "{{") || strings.Contains(inner, "}}") {
+		return "", false
+	}
+	// "{{- x -}}" trim markers are part of the delimiter, not the pipeline.
+	inner = strings.TrimSuffix(strings.TrimPrefix(inner, "- "), " -")
+	return inner, true
+}
+
+// resolveEnvironment renders a task's environment into concrete key/value
+// pairs. It accepts a mapping, a list of mappings (merged in order), or a
+// template resolving to either.
+func resolveEnvironment(raw any, vars map[string]any) map[string]string {
+	if raw == nil {
+		return nil
+	}
+
+	env := make(map[string]string)
+	switch val := resolveTemplatedValue(raw, vars).(type) {
+	case map[string]any:
+		mergeEnv(env, val, vars)
+	case []any:
+		for _, entry := range val {
+			if m, ok := entry.(map[string]any); ok {
+				mergeEnv(env, m, vars)
+			}
+		}
+	}
+
+	if len(env) == 0 {
+		return nil
+	}
+	return env
+}
+
+// mergeEnv renders each value of src and merges it into dst.
+func mergeEnv(dst map[string]string, src map[string]any, vars map[string]any) {
+	for k, v := range src {
+		if s, ok := v.(string); ok {
+			if rendered, err := template.ParseString(vars, s); err == nil {
+				dst[k] = rendered
+				continue
+			}
+		}
+		dst[k] = fmt.Sprintf("%v", v)
 	}
 }
 
@@ -361,6 +560,7 @@ func (e *TaskExecutor) registerResults(task ansible.TaskSpec, results []ansible.
 		regVar["rc"] = extractInt(result.Output, "rc")
 		regVar["failed"] = result.Error != "" || extractString(result.Output, "_ignored_error") != ""
 		regVar["skipped"] = result.Status == ansible.TaskStatusSkipped
+		regVar["changed"] = result.Changed
 
 		e.variable.Merge(variable.MergeHostRuntimeVars(result.Host, map[string]any{task.Register: regVar}))
 	}
