@@ -20,6 +20,16 @@ type state struct {
 	AgentID    string `json:"agentId"`
 	HostID     int64  `json:"hostId"`
 	AgentToken string `json:"agentToken"`
+	// MachineID is the identity this credential was issued against. It is
+	// recorded so a later start can notice the file has moved to a
+	// different machine -- which is what a disk clone or a golden image
+	// built from a registered host produces. Without the check the clone
+	// silently connects with the original's credential and both machines
+	// then fight over one host row.
+	//
+	// Empty means the state predates this field; the next start adopts
+	// the current machine id rather than refusing to run.
+	MachineID string `json:"machineId,omitempty"`
 }
 
 // stateFileMode is 0600: the file holds a durable credential that opens

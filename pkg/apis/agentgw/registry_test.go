@@ -56,6 +56,10 @@ func (f *fakeAgentStore) GetByHostID(context.Context, int64) (*gwstore.AgentRow,
 	return nil, nil
 }
 
+func (f *fakeAgentStore) CheckIdentity(context.Context, int64, string, time.Duration) (bool, error) {
+	return false, nil
+}
+
 func (f *fakeAgentStore) MarkOnline(_ context.Context, hostID int64, instanceID, version string, skew int64) (time.Time, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -258,5 +262,35 @@ func TestRegistryReconnectSupersedesWithoutEvictingTheLiveSession(t *testing.T) 
 	}
 	if _, offline, _ := store.snapshot(); len(offline) != 0 {
 		t.Fatalf("MarkOffline called %+v for a reconnect; the agent never went offline", offline)
+	}
+}
+
+func TestRegistryEvictDropsTheIncumbentChannel(t *testing.T) {
+	// The regression this guards: refusing the connection that exposed a
+	// contended identity is not enough on its own. The duplicate already
+	// holding the channel never reconnects, so it is never re-checked --
+	// and because a clone boots after the machine it was copied from, the
+	// incumbent is usually the copy. Without this the clone keeps the host
+	// and the real machine stays locked out.
+	store := &fakeAgentStore{}
+	r := NewRegistry(store, "inst-a")
+
+	sess := newTestSession(t, "agent-1", 100)
+	r.Add(context.Background(), sess, 0)
+
+	if !r.Evict(100, "contended") {
+		t.Fatal("Evict reported no session for a host that has one")
+	}
+	select {
+	case <-sess.ctx.Done():
+	case <-time.After(2 * time.Second):
+		t.Fatal("Evict left the session context live; its read loop would never unwind")
+	}
+
+	// Idempotent: the read loop's Remove has not run yet, and a second
+	// refused connection must not panic on the way through.
+	r.Remove(context.Background(), sess)
+	if r.Evict(100, "contended") {
+		t.Fatal("Evict reported a session after the host's channel was already gone")
 	}
 }

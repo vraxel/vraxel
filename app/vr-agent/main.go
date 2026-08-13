@@ -117,6 +117,9 @@ func ensureRegistered(ctx context.Context, httpClient *http.Client, statePath, s
 		return nil, err
 	}
 	if st != nil && !force {
+		if err := checkStateMachine(statePath, st, logger); err != nil {
+			return nil, err
+		}
 		// -server on a registered agent overrides the stored URL, so an
 		// operator can move a deployment behind a new address without
 		// re-onboarding every host.
@@ -167,12 +170,50 @@ func ensureRegistered(ctx context.Context, httpClient *http.Client, statePath, s
 		AgentID:    resp.AgentID,
 		HostID:     resp.HostID,
 		AgentToken: resp.AgentToken,
+		MachineID:  facts.MachineID,
 	}
 	if err := saveState(statePath, st, logger); err != nil {
 		return nil, err
 	}
 	logger.Infof("vr-agent: registered as host %d (agent %s)", resp.HostID, resp.AgentID)
 	return st, nil
+}
+
+// checkStateMachine refuses to reuse a credential that was issued to a
+// different machine.
+//
+// The case this exists for: an operator builds a golden image from a host
+// that is already onboarded, or full-clones its disk. /etc/vr-agent/agent.json
+// travels with the copy, the install script sees a state file and skips
+// registration, and every clone comes up holding the original's agent
+// token. They then supersede each other's control channel forever and
+// jobs land on whichever one happens to hold it.
+//
+// Refusing to start is the right failure: an agent that cannot prove
+// which machine it is has nothing safe to do. The message names the fix
+// because the obvious one (delete the state file) is wrong on its own --
+// a raw clone carries the machine id too, so re-registering would just
+// rebind the same host row.
+func checkStateMachine(statePath string, st *state, logger stdLogger) error {
+	current := hostinfo.MachineID()
+	if current == "" {
+		return fmt.Errorf("cannot determine a stable machine id (no /etc/machine-id and no hostname)")
+	}
+	if st.MachineID == "" {
+		// Registered by an agent that predates this field. Adopt the
+		// current identity so the check is live from the next start on.
+		st.MachineID = current
+		return saveState(statePath, st, logger)
+	}
+	if st.MachineID != current {
+		return fmt.Errorf(
+			"state file %s was issued to machine %q but this machine is %q. "+
+				"This host looks cloned from an already-onboarded one. "+
+				"Reset the machine identity first (`rm -f /etc/machine-id && systemd-machine-id-setup`, then reboot), "+
+				"then delete %s and re-onboard with a fresh join token",
+			statePath, st.MachineID, current, statePath)
+	}
+	return nil
 }
 
 // stdLogger adapts the standard library logger onto client.Logger.

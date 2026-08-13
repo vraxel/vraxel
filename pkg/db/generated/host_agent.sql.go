@@ -12,9 +12,56 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const checkHostAgentIdentity = `-- name: CheckHostAgentIdentity :one
+UPDATE host_agents
+SET prev_boot_nonce = CASE WHEN $1::text <> boot_nonce
+                           THEN boot_nonce ELSE prev_boot_nonce END,
+    boot_nonce      = $1,
+    conflict_at     = CASE WHEN $1::text <> ''
+                            AND $1::text = prev_boot_nonce
+                           THEN now() ELSE conflict_at END,
+    updated_at      = now()
+WHERE host_id = $2
+RETURNING conflict_at IS NOT NULL
+      AND conflict_at > now() - make_interval(secs => $3::float8) AS contended
+`
+
+type CheckHostAgentIdentityParams struct {
+	BootNonce    string  `json:"boot_nonce"`
+	HostID       int64   `json:"host_id"`
+	CooldownSecs float64 `json:"cooldown_secs"`
+}
+
+// Rolls this connection's boot nonce into the row's two-slot history and
+// reports whether the agent id is currently contended.
+//
+// Runs BEFORE the session is registered, because a contended id must not
+// reach MarkHostAgentOnline (which would mark the host online under a
+// channel we are about to close) or the run reconciler (which fails every
+// in-flight job the hello did not list).
+//
+// Every expression on the right reads the OLD row, which is what makes the
+// three rules fit in one statement:
+//   - prev only moves when the nonce actually changed, so an agent
+//     reconnecting with the same value never pollutes its own history;
+//   - a conflict is "the value we just retired is back", which only two
+//     live processes can produce -- a crash loop emits nothing but fresh
+//     values and can never match;
+//   - an empty nonce (an agent older than this field) is inert: it neither
+//     shifts the history nor raises a conflict.
+//
+// RETURNING reads the NEW row, so the connection that trips the conflict is
+// itself refused rather than being the one admitted.
+func (q *Queries) CheckHostAgentIdentity(ctx context.Context, arg CheckHostAgentIdentityParams) (*bool, error) {
+	row := q.db.QueryRow(ctx, checkHostAgentIdentity, arg.BootNonce, arg.HostID, arg.CooldownSecs)
+	var contended *bool
+	err := row.Scan(&contended)
+	return contended, err
+}
+
 const getHostAgentByAgentID = `-- name: GetHostAgentByAgentID :one
 
-SELECT host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at FROM host_agents WHERE agent_id = $1
+SELECT host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at, boot_nonce, prev_boot_nonce, conflict_at FROM host_agents WHERE agent_id = $1
 `
 
 // host_id = EXCLUDED.host_id (last writer wins) matters only in a race:
@@ -45,12 +92,15 @@ func (q *Queries) GetHostAgentByAgentID(ctx context.Context, agentID pgtype.UUID
 		&i.ClockSkewMs,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BootNonce,
+		&i.PrevBootNonce,
+		&i.ConflictAt,
 	)
 	return i, err
 }
 
 const getHostAgentByHostID = `-- name: GetHostAgentByHostID :one
-SELECT host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at FROM host_agents WHERE host_id = $1
+SELECT host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at, boot_nonce, prev_boot_nonce, conflict_at FROM host_agents WHERE host_id = $1
 `
 
 func (q *Queries) GetHostAgentByHostID(ctx context.Context, hostID int64) (HostAgent, error) {
@@ -68,6 +118,9 @@ func (q *Queries) GetHostAgentByHostID(ctx context.Context, hostID int64) (HostA
 		&i.ClockSkewMs,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BootNonce,
+		&i.PrevBootNonce,
+		&i.ConflictAt,
 	)
 	return i, err
 }
@@ -217,7 +270,7 @@ SET host_id       = EXCLUDED.host_id,
     version       = EXCLUDED.version,
     token_version = host_agents.token_version + 1,
     updated_at    = now()
-RETURNING host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at
+RETURNING host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at, boot_nonce, prev_boot_nonce, conflict_at
 `
 
 type UpsertHostAgentParams struct {
@@ -248,6 +301,9 @@ func (q *Queries) UpsertHostAgent(ctx context.Context, arg UpsertHostAgentParams
 		&i.ClockSkewMs,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BootNonce,
+		&i.PrevBootNonce,
+		&i.ConflictAt,
 	)
 	return i, err
 }

@@ -35,6 +35,38 @@ SELECT * FROM host_agents WHERE agent_id = @agent_id;
 -- name: GetHostAgentByHostID :one
 SELECT * FROM host_agents WHERE host_id = @host_id;
 
+-- name: CheckHostAgentIdentity :one
+-- Rolls this connection's boot nonce into the row's two-slot history and
+-- reports whether the agent id is currently contended.
+--
+-- Runs BEFORE the session is registered, because a contended id must not
+-- reach MarkHostAgentOnline (which would mark the host online under a
+-- channel we are about to close) or the run reconciler (which fails every
+-- in-flight job the hello did not list).
+--
+-- Every expression on the right reads the OLD row, which is what makes the
+-- three rules fit in one statement:
+--   * prev only moves when the nonce actually changed, so an agent
+--     reconnecting with the same value never pollutes its own history;
+--   * a conflict is "the value we just retired is back", which only two
+--     live processes can produce -- a crash loop emits nothing but fresh
+--     values and can never match;
+--   * an empty nonce (an agent older than this field) is inert: it neither
+--     shifts the history nor raises a conflict.
+-- RETURNING reads the NEW row, so the connection that trips the conflict is
+-- itself refused rather than being the one admitted.
+UPDATE host_agents
+SET prev_boot_nonce = CASE WHEN @boot_nonce::text <> boot_nonce
+                           THEN boot_nonce ELSE prev_boot_nonce END,
+    boot_nonce      = @boot_nonce,
+    conflict_at     = CASE WHEN @boot_nonce::text <> ''
+                            AND @boot_nonce::text = prev_boot_nonce
+                           THEN now() ELSE conflict_at END,
+    updated_at      = now()
+WHERE host_id = @host_id
+RETURNING conflict_at IS NOT NULL
+      AND conflict_at > now() - make_interval(secs => @cooldown_secs::float8) AS contended;
+
 -- name: MarkHostAgentOnline :one
 -- Called when a control channel is accepted. instance_id records which
 -- the server instance holds the socket (cross-instance addressing, §6.2).

@@ -68,17 +68,20 @@ type Host struct {
 }
 
 type HostAgent struct {
-	HostID       int64       `json:"host_id"`
-	AgentID      pgtype.UUID `json:"agent_id"`
-	TokenVersion int32       `json:"token_version"`
-	Version      string      `json:"version"`
-	InstanceID   string      `json:"instance_id"`
-	Status       string      `json:"status"`
-	ConnectedAt  *time.Time  `json:"connected_at"`
-	LastSeenAt   *time.Time  `json:"last_seen_at"`
-	ClockSkewMs  int64       `json:"clock_skew_ms"`
-	CreatedAt    time.Time   `json:"created_at"`
-	UpdatedAt    time.Time   `json:"updated_at"`
+	HostID        int64       `json:"host_id"`
+	AgentID       pgtype.UUID `json:"agent_id"`
+	TokenVersion  int32       `json:"token_version"`
+	Version       string      `json:"version"`
+	InstanceID    string      `json:"instance_id"`
+	Status        string      `json:"status"`
+	ConnectedAt   *time.Time  `json:"connected_at"`
+	LastSeenAt    *time.Time  `json:"last_seen_at"`
+	ClockSkewMs   int64       `json:"clock_skew_ms"`
+	CreatedAt     time.Time   `json:"created_at"`
+	UpdatedAt     time.Time   `json:"updated_at"`
+	BootNonce     string      `json:"boot_nonce"`
+	PrevBootNonce string      `json:"prev_boot_nonce"`
+	ConflictAt    *time.Time  `json:"conflict_at"`
 }
 
 type HostAgentJoinToken struct {
