@@ -11,12 +11,15 @@ import type { Host } from "@/modules/compute/api/types"
 interface Props {
   /** Null while the token is still being minted. */
   command: string | null
+  /** Scope-aware base path for the host list, e.g.
+   *  /compute/workspaces/3/hosts. The joined host's link hangs off it. */
+  hostsPath: string
   reservedName?: string
   /** Set once an agent has redeemed the token. */
   registeredHost: Host | null
 }
 
-export function StepInstall({ command, reservedName, registeredHost }: Props) {
+export function StepInstall({ command, hostsPath, reservedName, registeredHost }: Props) {
   const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
   // Cleared on unmount: without it the "copied" tick fires setState on a
@@ -99,7 +102,7 @@ export function StepInstall({ command, reservedName, registeredHost }: Props) {
               {t("compute.onboard.install.reportedHint")}
             </p>
             <Button asChild size="sm" variant="outline">
-              <Link to={`/compute/hosts/${registeredHost.metadata.id}`}>
+              <Link to={`${hostsPath}/${registeredHost.metadata.id}`}>
                 {t("compute.onboard.install.viewHost")}
               </Link>
             </Button>

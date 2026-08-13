@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { Button } from "@/shared/ui/button"
 import { useTranslation } from "@/i18n"
 import { useWorkspaceStore } from "@/core/scope/workspace-store"
+import { buildScopedPath } from "@/core/registry/nav-config"
 import { WizardStepper, type WizardStep } from "@/modules/compute/components/wizard-stepper"
 import { createJoinToken, pollForRegisteredHost } from "@/modules/compute/api/join-tokens"
 import type { Host } from "@/modules/compute/api/types"
@@ -62,7 +63,9 @@ export default function HostOnboardPage() {
       : t("compute.onboard.scope.platform")
 
   const isLastStep = stepIndex === steps.length - 1
-  const hostsPath = "/compute/hosts"
+  // Back / cancel / done return to the list in the scope the wizard was
+  // opened from, not to the platform one.
+  const hostsPath = buildScopedPath("hosts", workspaceId ?? null, namespaceId ?? null)
 
   // DEMO: stands in for the host list refetch that will reveal the row
   // once an agent redeems the token.
@@ -90,7 +93,7 @@ export default function HostOnboardPage() {
       setStepIndex(1)
       try {
         const token = await createJoinToken(
-          {},
+          { ws: workspaceId, ns: namespaceId },
           {
             hostName: namingMode === "reserved" ? hostName.trim() : undefined,
             name: description.trim() || undefined,
@@ -150,6 +153,7 @@ export default function HostOnboardPage() {
             {stepIndex === 1 && (
               <StepInstall
                 command={command}
+                hostsPath={hostsPath}
                 reservedName={namingMode === "reserved" ? hostName.trim() : undefined}
                 registeredHost={registeredHost}
               />

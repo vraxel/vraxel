@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Link } from "react-router"
+import { Link, useParams } from "react-router"
 import { KeyRound, Plus } from "lucide-react"
 import { formatDateTime } from "@/shared/lib/format"
 import { Button } from "@/shared/ui/button"
@@ -12,6 +12,7 @@ import type { ScopeRef } from "@/core/registry/resource"
 import { hostsApi } from "@/modules/compute/api/hosts"
 import type { Host } from "@/modules/compute/api/types"
 import { hostsDef } from "@/modules/compute/defs"
+import { buildScopedPath } from "@/core/registry/nav-config"
 import { AgentStatusBadge } from "@/modules/compute/components/agent-status-badge"
 import { PendingTokensSheet } from "@/modules/compute/components/pending-tokens-sheet"
 
@@ -19,13 +20,23 @@ export default function HostListPage() {
   const { t } = useTranslation()
   const [tokensOpen, setTokensOpen] = useState(false)
 
-  const scope: ScopeRef = {}
+  // Scope comes from the route, exactly as it does on every other
+  // scoped list: the selector navigates to /compute/workspaces/{ws}/hosts
+  // and the page must read it back, or picking a workspace would change
+  // the URL and nothing else.
+  const { workspaceId, namespaceId } = useParams()
+  const scope: ScopeRef = { ws: workspaceId, ns: namespaceId }
   const query = useListQuery<Host>({
     def: hostsDef,
     api: hostsApi,
     scope,
     filterKeys: ["agentStatus"],
   })
+
+  // Links stay inside the current scope; a detail page reached from a
+  // workspace list must keep that workspace in its URL.
+  const base = buildScopedPath("hosts", workspaceId ?? null, namespaceId ?? null)
+  const hostPath = (suffix: string) => `${base}/${suffix}`
 
   const columns: ColumnDef<Host>[] = [
     {
@@ -34,7 +45,7 @@ export default function HostListPage() {
       sortable: true,
       cell: (h) => (
         <NameCell
-          to={`/compute/hosts/${h.metadata.id}`}
+          to={hostPath(`${h.metadata.id}`)}
           displayName={h.spec.displayName}
           name={h.metadata.name}
           trailing={
@@ -124,7 +135,7 @@ export default function HostListPage() {
               {t("compute.token.pending")}
             </Button>
             <Button asChild>
-              <Link to="/compute/hosts/onboard">
+              <Link to={hostPath("onboard")}>
                 <Plus className="size-4" />
                 {t("compute.host.create")}
               </Link>
@@ -132,7 +143,7 @@ export default function HostListPage() {
           </div>
         }
       />
-      <PendingTokensSheet open={tokensOpen} onOpenChange={setTokensOpen} />
+      <PendingTokensSheet open={tokensOpen} onOpenChange={setTokensOpen} scope={scope} />
     </>
   )
 }

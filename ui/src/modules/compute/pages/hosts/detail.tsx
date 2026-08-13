@@ -9,15 +9,19 @@ import { qk } from "@/core/query/keys"
 import { useTranslation } from "@/i18n"
 import { hostsApi } from "@/modules/compute/api/hosts"
 import { hostsDef } from "@/modules/compute/defs"
+import { buildScopedPath } from "@/core/registry/nav-config"
+import type { ScopeRef } from "@/core/registry/resource"
 import { AgentStatusBadge } from "@/modules/compute/components/agent-status-badge"
 
 export default function HostDetailPage() {
-  const { hostId } = useParams()
+  const { hostId, workspaceId, namespaceId } = useParams()
   const { t } = useTranslation()
+  const scope: ScopeRef = { ws: workspaceId, ns: namespaceId }
+  const listPath = buildScopedPath("hosts", workspaceId ?? null, namespaceId ?? null)
 
   const query = useApiQuery({
-    queryKey: qk.detail(hostsDef, {}, hostId ?? ""),
-    queryFn: () => hostsApi.get({}, hostId!),
+    queryKey: qk.detail(hostsDef, scope, hostId ?? ""),
+    queryFn: () => hostsApi.get(scope, hostId!),
     enabled: !!hostId,
   })
   const host = query.data ?? null
@@ -38,7 +42,7 @@ export default function HostDetailPage() {
     <div className="p-6">
       <div className="mb-6 flex items-start gap-3">
         <Button asChild variant="ghost" size="icon" aria-label={t("compute.host.title")}>
-          <Link to="/compute/hosts">
+          <Link to={listPath}>
             <ArrowLeft className="size-4" />
           </Link>
         </Button>

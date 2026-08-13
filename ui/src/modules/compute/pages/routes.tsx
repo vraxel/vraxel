@@ -3,12 +3,23 @@ import HostListPage from "./hosts/list"
 import HostDetailPage from "./hosts/detail"
 import HostOnboardPage from "./hosts/onboard"
 
-// The onboarding wizard is a sibling route of the list rather than a
-// dialog inside it, and it is declared before the :hostId detail route so
-// "onboard" is not swallowed as an id.
+// Every resource declared in NAV_ITEMS with workspace / namespace scopes
+// must be routable at all three depths: buildScopedPath turns the scope
+// selector into `/compute/workspaces/{ws}/hosts`, and a missing route
+// falls through to the `*` catch-all, which redirects to the default
+// (platform) path -- so picking a workspace would silently bounce the
+// selector back to "all".
+//
+// "hosts/onboard" precedes "hosts/:hostId" so it is not swallowed as an id.
+const hostRoutes = (prefix: string): RouteObject[] => [
+  { path: `${prefix}hosts`, element: <HostListPage /> },
+  { path: `${prefix}hosts/onboard`, element: <HostOnboardPage /> },
+  { path: `${prefix}hosts/:hostId`, element: <HostDetailPage /> },
+]
+
 export const computeRoutes: RouteObject[] = [
   { index: true, element: <Navigate to="/compute/hosts" replace /> },
-  { path: "hosts", element: <HostListPage /> },
-  { path: "hosts/onboard", element: <HostOnboardPage /> },
-  { path: "hosts/:hostId", element: <HostDetailPage /> },
+  ...hostRoutes(""),
+  ...hostRoutes("workspaces/:workspaceId/"),
+  ...hostRoutes("workspaces/:workspaceId/namespaces/:namespaceId/"),
 ]

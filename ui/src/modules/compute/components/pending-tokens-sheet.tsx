@@ -9,10 +9,14 @@ import { qk } from "@/core/query/keys"
 import { useTranslation } from "@/i18n"
 import { joinTokensApi } from "@/modules/compute/api/join-tokens"
 import { agentJoinTokensDef } from "@/modules/compute/defs"
+import type { ScopeRef } from "@/core/registry/resource"
 
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** Tokens are scoped exactly like the hosts they mint, so the drawer
+   *  lists the ones belonging to the scope the page is open in. */
+  scope: ScopeRef
 }
 
 /**
@@ -23,12 +27,12 @@ interface Props {
  * plaintext is shown exactly once and may have been pasted somewhere it
  * should not be -- a credential you cannot withdraw is not acceptable.
  */
-export function PendingTokensSheet({ open, onOpenChange }: Props) {
+export function PendingTokensSheet({ open, onOpenChange, scope }: Props) {
   const { t } = useTranslation()
 
   const query = useApiQuery({
-    queryKey: qk.list(agentJoinTokensDef, {}, {}),
-    queryFn: () => joinTokensApi.list({}),
+    queryKey: qk.list(agentJoinTokensDef, scope, {}),
+    queryFn: () => joinTokensApi.list(scope),
     enabled: open,
   })
   const items = query.data?.items ?? []
