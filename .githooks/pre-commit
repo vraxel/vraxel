@@ -13,8 +13,16 @@ if echo "$staged" | grep -qE '\.tsx?$'; then
   # walk applies the same strictness CI uses (`pnpm build` -> `tsc -b`).
   # Plain `tsc --noEmit -p tsconfig.app.json` is more permissive and let
   # a Record-to-struct cast bug slip into main once already (US-1).
-  (cd ui && pnpm typecheck)
+  pnpm -r typecheck
   echo "TypeScript check passed."
+fi
+
+# Cheap (~2s) and the one thing that must never go quiet unnoticed: asserts the
+# pinned lint rules still resolve to error. Full `pnpm -r lint` is left to
+# `make check` / CI -- a hook slow enough to annoy is a hook people pass
+# --no-verify to.
+if echo "$staged" | grep -qE '\.tsx?$|eslint\.config\.js'; then
+  node ./scripts/check-lint-config.mjs
 fi
 
 if echo "$staged" | grep -qE '^pkg/apis/.*\.go$'; then

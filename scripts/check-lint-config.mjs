@@ -94,7 +94,12 @@ for (const pkg of workspacePackages()) {
 
   let resolved
   try {
-    resolved = JSON.parse(execFileSync("npx", ["eslint", "--print-config", file], {
+    // The workspace binary, not `npx`: npx may go to the network (or fail
+    // outright) inside a CI container, and a guard that cannot run is a guard
+    // that is not guarding.
+    const bin = join(repoRoot, pkg, "node_modules", ".bin", "eslint")
+    const eslintBin = existsSync(bin) ? bin : join(repoRoot, "node_modules", ".bin", "eslint")
+    resolved = JSON.parse(execFileSync(eslintBin, ["--print-config", file], {
       cwd: join(repoRoot, pkg),
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],

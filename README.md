@@ -153,13 +153,3 @@ add the routes to `ui/src/app/routes.tsx`, the nav entries to
 - The React Compiler is on (vite babel preset): components are
   auto-memoized at build time, and the react-hooks v7 lint rules gate
   compiler compatibility in `pnpm lint`.
-
-## Donate
-
-If this project helps you, consider buying me a coffee.
-
-<p>
-  <img src="assets/wechat-pay.jpg" alt="WeChat Pay" width="220">
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="assets/alipay.jpg" alt="Alipay" width="220">
-</p>
