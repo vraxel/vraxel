@@ -131,3 +131,20 @@ func TestSSHConnector_Fields(t *testing.T) {
 		t.Errorf("expected becomeUser %q, got %q", "admin", sc.becomeUser)
 	}
 }
+
+func TestNormalizePtyNewlines(t *testing.T) {
+	// A PTY rewrites every \n as \r\n; the returned bytes must read as if it
+	// had not, or every string comparison against a registered stdout fails.
+	cases := map[string]string{
+		"hello\r\nworld\r\n": "hello\nworld\n",
+		"plain\n":            "plain\n",
+		"":                   "",
+		// A bare \r redraws a line and is part of the output, not framing.
+		"progress\rdone\r\n": "progress\rdone\n",
+	}
+	for in, want := range cases {
+		if got := string(normalizePtyNewlines([]byte(in))); got != want {
+			t.Errorf("normalizePtyNewlines(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

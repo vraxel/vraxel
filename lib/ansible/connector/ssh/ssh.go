@@ -183,7 +183,7 @@ func (s *SSHConnector) ExecuteCommand(ctx context.Context, cmd string) ([]byte, 
 			EchoOff: true,
 		})
 		if result != nil {
-			return result.Stdout, nil, wrapExitCode(err, result.ExitCode)
+			return normalizePtyNewlines(result.Stdout), nil, wrapExitCode(err, result.ExitCode)
 		}
 		return nil, nil, err
 	}
@@ -201,6 +201,24 @@ func (s *SSHConnector) ExecuteCommand(ctx context.Context, cmd string) ([]byte, 
 		return result.Stdout, result.Stderr, wrapExitCode(err, result.ExitCode)
 	}
 	return nil, nil, err
+}
+
+// normalizePtyNewlines turns the CRLF a PTY produces back into LF.
+//
+// A terminal's ONLCR mode rewrites every \n the command emits as \r\n. That
+// is a property of the transport, not of the output, but it reaches every
+// consumer: a task's registered stdout would end in \r, so `when`, `assert`,
+// `failed_when` and `until` comparing it against a plain string all fail --
+// and they fail invisibly, because the two values print identically. Only
+// the returned bytes are normalized; the live writer still receives the raw
+// stream, which is what a terminal renderer needs.
+//
+// Bare \r (progress bars redrawing a line) is deliberately left alone.
+func normalizePtyNewlines(b []byte) []byte {
+	if !bytes.Contains(b, []byte("\r\n")) {
+		return b
+	}
+	return bytes.ReplaceAll(b, []byte("\r\n"), []byte("\n"))
 }
 
 // buildPtyCommand returns (commandLine, stdin) for the PTY path:

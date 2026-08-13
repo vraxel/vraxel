@@ -28,6 +28,31 @@ go run ./cmd/ansible -inventory hosts.json
 go run ./cmd/ansible -dir path/to/project -playbook site.yml -host 10.1.1.10
 ```
 
+### 多主机套件
+
+单主机跑不出来的语义（分组解析、组变量 vs 主机变量、`serial` 分批、`run_once`、跨主机 `delegate_to`、**每主机各自求值的循环**）在 `multi.yml`：
+
+```bash
+cp cmd/ansible/e2e/hosts.example.json /tmp/hosts.json   # 填自己的主机
+go run ./cmd/ansible -playbook multi.yml -inventory /tmp/hosts.json -var password=...
+```
+
+示例 inventory 里的口令是占位符，用 `-var` 覆盖即可，不必改文件。三台主机各带一份**不同长度**的 `host_packages`，断言各自创建的文件数——这正是「循环按主机求值」的回归测试，单主机永远测不出来。
+
+跨主机事实靠控制端汇总：每台主机通过 `delegate_to: localhost` 往控制端文件追加一行，最后一个 play 读回来断言总数。这是 playbook 观察「别的主机发生了什么」的唯一办法。
+
+> 套件拆成三个 play 是有原因的：`serial` 会让**整个 play（含 pre_tasks/post_tasks）每批各跑一次**（与 Ansible 一致），所以「重置计数」和「断言总数」不能放在同一个 play 里。`run_once` 同理是**每批一次**，不是每次运行一次。
+
+### PTY 模式
+
+`-pty` 让 SSH 连接器走 PTY 分支（并挂一个 live writer，否则该分支不会激活）：
+
+```bash
+go run ./cmd/ansible -host 10.1.1.10 -user root -password secret -pty
+```
+
+这条路径是 vraxel-server 做交互式执行时走的。加它是因为它此前从未被真实跑过——第一次跑就发现 PTY 的 `\r\n` 会残留在 register 值里，让所有字符串比较静默失败。
+
 ### 本地冒烟（无需远程主机）
 
 除去必须真机的任务外，整套剧本可以用本地连接器跑：
@@ -71,6 +96,7 @@ go run ./cmd/ansible -host localhost -var connection=local -become=false -skip-t
 | `wait_for` 端口与超时 | `site.yml` |
 | `delegate_to`（play 走 SSH，delegate 走本地，跨连接器类型） | `site.yml` |
 | `block`/`rescue`/`always`、`until`/`retries` | `site.yml` |
+| 分组解析、组变量 vs 主机变量、`serial` 分批、`run_once`、跨主机 `delegate_to`、每主机各自求值的循环、多 play | `multi.yml` |
 
 套件产生的东西全在 `/tmp/vraxel-e2e` 加一个一次性 systemd 单元，post_tasks 会删干净并断言删掉了。
 

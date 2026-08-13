@@ -53,6 +53,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -95,8 +96,14 @@ func main() {
 		execOpts = append(execOpts, executor.WithSkipTags(opts.skipTags))
 	}
 
-	result, err := executor.NewPlaybookExecutor(inv, source, execOpts...).
-		Execute(context.Background(), playbook)
+	exec := executor.NewPlaybookExecutor(inv, source, execOpts...)
+	if opts.pty {
+		// The SSH connector only allocates a PTY when a live writer is
+		// attached, so -pty has to supply one to reach that path at all.
+		exec.SetLiveOutput(io.Discard)
+	}
+
+	result, err := exec.Execute(context.Background(), playbook)
 	if err != nil {
 		exitf("execute: %v", err)
 	}
@@ -123,6 +130,7 @@ type options struct {
 	password  string
 	key       string
 	become    bool
+	pty       bool
 	extraVars stringSlice
 	tags      stringSlice
 	skipTags  stringSlice
@@ -140,6 +148,7 @@ func parseFlags() options {
 	flag.StringVar(&o.password, "password", "", "SSH password, also used for sudo")
 	flag.StringVar(&o.key, "key", "", "SSH private key file")
 	flag.BoolVar(&o.become, "become", true, "run tasks through sudo")
+	flag.BoolVar(&o.pty, "pty", false, "allocate a PTY for commands (exercises the ssh connector's PTY path)")
 	flag.Var(&o.extraVars, "var", "inventory variable as key=value (repeatable)")
 	flag.Var(&o.tags, "tag", "only run tasks with this tag (repeatable)")
 	flag.Var(&o.skipTags, "skip-tag", "skip tasks with this tag (repeatable)")
@@ -163,14 +172,20 @@ func buildInventory(o options) ansible.Inventory {
 
 	if o.inventory != "" {
 		var err error
-		if inv, err = loadInventory(o.inventory); err != nil {
+		if inv, err = loadInventory(o.inventory, o.pty); err != nil {
 			exitf("load inventory: %v", err)
 		}
 		if inv.Vars == nil {
 			inv.Vars = make(map[string]any)
 		}
+		// -var is an explicit override, so it has to reach the host vars too:
+		// loadInventory has already pushed the inventory vars down, and a host
+		// var outranks an inventory one.
 		for k, v := range parseVars(o.extraVars) {
 			inv.Vars[k] = v
+			for _, hostVars := range inv.Hosts {
+				hostVars[k] = v
+			}
 		}
 		return inv
 	}
@@ -180,10 +195,9 @@ func buildInventory(o options) ansible.Inventory {
 		"port":        o.port,
 		"remote_user": o.user,
 		"become":      o.become,
-		// The E2E playbook collects output into a buffer rather than a
-		// terminal, and the PTY path drops output for short commands
-		// without a live writer attached.
-		"pty": false,
+		// Off unless -pty: the PTY path drops output for short commands
+		// when no live writer is attached, and this output is asserted on.
+		"pty": o.pty,
 	}
 	if o.password != "" {
 		hostVars["password"] = o.password
@@ -213,7 +227,7 @@ type inventoryJSON struct {
 // loadInventory reads a JSON inventory, filling in the connection defaults and
 // pushing inventory vars down into each host so single- and multi-host runs
 // see the same variables.
-func loadInventory(path string) (ansible.Inventory, error) {
+func loadInventory(path string, pty bool) (ansible.Inventory, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return ansible.Inventory{}, fmt.Errorf("read %s: %w", path, err)
@@ -230,7 +244,7 @@ func loadInventory(path string) (ansible.Inventory, error) {
 	if raw.Vars == nil {
 		raw.Vars = make(map[string]any)
 	}
-	for k, v := range map[string]any{"connection": "ssh", "become": true, "pty": false} {
+	for k, v := range map[string]any{"connection": "ssh", "become": true, "pty": pty} {
 		if _, ok := raw.Vars[k]; !ok {
 			raw.Vars[k] = v
 		}

@@ -22,22 +22,48 @@ import (
 
 const e2eDir = "e2e"
 
-func TestE2EPlaybookParsesAndValidates(t *testing.T) {
+// playbooks are lists of plays; everything else under e2e/ that ends in .yml
+// is a block list (task file) or a plain variable file.
+var playbooks = []string{"site.yml", "multi.yml"}
+
+func isPlaybook(path string) bool {
+	for _, p := range playbooks {
+		if filepath.Base(path) == p {
+			return true
+		}
+	}
+	return false
+}
+
+func TestE2EPlaybooksParseAndValidate(t *testing.T) {
+	for _, name := range playbooks {
+		t.Run(name, func(t *testing.T) {
+			data, err := os.ReadFile(filepath.Join(e2eDir, name))
+			if err != nil {
+				t.Fatalf("read: %v", err)
+			}
+			// ParsePlaybook runs Validate, which is where unsupported
+			// directives are rejected, so this covers both.
+			pb, err := converter.ParsePlaybook(data)
+			if err != nil {
+				t.Fatalf("does not load: %v", err)
+			}
+			if len(pb.Play) == 0 {
+				t.Fatal("no plays parsed")
+			}
+		})
+	}
+
 	data, err := os.ReadFile(filepath.Join(e2eDir, "site.yml"))
 	if err != nil {
 		t.Fatalf("read site.yml: %v", err)
 	}
-	// ParsePlaybook runs Validate, which is where unsupported directives are
-	// rejected, so this covers both.
 	pb, err := converter.ParsePlaybook(data)
 	if err != nil {
 		t.Fatalf("site.yml does not load: %v", err)
 	}
-	if len(pb.Play) != 1 {
-		t.Fatalf("expected 1 play, got %d", len(pb.Play))
-	}
 	if len(pb.Play[0].Roles) == 0 {
-		t.Error("the suite should exercise a role")
+		t.Error("the single-host suite should exercise a role")
 	}
 }
 
@@ -47,7 +73,7 @@ func TestE2ETaskFilesParseAndValidate(t *testing.T) {
 		if err != nil || info.IsDir() || !strings.HasSuffix(p, ".yml") {
 			return err
 		}
-		if filepath.Base(p) == "site.yml" || strings.Contains(p, string(filepath.Separator)+"defaults"+string(filepath.Separator)) ||
+		if isPlaybook(p) || strings.Contains(p, string(filepath.Separator)+"defaults"+string(filepath.Separator)) ||
 			strings.Contains(p, string(filepath.Separator)+"vars"+string(filepath.Separator)) {
 			return nil // plays and plain var files are not block lists
 		}
@@ -126,7 +152,7 @@ func TestE2EReferencesOnlyRegisteredModules(t *testing.T) {
 		if readErr != nil {
 			return readErr
 		}
-		if filepath.Base(p) == "site.yml" {
+		if isPlaybook(p) {
 			pb, parseErr := converter.ParsePlaybook(data)
 			if parseErr != nil {
 				return parseErr
