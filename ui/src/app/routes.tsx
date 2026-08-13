@@ -6,6 +6,7 @@ import AuthCallbackPage from "@/app/pages/auth-callback"
 import ErrorPage from "@/app/pages/error"
 import { iamRoutes } from "@/modules/iam/pages/routes"
 import { auditRoutes } from "@/modules/audit/pages/routes"
+import { computeRoutes } from "@/modules/compute/pages/routes"
 import { usePermissionStore } from "@/core/permission/permission-store"
 import { getDefaultPath } from "@/core/permission/use-permission"
 import { DEFAULT_PATH } from "@/core/registry/nav-config"
@@ -39,6 +40,10 @@ export const routes: RouteObject[] = [
     element: <RootLayout />,
     children: [
       { index: true, element: <DefaultRedirect /> },
+      {
+        path: "compute",
+        children: computeRoutes,
+      },
       {
         path: "iam",
         children: iamRoutes,

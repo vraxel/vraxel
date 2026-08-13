@@ -1,4 +1,4 @@
-import { Users, Building2, FolderKanban, Shield, ScrollText } from "lucide-react"
+import { Users, Building2, FolderKanban, Shield, ScrollText, Server } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
 export type ScopeLevel = "platform" | "workspace" | "namespace"
@@ -35,6 +35,16 @@ export const PARENT_GROUP_ICON: Record<string, LucideIcon> = {}
  * Used by: sidebar nav, scope selector, permission checks, breadcrumbs.
  */
 export const NAV_ITEMS: NavItemConfig[] = [
+  // Compute
+  {
+    resource: "hosts",
+    module: "compute",
+    permission: "compute:hosts:list",
+    labelKey: "nav.hosts",
+    icon: Server,
+    group: "nav.compute",
+    scopes: ["platform", "workspace", "namespace"],
+  },
   // IAM
   {
     resource: "workspaces",
