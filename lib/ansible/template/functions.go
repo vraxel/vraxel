@@ -9,6 +9,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/BurntSushi/toml"
 	"github.com/Masterminds/sprig/v3"
 	"gopkg.in/yaml.v3"
 )
@@ -26,8 +27,10 @@ func buildFuncMap(t *template.Template, includedNames map[string]int) template.F
 	// Add custom functions
 	fm["toYaml"] = toYAML
 	fm["fromYaml"] = fromYAML
+	fm["toToml"] = toTOML
 	fm["ipInCIDR"] = ipInCIDR
 	fm["ipFamily"] = ipFamily
+	fm["isIP"] = isIP
 	fm["pow"] = pow
 	fm["subtractList"] = subtractList
 	fm["fileExists"] = fileExists
@@ -111,6 +114,16 @@ func fromYAML(v string) (any, error) {
 	var output any
 	err := yaml.Unmarshal([]byte(v), &output)
 	return output, err
+}
+
+// toTOML marshals a value to a TOML string. Errors are swallowed (empty string)
+// so it is safe to call from a template.
+func toTOML(v any) string {
+	var buf strings.Builder
+	if err := toml.NewEncoder(&buf).Encode(v); err != nil {
+		return ""
+	}
+	return buf.String()
 }
 
 // ipInCIDR takes a comma-separated list of CIDR/IP/range strings and returns
@@ -218,6 +231,23 @@ func ipFamily(addrOrCIDR string) (string, error) {
 		return "IPv4", nil
 	}
 	return "IPv6", nil
+}
+
+// isIP reports whether addr is an IP address. It accepts bare IPs
+// ("192.168.1.1", "2001:db8::1"), host:port forms ("192.168.1.1:5000",
+// "[2001:db8::1]:5000"), and bracketed IPv6 ("[2001:db8::1]").
+func isIP(addr string) bool {
+	if addr == "" {
+		return false
+	}
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		host = addr
+	}
+	if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
+		host = host[1 : len(host)-1]
+	}
+	return net.ParseIP(host) != nil
 }
 
 // pow returns base raised to the power of exp.

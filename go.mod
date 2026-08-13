@@ -5,6 +5,7 @@ go 1.26.5
 tool github.com/gzuidhof/tygo
 
 require (
+	github.com/BurntSushi/toml v1.6.0
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/VictoriaMetrics/metrics v1.44.0
 	github.com/VictoriaMetrics/metricsql v0.87.3

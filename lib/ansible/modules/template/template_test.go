@@ -283,8 +283,8 @@ func TestModuleTemplate_PutFileError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for PutFile failure")
 	}
-	if !strings.Contains(err.Error(), "template: upload") {
-		t.Errorf("expected 'template: upload' error, got %q", err.Error())
+	if !strings.Contains(err.Error(), "template: put file") {
+		t.Errorf("expected 'template: put file' error, got %q", err.Error())
 	}
 	if !strings.Contains(err.Error(), "connection refused") {
 		t.Errorf("expected underlying error 'connection refused', got %q", err.Error())
