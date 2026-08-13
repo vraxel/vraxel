@@ -7,6 +7,8 @@ package generated
 import (
 	"encoding/json"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type AuditLog struct {
@@ -31,6 +33,66 @@ type AuditLog struct {
 	Detail         json.RawMessage `json:"detail"`
 	ResponseDetail json.RawMessage `json:"response_detail"`
 	CreatedAt      time.Time       `json:"created_at"`
+}
+
+type Host struct {
+	ID                int64     `json:"id"`
+	Name              string    `json:"name"`
+	DisplayName       string    `json:"display_name"`
+	Description       string    `json:"description"`
+	Hostname          string    `json:"hostname"`
+	Os                string    `json:"os"`
+	Arch              string    `json:"arch"`
+	CpuCores          int32     `json:"cpu_cores"`
+	MemoryMb          int64     `json:"memory_mb"`
+	DiskGb            int64     `json:"disk_gb"`
+	Scope             string    `json:"scope"`
+	WorkspaceID       *int64    `json:"workspace_id"`
+	NamespaceID       *int64    `json:"namespace_id"`
+	Status            string    `json:"status"`
+	StatusMessage     string    `json:"status_message"`
+	SshPort           int32     `json:"ssh_port"`
+	AgentPort         int32     `json:"agent_port"`
+	MonitorStatus     string    `json:"monitor_status"`
+	MonitorMessage    string    `json:"monitor_message"`
+	LogAgentStatus    string    `json:"log_agent_status"`
+	LogAgentMessage   string    `json:"log_agent_message"`
+	Origin            string    `json:"origin"`
+	ConnectivityMode  string    `json:"connectivity_mode"`
+	ReportedIps       []string  `json:"reported_ips"`
+	ReportedPrimaryIp string    `json:"reported_primary_ip"`
+	PrimaryIpOverride string    `json:"primary_ip_override"`
+	CreatedBy         *int64    `json:"created_by"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
+}
+
+type HostAgent struct {
+	HostID       int64       `json:"host_id"`
+	AgentID      pgtype.UUID `json:"agent_id"`
+	TokenVersion int32       `json:"token_version"`
+	Version      string      `json:"version"`
+	InstanceID   string      `json:"instance_id"`
+	Status       string      `json:"status"`
+	ConnectedAt  *time.Time  `json:"connected_at"`
+	LastSeenAt   *time.Time  `json:"last_seen_at"`
+	ClockSkewMs  int64       `json:"clock_skew_ms"`
+	CreatedAt    time.Time   `json:"created_at"`
+	UpdatedAt    time.Time   `json:"updated_at"`
+}
+
+type HostAgentJoinToken struct {
+	ID          int64     `json:"id"`
+	Name        string    `json:"name"`
+	TokenHash   []byte    `json:"token_hash"`
+	Scope       string    `json:"scope"`
+	WorkspaceID *int64    `json:"workspace_id"`
+	NamespaceID *int64    `json:"namespace_id"`
+	MaxUses     int32     `json:"max_uses"`
+	UsedCount   int32     `json:"used_count"`
+	ExpiresAt   time.Time `json:"expires_at"`
+	CreatedBy   *int64    `json:"created_by"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 type LoginThrottle struct {
@@ -157,6 +219,13 @@ type RoleBinding struct {
 type RolePermissionRule struct {
 	RoleID  int64  `json:"role_id"`
 	Pattern string `json:"pattern"`
+}
+
+type ServerInstance struct {
+	InstanceID   string    `json:"instance_id"`
+	InternalAddr string    `json:"internal_addr"`
+	StartedAt    time.Time `json:"started_at"`
+	LastSeenAt   time.Time `json:"last_seen_at"`
 }
 
 type User struct {
