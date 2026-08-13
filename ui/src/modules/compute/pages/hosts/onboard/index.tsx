@@ -56,8 +56,14 @@ export default function HostOnboardPage() {
     [t],
   )
 
+  // Named from what is actually to hand. The workspace name is in the
+  // scope store; no namespace name is, and printing the raw id instead
+  // shows the operator a number that means nothing to them. The scope
+  // selector sits above this and already names the project, so the level
+  // alone is enough here -- adding a namespace name to the shared store
+  // would fork it from LCP for one label.
   const scopeLabel = namespaceId
-    ? t("compute.onboard.scope.namespace", { name: namespaceId })
+    ? t("compute.onboard.scope.namespace", { workspace: workspaceName ?? workspaceId ?? "" })
     : workspaceId
       ? t("compute.onboard.scope.workspace", { name: workspaceName ?? workspaceId })
       : t("compute.onboard.scope.platform")

@@ -64,7 +64,7 @@ const compute = {
 
   "compute.onboard.scope.platform": "平台",
   "compute.onboard.scope.workspace": "工作空间 {name}",
-  "compute.onboard.scope.namespace": "项目 {name}",
+  "compute.onboard.scope.namespace": "工作空间 {workspace} / 当前项目",
 
   "compute.onboard.identity.scope": "接入后归属：",
   "compute.onboard.identity.scopeHint":

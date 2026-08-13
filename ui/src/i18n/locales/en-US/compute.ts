@@ -63,7 +63,7 @@ const compute = {
 
   "compute.onboard.scope.platform": "Platform",
   "compute.onboard.scope.workspace": "Workspace {name}",
-  "compute.onboard.scope.namespace": "Project {name}",
+  "compute.onboard.scope.namespace": "Workspace {workspace} / current project",
 
   "compute.onboard.identity.scope": "Will belong to:",
   "compute.onboard.identity.scopeHint":

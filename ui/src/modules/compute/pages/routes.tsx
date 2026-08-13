@@ -10,7 +10,9 @@ import HostOnboardPage from "./hosts/onboard"
 // (platform) path -- so picking a workspace would silently bounce the
 // selector back to "all".
 //
-// "hosts/onboard" precedes "hosts/:hostId" so it is not swallowed as an id.
+// "onboard" and ":hostId" coexist safely: react-router ranks a static
+// segment above a dynamic one, so the order they are declared in does not
+// matter (verified against matchRoutes with the order reversed).
 const hostRoutes = (prefix: string): RouteObject[] => [
   { path: `${prefix}hosts`, element: <HostListPage /> },
   { path: `${prefix}hosts/onboard`, element: <HostOnboardPage /> },
