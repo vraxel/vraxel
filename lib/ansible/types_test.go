@@ -610,21 +610,15 @@ func TestVars_UnmarshalYAML_MultipleMerge(t *testing.T) {
 // Playbook Validate tests
 // ============================================================================
 
-func TestPlaybook_Validate_RemovesImportPlaybook(t *testing.T) {
+func TestPlaybook_Validate_RejectsImportPlaybook(t *testing.T) {
 	pb := &Playbook{
 		Play: []Play{
 			{ImportPlaybook: "other.yml"},
 			{PlayHost: PlayHost{Hosts: []string{"all"}}},
 		},
 	}
-	if err := pb.Validate(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(pb.Play) != 1 {
-		t.Fatalf("expected 1 play after validation, got %d", len(pb.Play))
-	}
-	if len(pb.Play[0].PlayHost.Hosts) != 1 || pb.Play[0].PlayHost.Hosts[0] != "all" {
-		t.Fatalf("expected remaining play with hosts=['all']")
+	if err := pb.Validate(); err == nil {
+		t.Fatal("expected import_playbook to be rejected, got nil")
 	}
 }
 
@@ -653,18 +647,15 @@ func TestPlaybook_Validate_ValidPlay(t *testing.T) {
 	}
 }
 
-func TestPlaybook_Validate_AllImports(t *testing.T) {
+func TestPlaybook_Validate_AllImportsRejected(t *testing.T) {
 	pb := &Playbook{
 		Play: []Play{
 			{ImportPlaybook: "a.yml"},
 			{ImportPlaybook: "b.yml"},
 		},
 	}
-	if err := pb.Validate(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(pb.Play) != 0 {
-		t.Fatalf("expected 0 plays after removing all imports, got %d", len(pb.Play))
+	if err := pb.Validate(); err == nil {
+		t.Fatal("expected import_playbook to be rejected, got nil")
 	}
 }
 

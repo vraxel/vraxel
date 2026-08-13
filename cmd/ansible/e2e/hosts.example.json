@@ -1,0 +1,61 @@
+{
+  "_comment": "Example inventory for multi.yml. Copy it, put your own hosts in, and run: go run ./cmd/ansible -playbook multi.yml -inventory <file>. Secrets are placeholders; override without editing the file using -var, e.g. -var password=... . Each host carries a different host_packages list on purpose: that is what proves a templated loop is resolved per host rather than once for the whole play. expected_batches must match the serial: list in multi.yml, since run_once fires once per batch.",
+  "hosts": {
+    "10.1.1.12": {
+      "node_role": "primary",
+      "overridden": "host-value",
+      "host_packages": [
+        "a",
+        "b",
+        "c"
+      ],
+      "expected_packages": "3"
+    },
+    "10.1.1.13": {
+      "node_role": "replica",
+      "overridden": "host-value",
+      "host_packages": [
+        "a"
+      ],
+      "expected_packages": "1"
+    },
+    "10.1.1.14": {
+      "node_role": "replica",
+      "overridden": "host-value",
+      "host_packages": [
+        "a",
+        "b"
+      ],
+      "expected_packages": "2"
+    }
+  },
+  "groups": {
+    "all_nodes": {
+      "hosts": [
+        "10.1.1.12",
+        "10.1.1.13",
+        "10.1.1.14"
+      ],
+      "vars": {
+        "from_group": "group-value",
+        "overridden": "group-value"
+      }
+    },
+    "replicas": {
+      "hosts": [
+        "10.1.1.13",
+        "10.1.1.14"
+      ]
+    }
+  },
+  "vars": {
+    "remote_user": "root",
+    "password": "changeme",
+    "become": true,
+    "connection": "ssh",
+    "primary_host": "10.1.1.12",
+    "primary_hostname": "test1",
+    "expected_hosts": "3",
+    "expected_batches": "2"
+  }
+}

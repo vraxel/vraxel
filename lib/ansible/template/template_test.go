@@ -40,6 +40,67 @@ func TestToTOML(t *testing.T) {
 	}
 }
 
+func TestSelectAttrRejectAttrMapAttr(t *testing.T) {
+	vars := map[string]any{
+		"services": []any{
+			map[string]any{"name": "pg", "tier": "db", "enabled": true},
+			map[string]any{"name": "redis", "tier": "cache", "enabled": false},
+			map[string]any{"name": "etcd", "tier": "db", "enabled": true},
+		},
+	}
+
+	cases := map[string]string{
+		// truthy-key form
+		`{{ .services | selectattr "enabled" | mapattr "name" | join "," }}`: "pg,etcd",
+		`{{ .services | rejectattr "enabled" | mapattr "name" | join "," }}`: "redis",
+		// key==value form
+		`{{ .services | selectattr "tier" "db" | mapattr "name" | join "," }}`: "pg,etcd",
+		`{{ .services | rejectattr "tier" "db" | mapattr "name" | join "," }}`: "redis",
+		// plain extraction
+		`{{ .services | mapattr "tier" | uniq | sortAlpha | join "," }}`: "cache,db",
+	}
+
+	for tpl, want := range cases {
+		got, err := ParseString(vars, tpl)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", tpl, err)
+			continue
+		}
+		if got != want {
+			t.Errorf("%s = %q, want %q", tpl, got, want)
+		}
+	}
+}
+
+func TestSelectAttr_ArgumentErrors(t *testing.T) {
+	if _, err := selectAttr("key"); err == nil {
+		t.Error("expected an error when the list is missing")
+	}
+	if _, err := mapAttr("key", "not a list"); err == nil {
+		t.Error("expected an error when the last argument is not a list")
+	}
+	if _, err := selectAttr(42, []any{}); err == nil {
+		t.Error("expected an error when the key is not a string")
+	}
+}
+
+func TestFlatten(t *testing.T) {
+	vars := map[string]any{
+		"nested": []any{[]any{"a", []any{"b", "c"}}, "d"},
+	}
+	got, err := ParseString(vars, `{{ .nested | flatten | join "," }}`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "a,b,c,d" {
+		t.Errorf("flatten = %q, want %q", got, "a,b,c,d")
+	}
+	// A non-list flattens to nothing rather than blowing up mid-render.
+	if out := flatten("scalar"); out != nil {
+		t.Errorf("flatten(scalar) = %v, want nil", out)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Parse
 // ---------------------------------------------------------------------------

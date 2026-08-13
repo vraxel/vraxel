@@ -98,6 +98,9 @@ func (e *RoleExecutor) loadRoleTasks(roleName string) ([]ansible.Block, error) {
 	if err := yaml.Unmarshal(data, &blocks); err != nil {
 		return nil, fmt.Errorf("role '%s': parse tasks: %w", roleName, err)
 	}
+	if err := ansible.ValidateBlocks(blocks); err != nil {
+		return nil, fmt.Errorf("role '%s': %w", roleName, err)
+	}
 	return blocks, nil
 }
 

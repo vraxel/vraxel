@@ -56,7 +56,7 @@ func setupBlockExecutor(t *testing.T, hosts []string) (*BlockExecutor, variable.
 	v := variable.New(inv)
 
 	var logBuf bytes.Buffer
-	taskExec := NewTaskExecutor(v, nil, connMap, &logBuf)
+	taskExec := NewTaskExecutor(v, nil, connMap, &logBuf, nil)
 	blockExec := NewBlockExecutor(taskExec, v, nil, connMap, hosts, &logBuf)
 
 	return blockExec, v
@@ -805,7 +805,7 @@ func TestBlockExecutor_LogOutput(t *testing.T) {
 	conns.Put("localhost", conn)
 
 	var logBuf bytes.Buffer
-	taskExec := NewTaskExecutor(v, nil, conns, &logBuf)
+	taskExec := NewTaskExecutor(v, nil, conns, &logBuf, nil)
 	blockExec := NewBlockExecutor(taskExec, v, nil, conns, []string{"localhost"}, &logBuf)
 	blockExec.WithRole("myrole")
 

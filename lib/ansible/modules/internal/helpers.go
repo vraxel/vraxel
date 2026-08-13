@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"sort"
 	"strings"
 	"time"
 )
@@ -55,6 +56,30 @@ func FileModeArg(args map[string]any, key string, defaultMode fs.FileMode) fs.Fi
 // shell injection and breakage on paths with spaces or metacharacters.
 func ShellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+// EnvPrefix builds a POSIX "export K='V'; " prefix for env, or "" when empty.
+// Keys are emitted in sorted order so a command is byte-identical across runs.
+func EnvPrefix(env map[string]string) string {
+	if len(env) == 0 {
+		return ""
+	}
+
+	keys := make([]string, 0, len(env))
+	for k := range env {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	var b strings.Builder
+	for _, k := range keys {
+		b.WriteString("export ")
+		b.WriteString(k)
+		b.WriteString("=")
+		b.WriteString(ShellQuote(env[k]))
+		b.WriteString("; ")
+	}
+	return b.String()
 }
 
 // WriteFile writes data to dest on the host. Without Become it uploads

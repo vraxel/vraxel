@@ -421,6 +421,9 @@ func (e *BlockExecutor) dealIncludeTasks(ctx context.Context, file string, hosts
 	if err := yaml.Unmarshal(data, &blocks); err != nil {
 		return fmt.Errorf("include_tasks: parse %s: %w", file, err)
 	}
+	if err := ansible.ValidateBlocks(blocks); err != nil {
+		return fmt.Errorf("include_tasks: %s: %w", file, err)
+	}
 
 	// Build the sub-executor's include stack: parent's stack + current
 	// file. Allocate a fresh slice instead of appending in place — the

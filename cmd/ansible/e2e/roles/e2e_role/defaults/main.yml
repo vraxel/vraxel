@@ -1,0 +1,5 @@
+---
+# Lowest-priority variables. The play does not set role_marker, so the
+# rendered report proves role defaults reached the template.
+role_marker: role-default
+role_overridable: from-defaults

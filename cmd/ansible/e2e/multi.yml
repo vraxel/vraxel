@@ -1,0 +1,167 @@
+---
+# Multi-host semantics: the things a single-host run cannot prove.
+#
+#   go run ./cmd/ansible -playbook multi.yml -inventory <hosts.json>
+#
+# See hosts.example.json for the inventory shape.
+#
+# Cross-host facts are collected on the controller: each host appends a line
+# to a file there through delegate_to, and a later play reads it back. That is
+# the only way a playbook can observe what happened on hosts other than the
+# one it is running on.
+#
+# The work is split across three plays because serial runs the whole play --
+# pre_tasks and post_tasks included -- once per batch, which is correct but
+# makes a play a bad place to both reset a tally and assert its total.
+
+# ---------------------------------------------------------------------------
+- name: reset the controller tallies
+  hosts:
+    - all_nodes
+  gather_facts: false
+  vars:
+    tally: /tmp/vraxel-e2e-multi-tally
+    runonce_tally: /tmp/vraxel-e2e-multi-runonce
+  tasks:
+    - name: clear both tally files
+      shell: "rm -f {{ .tally }} {{ .runonce_tally }}"
+      delegate_to: localhost
+      run_once: true
+      changed_when: false
+
+# ---------------------------------------------------------------------------
+- name: per-host work, in serial batches
+  hosts:
+    - all_nodes
+  gather_facts: true
+  serial:
+    - 1
+    - 2
+  vars:
+    workdir: /tmp/vraxel-e2e-multi
+    tally: /tmp/vraxel-e2e-multi-tally
+    runonce_tally: /tmp/vraxel-e2e-multi-runonce
+
+  pre_tasks:
+    - name: create the work directory
+      file:
+        path: "{{ .workdir }}"
+        state: directory
+        mode: "0755"
+
+  tasks:
+    - name: the host resolved through its group
+      assert:
+        that:
+          - '{{ ne .inventory_name "" }}'
+          - '{{ ne .node_role "" }}'
+        msg: "group resolution did not reach this host"
+
+    - name: group vars are visible, host vars outrank them
+      assert:
+        that:
+          # from_group is set on the group and left alone by the hosts
+          - '{{ eq .from_group "group-value" }}'
+          # overridden is set on both; the host's value must win
+          - '{{ eq .overridden "host-value" }}'
+        msg: "variable precedence wrong: from_group={{ .from_group }} overridden={{ .overridden }}"
+
+    # A templated loop must resolve against THIS host's variables. Each host
+    # carries a different list, so a loop resolved once for the whole play
+    # would give at least one host the wrong item count.
+    - name: loop over a per-host list
+      file:
+        path: "{{ .workdir }}/pkg-{{ .item }}"
+        state: touch
+      loop: "{{ .host_packages }}"
+
+    - name: count what this host created
+      shell: "ls {{ .workdir }}/pkg-* 2>/dev/null | wc -l | tr -d ' '"
+      register: pkg_count
+      changed_when: false
+
+    - name: assert the loop used this host's own list
+      assert:
+        that:
+          - '{{ eq .pkg_count.stdout .expected_packages }}'
+        msg: "host {{ .inventory_name }} created {{ .pkg_count.stdout }} files, expected {{ .expected_packages }}"
+
+    # Cross-host delegate_to: both ends are real ssh connections here, unlike
+    # the single-host suite where the delegate is the controller.
+    - name: read this host's own name
+      command:
+        cmd: "hostname"
+      register: local_name
+      changed_when: false
+
+    - name: read the primary's name from every host
+      command:
+        cmd: "hostname"
+      delegate_to: "{{ .primary_host }}"
+      register: primary_name
+      changed_when: false
+
+    - name: the delegated task ran on the primary
+      assert:
+        that:
+          - '{{ eq .primary_name.stdout .primary_hostname }}'
+        msg: "delegate_to {{ .primary_host }} returned {{ .primary_name.stdout }}, want {{ .primary_hostname }}"
+
+    - name: on a replica the delegate is a different machine
+      assert:
+        that:
+          - '{{ ne .primary_name.stdout .local_name.stdout }}'
+        msg: "delegate_to ran locally instead of on {{ .primary_host }}"
+      when: '{{ ne .node_role "primary" }}'
+
+    - name: record that this host ran
+      shell: "echo {{ .inventory_name }} >> {{ .tally }}"
+      delegate_to: localhost
+      changed_when: false
+
+    - name: record that the run_once task ran
+      shell: "echo {{ .inventory_name }} >> {{ .runonce_tally }}"
+      delegate_to: localhost
+      run_once: true
+      changed_when: false
+
+  post_tasks:
+    - name: remove the work directory
+      file:
+        path: "{{ .workdir }}"
+        state: absent
+
+# ---------------------------------------------------------------------------
+- name: verify what happened across all hosts
+  hosts:
+    - all_nodes
+  gather_facts: false
+  vars:
+    tally: /tmp/vraxel-e2e-multi-tally
+    runonce_tally: /tmp/vraxel-e2e-multi-runonce
+
+  tasks:
+    - name: read the tallies back from the controller
+      shell: |
+        printf '%s %s' \
+          "$(wc -l < {{ .tally }} 2>/dev/null | tr -d ' ')" \
+          "$(wc -l < {{ .runonce_tally }} 2>/dev/null | tr -d ' ')"
+      delegate_to: localhost
+      run_once: true
+      register: tallies
+      changed_when: false
+
+    # Every host ran exactly once across the serial batches, and the run_once
+    # task ran once per batch -- two batches, so two lines, not one per host.
+    - name: assert the tallies
+      assert:
+        that:
+          - '{{ eq .tallies.stdout (printf "%v %v" .expected_hosts .expected_batches) }}'
+        msg: "tallies were '{{ .tallies.stdout }}', want '{{ .expected_hosts }} {{ .expected_batches }}'"
+      run_once: true
+
+    - name: clean the controller tallies
+      shell: "rm -f {{ .tally }} {{ .runonce_tally }}"
+      delegate_to: localhost
+      run_once: true
+      changed_when: false

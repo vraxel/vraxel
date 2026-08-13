@@ -1,0 +1,4 @@
+---
+# Role vars outrank role defaults, so role_overridable must read from-vars
+# by the time the role's tasks run.
+role_overridable: from-vars

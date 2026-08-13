@@ -1,0 +1,87 @@
+---
+# Loop semantics, reached through include_tasks so that path is exercised too.
+# Each loop writes one file per item; the count is then asserted, which fails
+# loudly if a loop silently ran once instead of N times.
+
+- name: loop over a templated list
+  file:
+    path: "{{ .workdir }}/loop-{{ .item }}"
+    state: touch
+  loop: "{{ .packages }}"
+
+- name: with_items flattens one level
+  file:
+    path: "{{ .workdir }}/items-{{ .item }}"
+    state: touch
+  with_items: "{{ .nested_groups }}"
+
+- name: with_dict yields key and value
+  file:
+    path: "{{ .workdir }}/dict-{{ .item.key }}-{{ .item.value }}"
+    state: touch
+  with_dict: "{{ .settings }}"
+
+- name: loop_control renames the item and exposes the index
+  file:
+    path: "{{ .workdir }}/ctl-{{ .idx }}-{{ .pkg }}"
+    state: touch
+  loop: "{{ .packages }}"
+  loop_control:
+    loop_var: pkg
+    index_var: idx
+
+- name: an empty loop runs nothing
+  file:
+    path: "{{ .workdir }}/never-{{ .item }}"
+    state: touch
+  loop: "{{ .missing_variable }}"
+  register: empty_loop
+
+- name: count what the loops produced
+  shell: |
+    cd {{ .workdir }}
+    printf '%s %s %s %s %s' \
+      "$(ls loop-* 2>/dev/null | wc -l | tr -d ' ')" \
+      "$(ls items-* 2>/dev/null | wc -l | tr -d ' ')" \
+      "$(ls dict-* 2>/dev/null | wc -l | tr -d ' ')" \
+      "$(ls ctl-* 2>/dev/null | wc -l | tr -d ' ')" \
+      "$(ls never-* 2>/dev/null | wc -l | tr -d ' ')"
+  register: counts
+  changed_when: false
+
+- name: assert every loop iterated the right number of times
+  assert:
+    that:
+      # loop=2, with_items flattened 2+1=3, with_dict=2, loop_control=2, empty=0
+      - '{{ eq .counts.stdout "2 3 2 2 0" }}'
+    msg: "loop counts were {{ .counts.stdout }}, want '2 3 2 2 0'"
+
+- name: assert with_dict paired keys with values
+  stat:
+    path: "{{ .workdir }}/dict-alpha_key-alpha_value"
+  register: dict_pair
+  register_type: json
+
+- name: with_dict pairing
+  assert:
+    that:
+      - '{{ .dict_pair.stdout.exists }}'
+    msg: "with_dict did not pair key with value"
+
+- name: assert loop_control bound both variables
+  stat:
+    path: "{{ .workdir }}/ctl-1-beta"
+  register: ctl_pair
+  register_type: json
+
+- name: loop_control pairing
+  assert:
+    that:
+      - '{{ .ctl_pair.stdout.exists }}'
+    msg: "loop_control did not bind loop_var/index_var"
+
+- name: an empty loop reports skipped
+  assert:
+    that:
+      - '{{ .empty_loop.skipped }}'
+    msg: "an empty loop should skip, got skipped={{ .empty_loop.skipped }}"

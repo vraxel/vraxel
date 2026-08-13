@@ -23,6 +23,10 @@ type ExecOptions struct {
 	LogOutput io.Writer           // Log output writer
 	WorkDir   string              // Working directory
 	Become    bool                // Whether to use privilege escalation
+	// Environment holds the task's rendered "environment:" pairs. Only the
+	// command/shell modules apply it: they are the ones that run a user
+	// command, which is what an environment can act on.
+	Environment map[string]string
 }
 
 // ModuleExecFunc is the function signature for module execution.

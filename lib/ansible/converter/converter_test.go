@@ -110,7 +110,9 @@ func TestParsePlaybook_WithRoles(t *testing.T) {
 	}
 }
 
-func TestParsePlaybook_ImportPlaybook(t *testing.T) {
+func TestParsePlaybook_ImportPlaybookRejected(t *testing.T) {
+	// Silently dropping the import used to turn "also run these plays" into
+	// "run nothing", so it is now a load-time error.
 	yamlData := `
 - import_playbook: other.yml
 
@@ -119,16 +121,8 @@ func TestParsePlaybook_ImportPlaybook(t *testing.T) {
     - name: hello
       shell: echo hi
 `
-	pb, err := ParsePlaybook([]byte(yamlData))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	// import_playbook plays should be removed by Validate.
-	if len(pb.Play) != 1 {
-		t.Fatalf("expected 1 play after validation, got %d", len(pb.Play))
-	}
-	if pb.Play[0].PlayHost.Hosts[0] != "all" {
-		t.Fatalf("expected remaining play hosts=['all'], got %v", pb.Play[0].PlayHost.Hosts)
+	if _, err := ParsePlaybook([]byte(yamlData)); err == nil {
+		t.Fatal("expected import_playbook to be rejected, got nil")
 	}
 }
 
@@ -213,6 +207,57 @@ func TestBlockToTaskSpec(t *testing.T) {
 	}
 	if spec.Notify != "restart service" {
 		t.Fatalf("expected notify 'restart service', got %q", spec.Notify)
+	}
+}
+
+func TestBlockToTaskSpec_LoopKinds(t *testing.T) {
+	moduleFinder := func(name string) bool { return name == "shell" }
+
+	cases := []struct {
+		name     string
+		set      func(*ansible.Block)
+		wantLoop any
+		wantKind ansible.LoopKind
+	}{
+		{"loop", func(b *ansible.Block) { b.Loop = []any{"a"} }, []any{"a"}, ansible.LoopKindLoop},
+		{"with_items", func(b *ansible.Block) { b.WithItems = "{{ .l }}" }, "{{ .l }}", ansible.LoopKindItems},
+		{"with_dict", func(b *ansible.Block) { b.WithDict = "{{ .m }}" }, "{{ .m }}", ansible.LoopKindDict},
+		{"none", func(*ansible.Block) {}, nil, ansible.LoopKindLoop},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			block := ansible.Block{}
+			block.UnknownField = map[string]any{"shell": "true"}
+			tc.set(&block)
+
+			spec := BlockToTaskSpec(block, []string{"h"}, "", moduleFinder)
+
+			if !reflect.DeepEqual(spec.Loop, tc.wantLoop) {
+				t.Errorf("Loop = %v, want %v", spec.Loop, tc.wantLoop)
+			}
+			if spec.LoopKind != tc.wantKind {
+				t.Errorf("LoopKind = %q, want %q", spec.LoopKind, tc.wantKind)
+			}
+		})
+	}
+}
+
+func TestBlockToTaskSpec_ChangedWhenAndEnvironment(t *testing.T) {
+	moduleFinder := func(name string) bool { return name == "shell" }
+
+	block := ansible.Block{}
+	block.UnknownField = map[string]any{"shell": "true"}
+	block.ChangedWhen = ansible.When{Data: []string{"{{ false }}"}}
+	block.Environment = map[string]any{"HTTP_PROXY": "http://p"}
+
+	spec := BlockToTaskSpec(block, []string{"h"}, "", moduleFinder)
+
+	if !reflect.DeepEqual(spec.ChangedWhen, []string{"{{ false }}"}) {
+		t.Errorf("ChangedWhen = %v", spec.ChangedWhen)
+	}
+	if !reflect.DeepEqual(spec.Environment, map[string]any{"HTTP_PROXY": "http://p"}) {
+		t.Errorf("Environment = %v", spec.Environment)
 	}
 }
 
@@ -618,7 +663,6 @@ func TestParseAndConvert(t *testing.T) {
       retries: 3
       delay: 10
       until: deploy_result is succeeded
-      notify: restart app
 `
 	pb, err := ParsePlaybook([]byte(yamlData))
 	if err != nil {
@@ -656,9 +700,6 @@ func TestParseAndConvert(t *testing.T) {
 	}
 	if spec.Delay != 10 {
 		t.Fatalf("expected delay 10, got %d", spec.Delay)
-	}
-	if spec.Notify != "restart app" {
-		t.Fatalf("expected notify 'restart app', got %q", spec.Notify)
 	}
 	if len(spec.When) != 1 {
 		t.Fatalf("expected 1 when condition, got %d", len(spec.When))

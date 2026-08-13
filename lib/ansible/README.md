@@ -232,7 +232,7 @@ inv := ansible.Inventory{
 
 > **推荐非 root 用户 + become**：使用普通用户 SSH 登录，需要 root 权限的操作通过 `become: true` 自动 sudo。要求目标主机 sudoers 配置允许该用户执行 sudo（可带密码或 NOPASSWD）。
 
-变量优先级（从低到高）：`Inventory.Vars` → 组变量 → `gather_facts` → 运行时变量 → 主机变量
+变量优先级（从低到高，与 Ansible 一致）：角色 `defaults` → `Inventory.Vars` → 组变量 → 主机变量 → `gather_facts` 采集的事实 → 运行时变量（`set_fact` / `include_vars` / block 与 role 的 `vars`）
 
 ## 内置模块
 
@@ -251,8 +251,29 @@ inv := ansible.Inventory{
 | `assert` | 条件断言 | — | `assert: {that: ['{{ eq .env "prod" }}'], fail_msg: "非生产环境"}` |
 | `result` | 存储全局执行结果 | — | `result: {version: "{{ .app_version }}"}` |
 | `http_get_file` | HTTP 下载文件 | — | `http_get_file: {url: "https://...", dest: /tmp/pkg.tar.gz}` |
+| `file` | 建目录/软链、touch、删除、改权限 | ✅ (connector) | `file: {path: /opt/app, state: directory, mode: "0750", owner: app}` |
+| `stat` | 查询路径状态（输出 JSON） | ✅ (connector) | `stat: {path: /etc/app.conf}` |
+| `service` / `systemd` | 驱动 systemd 单元 | ✅ (connector) | `service: {name: nginx, state: restarted, enabled: true}` |
+| `wait_for` | 等待端口或路径就绪 | ✅ (connector) | `wait_for: {host: 127.0.0.1, port: 5432, timeout: 60}` |
 
 > `copy` 和 `template` 支持 `owner`/`group` 参数，上传后自动 `chown`。`fetch` 在 become 模式下通过 sudo cp 到临时文件再下载。
+
+`file` 的 `state` 取值：`directory` / `touch` / `link`（需 `src`）/ `absent` / `file`。其中 `file` 只做"断言存在 + 应用权限"，不创建文件——要创建用 `touch`。
+
+`stat` 输出 JSON，配 `register_type: json` 使用；**路径不存在不算失败**（`exists: false`），这样才能当条件用：
+
+```yaml
+- stat: {path: /etc/app.conf}
+  register: cfg
+  register_type: json
+
+- shell: "echo 已存在"
+  when: '{{ .cfg.stdout.exists }}'
+```
+
+`service` 与 `systemd` 是同一实现（本引擎面向 systemd 主机）。同时给 `enabled` 与 `state` 时先 enable 后 start。
+
+`wait_for` 的轮询在 Go 侧进行而非目标主机上，因此取消 playbook 的 context 能立刻中断等待。`state: absent` 则等待端口/路径消失。
 
 ## 权限提升 (become)
 
@@ -340,6 +361,117 @@ inv := ansible.Inventory{
     - /opt/data
 ```
 
+循环值可以是模板，按每台主机各自的变量求值：
+
+```yaml
+- name: 用变量里的列表循环
+  shell: "mkdir -p {{ .item }}"
+  loop: "{{ .app_dirs }}"          # 解析为列表本身，而非它渲染成的字符串
+```
+
+`with_items` 会额外展开一层嵌套列表，`with_dict` 把映射变成 `{key, value}` 条目（按 key 排序，保证可复现）：
+
+```yaml
+- name: with_items 展开一层
+  shell: "install {{ .item }}"
+  with_items: "{{ .pkg_groups }}"   # [[a, b], [c]] -> a, b, c
+
+- name: with_dict 遍历映射
+  shell: "set {{ .item.key }}={{ .item.value }}"
+  with_dict: "{{ .settings }}"
+```
+
+`loop_control` 可改写条目变量名与序号变量名：
+
+```yaml
+- name: 重命名循环变量
+  shell: "systemctl restart {{ .svc }}"
+  loop: "{{ .services }}"
+  loop_control:
+    loop_var: svc
+    index_var: idx
+```
+
+空列表（或解析为空的模板）不执行任何一次，任务记为 `skipped`。
+
+### 委派执行（delegate_to）
+
+任务改在另一台主机上执行，但**变量与 `register` 结果仍属于原主机**（Ansible 语义）。目标支持模板；若该主机不在本 play 的主机列表里，引擎按需为它新建连接，并在 play 结束时一并关闭。
+
+```yaml
+- name: 在主库上验证从库已跟上
+  shell: "check-replica {{ .inventory_hostname }}"
+  delegate_to: "{{ .primary_host }}"
+  register: replica_state          # 结果记在原主机上
+```
+
+目标主机既不在注册表也无法新建连接时，任务明确失败并在错误里指出该主机名。
+
+### 变更状态（changed_when）
+
+引擎不猜测模块是否产生变更：只有写了 `changed_when` 的任务才会被标记为 `changed`，其结果同时进入 `register` 变量的 `changed` 字段。
+
+```yaml
+- name: 只有真的改了才算变更
+  shell: "apply-config"
+  changed_when: '{{ not (contains "no change" .stdout) }}'
+  register: apply_out
+
+- name: 永不算变更
+  shell: "check-config"
+  changed_when: false
+```
+
+### 环境变量（environment）
+
+`environment` 支持映射、映射列表，或解析为二者之一的模板；值本身也会渲染。仅 `command` / `shell` 应用它——它们才是执行用户命令的模块。
+
+```yaml
+- name: 走代理下载
+  shell: "curl -O https://example.com/pkg.tar.gz"
+  environment:
+    http_proxy: "{{ .proxy_url }}"
+    https_proxy: "{{ .proxy_url }}"
+
+- name: 整个映射来自变量
+  shell: "make build"
+  environment: "{{ .build_env }}"
+```
+
+### 拆分任务文件（include_tasks / import_tasks）
+
+```yaml
+tasks:
+  - include_tasks: tasks/setup.yml
+  - import_tasks: tasks/verify.yml     # 等价写法
+```
+
+Ansible 用 import/include 区分"解析期读入"与"运行期读入"，本引擎一律在运行期读入，两者等价。差别只体现在 `tags` 与 `when` 的传播方式上；需要精确控制时用 `include_tasks` 并在被包含文件内写条件。
+
+### 不支持的指令会在加载时报错
+
+YAML 层能解析、但引擎没有实现的指令，**在加载 playbook / role / include_tasks 文件时直接报错**，而不是静默忽略。静默忽略会产出"报告成功、行为却和剧本写的不一样"的运行结果——不委派的 `delegate_to`、不循环的 `with_*`、不触发的 handler，这类问题最难排查。
+
+当前会被拒绝的指令：
+
+| 指令 | 替代写法 |
+|------|----------|
+| `notify` / `handlers` / `force_handlers` | 直接调用该任务，或用 `when` 控制 |
+| `async` / `poll` | 在 shell 里自行后台执行 |
+| `strategy`（非 `linear`）/ `order` | 只有默认的 linear 策略、inventory 顺序 |
+| `throttle` | 用 `serial` 限制并发主机数 |
+| `any_errors_fatal` / `max_fail_percentage` | 任一主机失败即中止 play |
+| `timeout` | 给命令本身加超时（如 `timeout(1)`） |
+| `import_playbook` | 把被引用 play 合并进本文件 |
+| `include_role` / `import_role` | 在 play 的 `roles:` 里声明 |
+| `local_action` | 用 `delegate_to: localhost` |
+| `delegate_facts` | 事实始终属于原主机 |
+| `with_*`（除 `with_items` / `with_dict`） | 用 `loop` |
+| play 级 / block 容器级 `environment` | 挂到具体任务上（引擎不做 environment 继承） |
+| 同一任务写多个 loop 指令 | `loop` / `with_items` / `with_dict` 互斥，只写一个 |
+
+`check_mode` / `diff` **不在拒绝之列**：引擎本身没有 dry-run 模式，它们只是无效而非误导，拒绝反而会打断防御性写法。
+
 ### 重试
 
 ```yaml
@@ -413,6 +545,52 @@ msg: "{{ join \",\" .servers }}"
 # 自定义函数
 msg: "{{ toYaml .config }}"          # 转 YAML 字符串
 msg: "{{ ipFamily .listen_addr }}"   # 返回 "IPv4" 或 "IPv6"
+```
+
+### 这不是 Jinja2
+
+引擎的模板层是 Go `text/template` + Sprig，**不是 Jinja2**。这不是"还没实现"，而是根本性的取舍：Go 生态没有完整的 Jinja2 实现，自建一个远超本库范围。因此现成的 Ansible playbook **无法原样运行**，必须改写模板表达式。三条硬性差异：
+
+1. **变量要带 `.` 前缀**：`{{ nodename }}` → `{{ .nodename }}`
+2. **过滤器是函数调用，参数顺序常相反**：`{{ x | default('a') }}` → `{{ default "a" .x }}`
+3. **没有 Jinja 控制流与测试**：`{% if %}`、`is defined`、`~` 拼接都不可用；改用 `{{ if }}`、`hasKey`、`printf`
+
+### Ansible/Jinja 过滤器移植对照
+
+| Ansible / Jinja | 本引擎写法 | 来源 |
+|---|---|---|
+| `x \| default('a')` | `default "a" .x` | Sprig |
+| `x \| int` / `\| string` | `atoi .x` / `toString .x` | Sprig |
+| `x \| length` | `len .x` | Go 内置 |
+| `x \| replace('a','b')` | `replace "a" "b" .x` | Sprig |
+| `x \| join(',')` | `join "," .x` | Sprig |
+| `x \| sort` / `\| unique` | `sortAlpha .x` / `uniq .x` | Sprig |
+| `x \| min` / `\| max` | `min .x` / `max .x` | Sprig |
+| `x \| trim` / `\| lower` / `\| upper` | `trim .x` / `lower .x` / `upper .x` | Sprig |
+| `x \| to_json` / `from_json` | `toJson .x` / `fromJson .x` | Sprig |
+| `x \| to_yaml` / `from_yaml` | `toYaml .x` / `fromYaml .x` | 自定义 |
+| `x \| regex_replace('a','b')` | `regexReplaceAll "a" .x "b"` | Sprig |
+| `x \| regex_search('re')` | `regexFind "re" .x` | Sprig |
+| `a \| combine(b)` | `merge .a .b` | Sprig |
+| `x \| b64encode` / `b64decode` | `b64enc .x` / `b64dec .x` | Sprig |
+| `x \| ternary(a,b)` | `ternary a b .x` | Sprig |
+| `x \| mandatory` | `required "msg" .x` | Sprig |
+| `x is defined` | `hasKey . "x"` | Sprig |
+| `x \| selectattr('k')` | `.x \| selectattr "k"` | 自定义 |
+| `x \| selectattr('k','equalto','v')` | `.x \| selectattr "k" "v"` | 自定义 |
+| `x \| rejectattr('k')` | `.x \| rejectattr "k"` | 自定义 |
+| `x \| map(attribute='k')` | `.x \| mapattr "k"` | 自定义 |
+| `x \| flatten` | `.x \| flatten` | 自定义 |
+| `x \| json_query(...)` | **无对应**（JMESPath 未实现），改用 `mapattr` / `selectattr` 组合 |
+| `x \| strftime(...)` | **无对应**，用 Sprig 的 `date` / `dateInZone` |
+
+`selectattr` / `rejectattr` / `mapattr` / `flatten` 是本引擎补的：它们处理"字典列表"，Sprig 没有等价物，而 Ansible 剧本大量依赖。列表放在最后一个参数，因此可直接接管道：
+
+```yaml
+# 取出所有启用的服务名
+msg: '{{ .services | selectattr "enabled" | mapattr "name" | join "," }}'
+# 按字段值筛选
+msg: '{{ .services | selectattr "tier" "db" | mapattr "name" | join "," }}'
 ```
 
 ## 注册自定义模块

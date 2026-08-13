@@ -32,7 +32,8 @@ func BlockToTaskSpec(block ansible.Block, hosts []string, role string, moduleFin
 		Hosts:        hosts,
 		When:         block.When.Data,
 		FailedWhen:   block.FailedWhen.Data,
-		Loop:         block.Loop,
+		ChangedWhen:  block.ChangedWhen.Data,
+		Environment:  block.Environment,
 		LoopControl:  block.Task.LoopControl,
 		Register:     block.Register,
 		RegisterType: block.RegisterType,
@@ -46,6 +47,17 @@ func BlockToTaskSpec(block ansible.Block, hosts []string, role string, moduleFin
 		Poll:         block.Poll,
 		Notify:       block.Notify,
 		IgnoreErrors: block.IgnoreErrors,
+	}
+
+	// loop / with_items / with_dict share TaskSpec.Loop but keep their own
+	// item semantics, recorded in LoopKind. Only one may win; loop first.
+	switch {
+	case block.Loop != nil:
+		spec.Loop, spec.LoopKind = block.Loop, ansible.LoopKindLoop
+	case block.WithItems != nil:
+		spec.Loop, spec.LoopKind = block.WithItems, ansible.LoopKindItems
+	case block.WithDict != nil:
+		spec.Loop, spec.LoopKind = block.WithDict, ansible.LoopKindDict
 	}
 
 	// Identify module from UnknownField

@@ -15,7 +15,7 @@ func ModuleCommand(ctx context.Context, opts internal.ExecOptions) (string, stri
 		return "", "", fmt.Errorf("command module: no command specified")
 	}
 
-	stdout, stderr, err := opts.Connector.ExecuteCommand(ctx, cmd)
+	stdout, stderr, err := opts.Connector.ExecuteCommand(ctx, internal.EnvPrefix(opts.Environment)+cmd)
 	return string(stdout), string(stderr), err
 }
 

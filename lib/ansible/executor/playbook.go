@@ -42,6 +42,12 @@ type PlaybookExecutor struct {
 	// stays atomic without contending with map writes.
 	liveMu     sync.Mutex
 	liveOutput io.Writer
+
+	// delegateMu serialises on-demand connector creation for delegate_to
+	// targets. Task workers run in parallel, so without it two hosts
+	// delegating to the same third host would each build a connector and
+	// one would be orphaned in the registry.
+	delegateMu sync.Mutex
 }
 
 // Resize forwards a window-size change to every connector that has
@@ -212,7 +218,7 @@ func (e *PlaybookExecutor) execPlay(ctx context.Context, playIndex int, play ans
 	if err := e.initConnectors(ctx, hosts, play); err != nil {
 		return err
 	}
-	defer e.closeConnectors(ctx, hosts)
+	defer e.closeConnectors(ctx)
 
 	// 3. Merge play-level variables
 	if len(play.Vars.Nodes) > 0 {
@@ -258,7 +264,10 @@ func countBlocks(blocks []ansible.Block) int {
 
 // execBatch executes pre_tasks -> roles -> tasks -> post_tasks for a host batch.
 func (e *PlaybookExecutor) execBatch(ctx context.Context, play ansible.Play, hosts []string, result *ansible.PlaybookResult) error {
-	taskExec := NewTaskExecutor(e.variable, e.source, e.connectors, e.logOutput)
+	taskExec := NewTaskExecutor(e.variable, e.source, e.connectors, e.logOutput,
+		func(ctx context.Context, host string) (connector.Connector, error) {
+			return e.connectorForDelegate(ctx, host, play)
+		})
 
 	// Count total tasks for progress tracking (best-effort for inline tasks)
 	total := countBlocks(play.PreTasks) + countBlocks(play.Tasks) + countBlocks(play.PostTasks)
@@ -385,13 +394,30 @@ func initConnectorBecomeDefaults(vars map[string]any, play ansible.Play) {
 	}
 }
 
-// closeConnectors closes connectors for hosts.
-func (e *PlaybookExecutor) closeConnectors(ctx context.Context, hosts []string) {
-	for _, host := range hosts {
-		if conn := e.connectors.Delete(host); conn != nil {
-			_ = conn.Close(ctx)
-		}
+// closeConnectors closes every connector the play opened. It drains the
+// registry rather than walking the play's host list so that connectors made
+// on demand for delegate_to targets are closed too.
+func (e *PlaybookExecutor) closeConnectors(ctx context.Context) {
+	for _, conn := range e.connectors.Drain() {
+		_ = conn.Close(ctx)
 	}
+}
+
+// connectorForDelegate returns the connector for a delegate_to target,
+// creating and registering it on first use. A delegate can be a host the play
+// never listed, so the play's initConnectors pass will not have covered it.
+func (e *PlaybookExecutor) connectorForDelegate(ctx context.Context, host string, play ansible.Play) (connector.Connector, error) {
+	e.delegateMu.Lock()
+	defer e.delegateMu.Unlock()
+
+	// Re-check under the lock: a parallel task worker may have just made it.
+	if conn := e.connectors.Get(host); conn != nil {
+		return conn, nil
+	}
+	if err := e.initConnector(ctx, host, play); err != nil {
+		return nil, err
+	}
+	return e.connectors.Get(host), nil
 }
 
 // gatherFacts runs setup module on all hosts.

@@ -1,0 +1,27 @@
+---
+# Runs from the play's roles: list. It checks the two things a role adds on
+# top of ordinary tasks: its own variable precedence, and that set_fact from
+# inside a role is visible to the play afterwards.
+
+- name: role vars outrank role defaults
+  assert:
+    that:
+      - '{{ eq .role_overridable "from-vars" }}'
+      - '{{ eq .role_marker "role-default" }}'
+    msg: "role variable precedence wrong: overridable={{ .role_overridable }} marker={{ .role_marker }}"
+
+- name: play vars are visible inside the role
+  assert:
+    that:
+      - '{{ ne .workdir "" }}'
+    msg: "play vars did not reach the role"
+
+- name: set a fact the play will check
+  set_fact:
+    role_ran: "yes"
+
+- name: gathered facts are visible inside the role
+  assert:
+    that:
+      - '{{ ne .os_release.ID "" }}'
+    msg: "gathered facts did not reach the role"

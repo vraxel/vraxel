@@ -35,7 +35,7 @@ func setupRoleExecutor(t *testing.T, hosts []string, files map[string][]byte) (*
 
 	var logBuf bytes.Buffer
 	src := &memSource{files: files}
-	taskExec := NewTaskExecutor(v, src, connMap, &logBuf)
+	taskExec := NewTaskExecutor(v, src, connMap, &logBuf, nil)
 	blockExec := NewBlockExecutor(taskExec, v, src, connMap, hosts, &logBuf)
 	roleExec := NewRoleExecutor(blockExec, src, v, hosts, &logBuf)
 
