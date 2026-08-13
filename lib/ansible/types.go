@@ -243,6 +243,8 @@ type Block struct {
 	BlockBase
 	// If it has Block, Task should be empty.
 	Task
+	// IncludeTasks holds the target of include_tasks or its accepted
+	// spelling import_tasks; see Block.UnmarshalYAML.
 	IncludeTasks string `yaml:"include_tasks,omitempty"`
 
 	BlockInfo
@@ -301,7 +303,11 @@ func (b *Block) UnmarshalYAML(node *yaml.Node) error {
 		valueNode := node.Content[i+1]
 
 		switch keyNode.Value {
-		case "include_tasks":
+		// import_tasks is accepted as a spelling of include_tasks. Ansible
+		// separates them by when the file is read (import at parse time,
+		// include at run time); this engine reads it at run time either way,
+		// so the difference only shows in how tags and when propagate.
+		case "include_tasks", "import_tasks":
 			b.IncludeTasks = valueNode.Value
 			return nil
 

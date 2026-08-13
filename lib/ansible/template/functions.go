@@ -31,6 +31,10 @@ func buildFuncMap(t *template.Template, includedNames map[string]int) template.F
 	fm["ipInCIDR"] = ipInCIDR
 	fm["ipFamily"] = ipFamily
 	fm["isIP"] = isIP
+	fm["selectattr"] = selectAttr
+	fm["rejectattr"] = rejectAttr
+	fm["mapattr"] = mapAttr
+	fm["flatten"] = flatten
 	fm["pow"] = pow
 	fm["subtractList"] = subtractList
 	fm["fileExists"] = fileExists
@@ -248,6 +252,153 @@ func isIP(addr string) bool {
 		host = host[1 : len(host)-1]
 	}
 	return net.ParseIP(host) != nil
+}
+
+// The next four cover list-of-map work that Sprig has no equivalent for and
+// that Ansible playbooks lean on heavily (selectattr / rejectattr /
+// map(attribute=) / flatten). They take the list last so they read naturally
+// in a pipeline, matching Sprig's convention:
+//
+//	{{ .services | selectattr "enabled" }}
+//	{{ .services | selectattr "tier" "db" }}
+//	{{ .services | mapattr "name" }}
+
+// selectAttr keeps the maps in a list whose key is truthy, or whose key equals
+// a given value when one is supplied.
+func selectAttr(args ...any) ([]any, error) {
+	return filterByAttr("selectattr", true, args...)
+}
+
+// rejectAttr is selectAttr's complement: it drops the entries selectAttr keeps.
+func rejectAttr(args ...any) ([]any, error) {
+	return filterByAttr("rejectattr", false, args...)
+}
+
+// filterByAttr implements selectattr/rejectattr. keep says which side of the
+// match to return.
+func filterByAttr(name string, keep bool, args ...any) ([]any, error) {
+	key, want, list, err := attrArgs(name, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]any, 0, len(list))
+	for _, entry := range list {
+		m, ok := entry.(map[string]any)
+		if !ok {
+			continue
+		}
+		matched := isTruthy(m[key])
+		if want != nil {
+			matched = fmt.Sprint(m[key]) == fmt.Sprint(want)
+		}
+		if matched == keep {
+			result = append(result, entry)
+		}
+	}
+	return result, nil
+}
+
+// mapAttr extracts one key from every map in a list, skipping entries that do
+// not carry it. It is Ansible's map(attribute='key').
+func mapAttr(args ...any) ([]any, error) {
+	key, _, list, err := attrArgs("mapattr", args...)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]any, 0, len(list))
+	for _, entry := range list {
+		if m, ok := entry.(map[string]any); ok {
+			if v, exists := m[key]; exists {
+				result = append(result, v)
+			}
+		}
+	}
+	return result, nil
+}
+
+// attrArgs unpacks the shared "key [value] list" argument shape.
+func attrArgs(name string, args ...any) (key string, want any, list []any, err error) {
+	if len(args) < 2 || len(args) > 3 {
+		return "", nil, nil, fmt.Errorf("%s: want (key, [value], list), got %d arguments", name, len(args))
+	}
+	key, ok := args[0].(string)
+	if !ok {
+		return "", nil, nil, fmt.Errorf("%s: key must be a string, got %T", name, args[0])
+	}
+	if len(args) == 3 {
+		want = args[1]
+	}
+	list, ok = toList(args[len(args)-1])
+	if !ok {
+		return "", nil, nil, fmt.Errorf("%s: last argument must be a list, got %T", name, args[len(args)-1])
+	}
+	return key, want, list, nil
+}
+
+// flatten collapses nested lists into a single list, at any depth.
+func flatten(v any) []any {
+	list, ok := toList(v)
+	if !ok {
+		return nil
+	}
+
+	result := make([]any, 0, len(list))
+	for _, entry := range list {
+		if _, nested := toList(entry); nested {
+			result = append(result, flatten(entry)...)
+			continue
+		}
+		result = append(result, entry)
+	}
+	return result
+}
+
+// toList normalises the list shapes templates produce into []any.
+func toList(v any) ([]any, bool) {
+	switch x := v.(type) {
+	case []any:
+		return x, true
+	case []string:
+		out := make([]any, len(x))
+		for i, s := range x {
+			out[i] = s
+		}
+		return out, true
+	case []map[string]any:
+		out := make([]any, len(x))
+		for i, m := range x {
+			out[i] = m
+		}
+		return out, true
+	default:
+		return nil, false
+	}
+}
+
+// isTruthy mirrors the emptiness rule Go templates use for if.
+func isTruthy(v any) bool {
+	switch x := v.(type) {
+	case nil:
+		return false
+	case bool:
+		return x
+	case string:
+		return x != ""
+	case int:
+		return x != 0
+	case int64:
+		return x != 0
+	case float64:
+		return x != 0
+	case []any:
+		return len(x) > 0
+	case map[string]any:
+		return len(x) > 0
+	default:
+		return true
+	}
 }
 
 // pow returns base raised to the power of exp.

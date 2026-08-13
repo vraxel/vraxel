@@ -502,6 +502,47 @@ func TestUnsupported_RejectedInsideIncludeTasks(t *testing.T) {
 	}
 }
 
+func TestImportTasks_LoadsLikeIncludeTasks(t *testing.T) {
+	files := map[string][]byte{
+		"tasks/imported.yml": []byte(`
+- name: imported task
+  command:
+    cmd: echo imported
+  register: imported_out
+`),
+	}
+
+	pb, err := converter.ParsePlaybook([]byte(`
+- name: importing
+  hosts:
+    - localhost
+  gather_facts: false
+  tasks:
+    - import_tasks: tasks/imported.yml
+`))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+
+	exec, _ := setupPlaybookExecutor(t, localhostInventory(), files)
+	result, err := exec.Execute(context.Background(), pb)
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if !result.Success {
+		t.Fatalf("playbook failed: %s", result.Error)
+	}
+
+	vars := exec.variable.Get(variable.GetAllVariable("localhost")).(map[string]any)
+	reg, ok := vars["imported_out"].(map[string]any)
+	if !ok {
+		t.Fatal("expected the imported task to have run and registered")
+	}
+	if reg["stdout"] != "imported" {
+		t.Errorf("imported task stdout = %v, want %q", reg["stdout"], "imported")
+	}
+}
+
 func TestUnsupported_RejectedInsideRole(t *testing.T) {
 	files := map[string][]byte{
 		"roles/svc/tasks/main.yml": []byte(`

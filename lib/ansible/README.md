@@ -417,6 +417,16 @@ inv := ansible.Inventory{
   environment: "{{ .build_env }}"
 ```
 
+### 拆分任务文件（include_tasks / import_tasks）
+
+```yaml
+tasks:
+  - include_tasks: tasks/setup.yml
+  - import_tasks: tasks/verify.yml     # 等价写法
+```
+
+Ansible 用 import/include 区分"解析期读入"与"运行期读入"，本引擎一律在运行期读入，两者等价。差别只体现在 `tags` 与 `when` 的传播方式上；需要精确控制时用 `include_tasks` 并在被包含文件内写条件。
+
 ### 不支持的指令会在加载时报错
 
 YAML 层能解析、但引擎没有实现的指令，**在加载 playbook / role / include_tasks 文件时直接报错**，而不是静默忽略。静默忽略会产出"报告成功、行为却和剧本写的不一样"的运行结果——不委派的 `delegate_to`、不循环的 `with_*`、不触发的 handler，这类问题最难排查。
@@ -512,6 +522,52 @@ msg: "{{ join \",\" .servers }}"
 # 自定义函数
 msg: "{{ toYaml .config }}"          # 转 YAML 字符串
 msg: "{{ ipFamily .listen_addr }}"   # 返回 "IPv4" 或 "IPv6"
+```
+
+### 这不是 Jinja2
+
+引擎的模板层是 Go `text/template` + Sprig，**不是 Jinja2**。这不是"还没实现"，而是根本性的取舍：Go 生态没有完整的 Jinja2 实现，自建一个远超本库范围。因此现成的 Ansible playbook **无法原样运行**，必须改写模板表达式。三条硬性差异：
+
+1. **变量要带 `.` 前缀**：`{{ nodename }}` → `{{ .nodename }}`
+2. **过滤器是函数调用，参数顺序常相反**：`{{ x | default('a') }}` → `{{ default "a" .x }}`
+3. **没有 Jinja 控制流与测试**：`{% if %}`、`is defined`、`~` 拼接都不可用；改用 `{{ if }}`、`hasKey`、`printf`
+
+### Ansible/Jinja 过滤器移植对照
+
+| Ansible / Jinja | 本引擎写法 | 来源 |
+|---|---|---|
+| `x \| default('a')` | `default "a" .x` | Sprig |
+| `x \| int` / `\| string` | `atoi .x` / `toString .x` | Sprig |
+| `x \| length` | `len .x` | Go 内置 |
+| `x \| replace('a','b')` | `replace "a" "b" .x` | Sprig |
+| `x \| join(',')` | `join "," .x` | Sprig |
+| `x \| sort` / `\| unique` | `sortAlpha .x` / `uniq .x` | Sprig |
+| `x \| min` / `\| max` | `min .x` / `max .x` | Sprig |
+| `x \| trim` / `\| lower` / `\| upper` | `trim .x` / `lower .x` / `upper .x` | Sprig |
+| `x \| to_json` / `from_json` | `toJson .x` / `fromJson .x` | Sprig |
+| `x \| to_yaml` / `from_yaml` | `toYaml .x` / `fromYaml .x` | 自定义 |
+| `x \| regex_replace('a','b')` | `regexReplaceAll "a" .x "b"` | Sprig |
+| `x \| regex_search('re')` | `regexFind "re" .x` | Sprig |
+| `a \| combine(b)` | `merge .a .b` | Sprig |
+| `x \| b64encode` / `b64decode` | `b64enc .x` / `b64dec .x` | Sprig |
+| `x \| ternary(a,b)` | `ternary a b .x` | Sprig |
+| `x \| mandatory` | `required "msg" .x` | Sprig |
+| `x is defined` | `hasKey . "x"` | Sprig |
+| `x \| selectattr('k')` | `.x \| selectattr "k"` | 自定义 |
+| `x \| selectattr('k','equalto','v')` | `.x \| selectattr "k" "v"` | 自定义 |
+| `x \| rejectattr('k')` | `.x \| rejectattr "k"` | 自定义 |
+| `x \| map(attribute='k')` | `.x \| mapattr "k"` | 自定义 |
+| `x \| flatten` | `.x \| flatten` | 自定义 |
+| `x \| json_query(...)` | **无对应**（JMESPath 未实现），改用 `mapattr` / `selectattr` 组合 |
+| `x \| strftime(...)` | **无对应**，用 Sprig 的 `date` / `dateInZone` |
+
+`selectattr` / `rejectattr` / `mapattr` / `flatten` 是本引擎补的：它们处理"字典列表"，Sprig 没有等价物，而 Ansible 剧本大量依赖。列表放在最后一个参数，因此可直接接管道：
+
+```yaml
+# 取出所有启用的服务名
+msg: '{{ .services | selectattr "enabled" | mapattr "name" | join "," }}'
+# 按字段值筛选
+msg: '{{ .services | selectattr "tier" "db" | mapattr "name" | join "," }}'
 ```
 
 ## 注册自定义模块
