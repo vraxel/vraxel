@@ -38,8 +38,13 @@ export default function HostListPage() {
       // column for data that has nowhere else to go. The name's width cap
       // is tightened from the default so the badge stays adjacent instead
       // of drifting right on long names.
+      //
+      // Centred rather than aligned to the first line: NameCell is one or
+      // two lines depending on whether the host has a display name, and
+      // top-aligning makes the badge jump between rows of different
+      // heights. Centred, it holds one baseline down the column.
       cell: (h) => (
-        <div className="flex min-w-0 items-start gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           <NameCell
             to={`/compute/hosts/${h.metadata.id}`}
             displayName={h.spec.displayName}
@@ -49,7 +54,7 @@ export default function HostListPage() {
           <AgentStatusBadge
             status={h.spec.agentStatus}
             conflictAt={h.spec.agentConflictAt}
-            className="mt-0.5 shrink-0"
+            className="shrink-0"
           />
         </div>
       ),
