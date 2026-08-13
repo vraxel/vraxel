@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
 )
 
 var version = flag.Bool("version", false, "Show Vraxel Server version")
@@ -26,17 +27,24 @@ var devVersionRe = regexp.MustCompile(`\d{8}-\d{6}-.*?(g[0-9a-f]+)$`)
 //   - semver tag present                         -> "vX.Y.Z[-suffix]"
 //   - Makefile-built dev/CI string               -> "YYYYMMDD-gSHA"
 //   - anything else                              -> the full Version string
-func ShortVersion() string {
-	if Version == "" {
+func ShortVersion() string { return ShortVersionOf(Version) }
+
+// ShortVersionOf is ShortVersion applied to an arbitrary version string.
+// The agent's self-upgrade needs it to read the version out of a staged
+// binary's -version output, which prints the full build string while
+// every version the server knows is a short one.
+func ShortVersionOf(version string) string {
+	version = strings.TrimSpace(version)
+	if version == "" {
 		return "dev"
 	}
-	if m := shortVersionRe.FindString(Version); m != "" {
+	if m := shortVersionRe.FindString(version); m != "" {
 		return m
 	}
-	if m := devVersionRe.FindStringSubmatch(Version); m != nil {
+	if m := devVersionRe.FindStringSubmatch(version); m != nil {
 		return m[0][:8] + "-" + m[1]
 	}
-	return Version
+	return version
 }
 
 // Init must be called after flag.Parse call.

@@ -87,10 +87,25 @@ func (c *Conn) WriteBinary(ctx context.Context, data []byte) error {
 	return c.WriteMessage(ctx, cws.MessageBinary, data)
 }
 
+// WriteText writes a text WebSocket message. Lets callers send text frames
+// (e.g. JSON control frames) without importing coder/websocket for its
+// MessageText constant.
+func (c *Conn) WriteText(ctx context.Context, data []byte) error {
+	return c.WriteMessage(ctx, cws.MessageText, data)
+}
+
 // Close sends a close frame and stops the keepalive goroutine.
 func (c *Conn) Close(code cws.StatusCode, reason string) error {
 	c.cancel() // stop keepalive
 	return c.inner.Close(code, reason)
+}
+
+// CloseNow closes the connection immediately, skipping the close handshake,
+// and stops the keepalive goroutine. Use on error / cleanup paths where a
+// graceful Close could block waiting for a reply from a half-dead peer.
+func (c *Conn) CloseNow() error {
+	c.cancel() // stop keepalive
+	return c.inner.CloseNow()
 }
 
 // DrainReads starts a background goroutine that reads and DISCARDS every
