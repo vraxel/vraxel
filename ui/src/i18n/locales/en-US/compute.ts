@@ -8,10 +8,9 @@ const compute = {
   "compute.host.subtitle":
     "Hosts managed through an agent. Specs are reported by the agent, never typed in.",
   "compute.host.searchPlaceholder": "Search name / IP / OS",
-  "compute.host.onboard": "Onboard host",
+  "compute.host.create": "Create host",
+  "compute.host.agentStatusAll": "All statuses",
   "compute.host.empty": "No hosts onboarded yet",
-  "compute.host.emptyHint":
-    "Onboarding runs one command on the host; its specs are reported automatically.",
   "compute.host.agentStatus": "Agent",
   "compute.host.ip": "IP address",
   "compute.host.os": "OS",
@@ -58,28 +57,9 @@ const compute = {
   "compute.onboard.next": "Next",
   "compute.onboard.prev": "Back",
   "compute.onboard.done": "Done",
-  "compute.onboard.comingSoon": "Coming soon",
-  "compute.onboard.flowPrefix": "Steps: ",
 
-  "compute.onboard.step.method": "Method",
   "compute.onboard.step.identity": "Host details",
   "compute.onboard.step.install": "Install and join",
-  "compute.onboard.step.pool": "Resource pool",
-  "compute.onboard.step.template": "Template / image",
-  "compute.onboard.step.spec": "Spec and disks",
-  "compute.onboard.step.network": "Network",
-  "compute.onboard.step.confirm": "Confirm",
-  "compute.onboard.step.connection": "Connection",
-
-  "compute.onboard.method.agent.title": "Agent onboarding",
-  "compute.onboard.method.agent.desc":
-    "The host already exists (bare metal, VM or cloud instance). Install vr-agent on it and the agent dials out to the control plane -- the control plane never needs to reach the host.",
-  "compute.onboard.method.cloud.title": "Provision from a cloud pool",
-  "compute.onboard.method.cloud.desc":
-    "Create a new host on VMware, AWS or a similar pool, then install the agent and onboard it automatically.",
-  "compute.onboard.method.ssh.title": "Manage over SSH",
-  "compute.onboard.method.ssh.desc":
-    "No agent; the control plane manages the host over SSH. For hosts where a resident process is not allowed. Reduced capability.",
 
   "compute.onboard.scope.platform": "Platform",
   "compute.onboard.scope.workspace": "Workspace {name}",

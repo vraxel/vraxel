@@ -3,6 +3,7 @@ import { Link } from "react-router"
 import { KeyRound, Plus } from "lucide-react"
 import { formatDateTime } from "@/shared/lib/format"
 import { Button } from "@/shared/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select"
 import { useTranslation } from "@/i18n"
 import { useListQuery } from "@/frameworks/list/use-list-query"
 import { NameCell } from "@/frameworks/list/name-cell"
@@ -11,7 +12,7 @@ import type { ScopeRef } from "@/core/registry/resource"
 import { hostsApi } from "@/modules/compute/api/hosts"
 import type { Host } from "@/modules/compute/api/types"
 import { hostsDef } from "@/modules/compute/defs"
-import { AgentStatusBadge } from "@/modules/compute/components/agent-status-badge"
+import { AgentStatusBadge, AgentStatusDot } from "@/modules/compute/components/agent-status-badge"
 import { PendingTokensSheet } from "@/modules/compute/components/pending-tokens-sheet"
 
 export default function HostListPage() {
@@ -31,26 +32,22 @@ export default function HostListPage() {
       key: "name",
       header: t("common.name"),
       sortable: true,
+      // Status rides in the name cell rather than a column of its own.
+      // It is the first thing an operator looks for, so it belongs on the
+      // line their eye is already on, and folding it in buys back a
+      // column for data that has nowhere else to go.
       cell: (h) => (
-        <NameCell
-          to={`/compute/hosts/${h.metadata.id}`}
-          displayName={h.spec.displayName}
-          name={h.metadata.name}
-        />
-      ),
-    },
-    {
-      key: "agentStatus",
-      header: t("compute.host.agentStatus"),
-      // The one status column. hosts.status is deliberately absent: see
-      // docs/agent/onboarding-design.md section 5.
-      filter: [
-        { value: "all", label: t("common.all") },
-        { value: "online", label: t("compute.agent.online") },
-        { value: "offline", label: t("compute.agent.offline") },
-      ],
-      cell: (h) => (
-        <AgentStatusBadge status={h.spec.agentStatus} conflictAt={h.spec.agentConflictAt} />
+        <div className="flex min-w-0 items-center gap-2">
+          <AgentStatusDot status={h.spec.agentStatus} conflictAt={h.spec.agentConflictAt} />
+          <NameCell
+            to={`/compute/hosts/${h.metadata.id}`}
+            displayName={h.spec.displayName}
+            name={h.metadata.name}
+          />
+          {h.spec.agentConflictAt && (
+            <AgentStatusBadge status={h.spec.agentStatus} conflictAt={h.spec.agentConflictAt} />
+          )}
+        </div>
       ),
     },
     {
@@ -80,13 +77,6 @@ export default function HostListPage() {
       ),
     },
     {
-      key: "agentVersion",
-      header: t("compute.host.agentVersion"),
-      cell: (h) => (
-        <span className="text-muted-foreground text-xs">{h.spec.agentVersion || "-"}</span>
-      ),
-    },
-    {
       key: "createdAt",
       header: t("common.created"),
       sortable: true,
@@ -105,15 +95,6 @@ export default function HostListPage() {
     },
   ]
 
-  const onboardButton = (
-    <Button asChild>
-      <Link to="/compute/hosts/onboard">
-        <Plus className="size-4" />
-        {t("compute.host.onboard")}
-      </Link>
-    </Button>
-  )
-
   return (
     <>
       <ResourceListPage
@@ -123,10 +104,27 @@ export default function HostListPage() {
         subtitle={t("compute.host.subtitle")}
         searchPlaceholderKey="compute.host.searchPlaceholder"
         // The framework renders the empty state itself and reuses
-        // createButton as its call to action, so onboarding stays the one
+        // createButton as its call to action, so creating stays the one
         // thing offered on an empty table.
         emptyKey="compute.host.empty"
         selectable={false}
+        // The status filter follows its column into the toolbar: left on
+        // the name header it would read as filtering by name.
+        toolbarExtra={
+          <Select
+            value={query.filters.agentStatus ?? "all"}
+            onValueChange={(v) => query.setFilter("agentStatus", v)}
+          >
+            <SelectTrigger className="h-9 w-40">
+              <SelectValue placeholder={t("compute.host.agentStatus")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("compute.host.agentStatusAll")}</SelectItem>
+              <SelectItem value="online">{t("compute.agent.online")}</SelectItem>
+              <SelectItem value="offline">{t("compute.agent.offline")}</SelectItem>
+            </SelectContent>
+          </Select>
+        }
         createButton={
           <div className="flex items-center gap-2">
             {/* Pending tokens live behind a secondary affordance: they are
@@ -137,7 +135,12 @@ export default function HostListPage() {
               <KeyRound className="size-4" />
               {t("compute.token.pending")}
             </Button>
-            {onboardButton}
+            <Button asChild>
+              <Link to="/compute/hosts/onboard">
+                <Plus className="size-4" />
+                {t("compute.host.create")}
+              </Link>
+            </Button>
           </div>
         }
       />

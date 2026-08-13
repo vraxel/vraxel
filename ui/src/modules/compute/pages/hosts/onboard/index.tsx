@@ -8,8 +8,6 @@ import { useWorkspaceStore } from "@/core/scope/workspace-store"
 import { WizardStepper, type WizardStep } from "@/modules/compute/components/wizard-stepper"
 import { createJoinToken, pollForRegisteredHost } from "@/modules/compute/api/join-tokens"
 import type { Host } from "@/modules/compute/api/types"
-import { ONBOARD_METHODS, type OnboardMethodId } from "./methods"
-import { StepMethod } from "./step-method"
 import { StepIdentity, type NamingMode } from "./step-identity"
 import { StepInstall } from "./step-install"
 
@@ -20,16 +18,19 @@ import { StepInstall } from "./step-install"
 const HOST_NAME_RE = /^[a-zA-Z0-9]([a-zA-Z0-9_-]{1,48}[a-zA-Z0-9])?$/
 
 /**
- * Full-page host onboarding wizard.
+ * Full-page host creation wizard.
  *
- * A page rather than a dialog because the flow branches: agent
- * onboarding is short, but provisioning from a cloud pool will ask for a
- * pool, a template, a spec, networking and a confirmation. A modal that
- * has to hold six steps ends up as LCP's 1026-line host-form-dialog,
- * where one component carries several unrelated creation semantics.
+ * A page rather than a dialog because the flow is going to branch:
+ * provisioning from a cloud pool will ask for a pool, a template, a spec,
+ * networking and a confirmation. A modal that has to hold six steps ends
+ * up as LCP's 1026-line host-form-dialog, where one component carries
+ * several unrelated creation semantics at once.
  *
- * The step list comes from the chosen method (see methods.ts), so that
- * branch lands as new step components plus one registry entry.
+ * Today there is one way a host comes into existence, so there is no
+ * method step -- a step with a single option is a click that asks
+ * nothing. When a second way lands it goes back in front as step one and
+ * that branch's steps append below; the shell, the stepper and the footer
+ * render whatever the step list holds.
  */
 export default function HostOnboardPage() {
   const { t } = useTranslation()
@@ -38,7 +39,6 @@ export default function HostOnboardPage() {
   const workspaceName = useWorkspaceStore((s) => s.currentWorkspaceName)
 
   const [stepIndex, setStepIndex] = useState(0)
-  const [method, setMethod] = useState<OnboardMethodId>("agent")
   const [namingMode, setNamingMode] = useState<NamingMode>("auto")
   const [hostName, setHostName] = useState("")
   const [description, setDescription] = useState("")
@@ -47,14 +47,12 @@ export default function HostOnboardPage() {
   const [minting, setMinting] = useState(false)
   const [registeredHost, setRegisteredHost] = useState<Host | null>(null)
 
-  const methodDef = ONBOARD_METHODS.find((m) => m.id === method) ?? ONBOARD_METHODS[0]
-
   const steps: WizardStep[] = useMemo(
     () => [
-      { id: "method", label: t("compute.onboard.step.method") },
-      ...methodDef.stepKeys.map((k) => ({ id: k, label: t(k) })),
+      { id: "identity", label: t("compute.onboard.step.identity") },
+      { id: "install", label: t("compute.onboard.step.install") },
     ],
-    [methodDef, t],
+    [t],
   )
 
   const scopeLabel = namespaceId
@@ -80,22 +78,16 @@ export default function HostOnboardPage() {
   }, [command, registeredHost])
 
   const goNext = async () => {
-    // Step 0 -> method chosen.
     if (stepIndex === 0) {
-      setStepIndex(1)
-      return
-    }
-    // Last editable step of the agent branch: mint the token, then reveal
-    // the command. Minting on the way in (rather than on page load) means
-    // an abandoned wizard leaves no live credential behind.
-    if (stepIndex === 1) {
       if (namingMode === "reserved" && !HOST_NAME_RE.test(hostName.trim())) {
         setNameError(t("compute.onboard.identity.nameInvalid"))
         return
       }
       setNameError(undefined)
+      // Minting on the way in rather than on page load means an abandoned
+      // wizard leaves no live credential behind.
       setMinting(true)
-      setStepIndex(2)
+      setStepIndex(1)
       try {
         const token = await createJoinToken(
           {},
@@ -107,7 +99,7 @@ export default function HostOnboardPage() {
         setCommand(buildInstallCommand(token.spec.token ?? ""))
       } catch {
         toast.error(t("compute.onboard.install.mintFailed"))
-        setStepIndex(1)
+        setStepIndex(0)
       } finally {
         setMinting(false)
       }
@@ -117,7 +109,7 @@ export default function HostOnboardPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-4xl p-6">
+    <div className="p-6">
       <div className="mb-6 flex items-center gap-3">
         <Button asChild variant="ghost" size="icon" aria-label={t("common.cancel")}>
           <Link to={hostsPath}>
@@ -135,30 +127,34 @@ export default function HostOnboardPage() {
           <WizardStepper steps={steps} current={stepIndex} />
         </div>
 
+        {/* The card runs the page's full width like every detail page; the
+            step body caps itself so a single text field does not stretch
+            across 1600px on a wide monitor. */}
         <div className="px-6 py-6">
-          {stepIndex === 0 && <StepMethod value={method} onChange={setMethod} />}
-          {stepIndex === 1 && (
-            <StepIdentity
-              mode={namingMode}
-              hostName={hostName}
-              description={description}
-              scopeLabel={scopeLabel}
-              nameError={nameError}
-              onModeChange={setNamingMode}
-              onHostNameChange={(v) => {
-                setHostName(v)
-                setNameError(undefined)
-              }}
-              onDescriptionChange={setDescription}
-            />
-          )}
-          {stepIndex === 2 && (
-            <StepInstall
-              command={command}
-              reservedName={namingMode === "reserved" ? hostName.trim() : undefined}
-              registeredHost={registeredHost}
-            />
-          )}
+          <div className="max-w-3xl">
+            {stepIndex === 0 && (
+              <StepIdentity
+                mode={namingMode}
+                hostName={hostName}
+                description={description}
+                scopeLabel={scopeLabel}
+                nameError={nameError}
+                onModeChange={setNamingMode}
+                onHostNameChange={(v) => {
+                  setHostName(v)
+                  setNameError(undefined)
+                }}
+                onDescriptionChange={setDescription}
+              />
+            )}
+            {stepIndex === 1 && (
+              <StepInstall
+                command={command}
+                reservedName={namingMode === "reserved" ? hostName.trim() : undefined}
+                registeredHost={registeredHost}
+              />
+            )}
+          </div>
         </div>
 
         <div className="border-border-subtle flex items-center justify-between border-t px-6 py-4">

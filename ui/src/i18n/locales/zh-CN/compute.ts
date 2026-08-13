@@ -9,9 +9,9 @@ const compute = {
   "compute.host.title": "主机",
   "compute.host.subtitle": "通过 agent 纳管的主机。规格信息由 agent 上报，无需手工录入。",
   "compute.host.searchPlaceholder": "搜索名称 / IP / 操作系统",
-  "compute.host.onboard": "接入主机",
+  "compute.host.create": "创建主机",
+  "compute.host.agentStatusAll": "全部状态",
   "compute.host.empty": "还没有接入任何主机",
-  "compute.host.emptyHint": "接入主机后，在主机上执行一条命令即可完成纳管，规格信息会自动上报。",
   "compute.host.agentStatus": "Agent 状态",
   "compute.host.ip": "IP 地址",
   "compute.host.os": "操作系统",
@@ -58,28 +58,9 @@ const compute = {
   "compute.onboard.next": "下一步",
   "compute.onboard.prev": "上一步",
   "compute.onboard.done": "完成",
-  "compute.onboard.comingSoon": "即将支持",
-  "compute.onboard.flowPrefix": "流程：",
 
-  "compute.onboard.step.method": "接入方式",
   "compute.onboard.step.identity": "主机信息",
   "compute.onboard.step.install": "安装并接入",
-  "compute.onboard.step.pool": "资源池",
-  "compute.onboard.step.template": "模板 / 镜像",
-  "compute.onboard.step.spec": "规格与磁盘",
-  "compute.onboard.step.network": "网络",
-  "compute.onboard.step.confirm": "确认",
-  "compute.onboard.step.connection": "连接信息",
-
-  "compute.onboard.method.agent.title": "Agent 接入",
-  "compute.onboard.method.agent.desc":
-    "主机已存在（物理机、虚拟机或云主机）。在主机上安装 vr-agent，由 agent 主动连接控制面完成纳管，无需控制面能访问该主机。",
-  "compute.onboard.method.cloud.title": "从云资源池创建",
-  "compute.onboard.method.cloud.desc":
-    "从 VMware、AWS、阿里云等资源池创建新主机，创建完成后自动安装 agent 并纳管。",
-  "compute.onboard.method.ssh.title": "SSH 直连纳管",
-  "compute.onboard.method.ssh.desc":
-    "不安装 agent，控制面通过 SSH 直接管理。适用于明确不允许安装常驻进程的主机；能力受限。",
 
   "compute.onboard.scope.platform": "平台",
   "compute.onboard.scope.workspace": "工作空间 {name}",
