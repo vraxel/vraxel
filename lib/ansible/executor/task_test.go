@@ -39,7 +39,7 @@ func setupTestExecutor(t *testing.T) (*TaskExecutor, variable.Variable) {
 	conns := newConnectorRegistry()
 	conns.Put("localhost", conn)
 	var logBuf bytes.Buffer
-	executor := NewTaskExecutor(v, nil, conns, &logBuf)
+	executor := NewTaskExecutor(v, nil, conns, &logBuf, nil)
 	return executor, v
 }
 
@@ -436,7 +436,7 @@ func TestTaskExecutor_MultiHost(t *testing.T) {
 	conns.Put("host2", conn)
 	conns.Put("host3", conn)
 	var logBuf bytes.Buffer
-	executor := NewTaskExecutor(v, nil, conns, &logBuf)
+	executor := NewTaskExecutor(v, nil, conns, &logBuf, nil)
 
 	task := ansible.TaskSpec{
 		Name:  "multi-host task",

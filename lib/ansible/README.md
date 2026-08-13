@@ -373,6 +373,19 @@ inv := ansible.Inventory{
 
 空列表（或解析为空的模板）不执行任何一次，任务记为 `skipped`。
 
+### 委派执行（delegate_to）
+
+任务改在另一台主机上执行，但**变量与 `register` 结果仍属于原主机**（Ansible 语义）。目标支持模板；若该主机不在本 play 的主机列表里，引擎按需为它新建连接，并在 play 结束时一并关闭。
+
+```yaml
+- name: 在主库上验证从库已跟上
+  shell: "check-replica {{ .inventory_hostname }}"
+  delegate_to: "{{ .primary_host }}"
+  register: replica_state          # 结果记在原主机上
+```
+
+目标主机既不在注册表也无法新建连接时，任务明确失败并在错误里指出该主机名。
+
 ### 变更状态（changed_when）
 
 引擎不猜测模块是否产生变更：只有写了 `changed_when` 的任务才会被标记为 `changed`，其结果同时进入 `register` 变量的 `changed` 字段。

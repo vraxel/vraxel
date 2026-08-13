@@ -22,12 +22,18 @@ import (
 	"vraxel.io/vraxel/lib/ansible/variable"
 )
 
+// ConnectorResolver produces the connector for a host the registry does not
+// already hold. delegate_to can name a host the play never listed, so a plain
+// registry lookup cannot serve it.
+type ConnectorResolver func(ctx context.Context, host string) (connector.Connector, error)
+
 // TaskExecutor executes a single TaskSpec against hosts.
 type TaskExecutor struct {
 	variable   variable.Variable
 	source     project.Source
 	logOutput  io.Writer
 	connectors *connectorRegistry // host -> connector, race-safe
+	resolve    ConnectorResolver  // optional; nil means registry-only
 }
 
 // NewTaskExecutor creates a new task executor.
@@ -36,13 +42,29 @@ type TaskExecutor struct {
 // one via newConnectorRegistry + Put. Worker goroutines spawned by
 // Exec read it concurrently with PlaybookExecutor.Resize /
 // SetLiveOutput, so the RWMutex inside the registry is required.
-func NewTaskExecutor(v variable.Variable, src project.Source, conns *connectorRegistry, logOutput io.Writer) *TaskExecutor {
+//
+// resolve may be nil, in which case delegate_to can only target hosts that
+// are already in the registry.
+func NewTaskExecutor(v variable.Variable, src project.Source, conns *connectorRegistry, logOutput io.Writer, resolve ConnectorResolver) *TaskExecutor {
 	return &TaskExecutor{
 		variable:   v,
 		source:     src,
 		logOutput:  logOutput,
 		connectors: conns,
+		resolve:    resolve,
 	}
+}
+
+// connectorFor returns the connector to run a task through, creating one via
+// the resolver when the registry has no entry for host.
+func (e *TaskExecutor) connectorFor(ctx context.Context, host string) (connector.Connector, error) {
+	if conn := e.connectors.Get(host); conn != nil {
+		return conn, nil
+	}
+	if e.resolve == nil {
+		return nil, fmt.Errorf("no connector for host %q", host)
+	}
+	return e.resolve(ctx, host)
 }
 
 // Exec executes a task and returns results per host.
@@ -259,8 +281,16 @@ func (e *TaskExecutor) executeModule(ctx context.Context, task ansible.TaskSpec,
 	args := e.toArgsMap(task.Module.Args)
 	args = e.renderArgs(args, vars)
 
-	// Execute module
-	conn := e.connectors.Get(host)
+	// Execute module. With delegate_to the module runs through the
+	// delegate's connection while the variables and the registered result
+	// stay with the original host, which is Ansible's semantics.
+	conn, connErr := e.taskConnector(ctx, task, host, vars)
+	if connErr != nil {
+		result.Result.Error = connErr.Error()
+		result.Result.Status = ansible.TaskStatusFailed
+		return result
+	}
+
 	stdout, stderr, err := moduleFn(ctx, modules.ExecOptions{
 		Args:        args,
 		Host:        host,
@@ -290,6 +320,30 @@ func (e *TaskExecutor) executeModule(ctx context.Context, task ansible.TaskSpec,
 	e.executeModuleApplyChanged(host, task, &result)
 
 	return result
+}
+
+// taskConnector picks the connection a task runs over: the host's own, or the
+// delegate_to target's when that directive is set. delegate_to is templated,
+// so it is rendered against the original host's variables first.
+func (e *TaskExecutor) taskConnector(ctx context.Context, task ansible.TaskSpec, host string, vars map[string]any) (connector.Connector, error) {
+	if task.DelegateTo == "" {
+		return e.connectorFor(ctx, host)
+	}
+
+	target, err := template.ParseString(vars, task.DelegateTo)
+	if err != nil {
+		return nil, fmt.Errorf("render delegate_to: %w", err)
+	}
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return nil, fmt.Errorf("delegate_to %q rendered empty", task.DelegateTo)
+	}
+
+	conn, err := e.connectorFor(ctx, target)
+	if err != nil {
+		return nil, fmt.Errorf("delegate_to %q: %w", target, err)
+	}
+	return conn, nil
 }
 
 // executeModuleApplyChanged evaluates changed_when and records the outcome on

@@ -1,13 +1,17 @@
 package executor
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"io/fs"
 	"strings"
 	"sync"
 	"testing"
 
 	"vraxel.io/vraxel/lib/ansible"
+	"vraxel.io/vraxel/lib/ansible/connector"
 	"vraxel.io/vraxel/lib/ansible/converter"
 	"vraxel.io/vraxel/lib/ansible/modules"
 	"vraxel.io/vraxel/lib/ansible/variable"
@@ -292,6 +296,164 @@ func TestEnvironment_WholeMapFromTemplate(t *testing.T) {
 
 	if got := executor.hostVars("localhost")["r"].(map[string]any)["stdout"]; got != "yes" {
 		t.Errorf("expected env map resolved from a template, got %v", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// delegate_to
+// ---------------------------------------------------------------------------
+
+// markerConnector reports which host it belongs to, so a test can tell which
+// connection a task actually ran over.
+type markerConnector struct{ name string }
+
+func (m *markerConnector) Init(context.Context) error  { return nil }
+func (m *markerConnector) Close(context.Context) error { return nil }
+func (m *markerConnector) ExecuteCommand(_ context.Context, _ string) ([]byte, []byte, error) {
+	return []byte(m.name), nil, nil
+}
+func (m *markerConnector) PutFile(context.Context, []byte, string, fs.FileMode) error { return nil }
+func (m *markerConnector) FetchFile(context.Context, string, io.Writer) error         { return nil }
+func (m *markerConnector) Resize(context.Context, uint16, uint16) error               { return nil }
+
+// setupMarkerExecutor builds an executor whose hosts each answer with their
+// own name, plus an optional resolver for hosts outside the registry.
+func setupMarkerExecutor(t *testing.T, resolve ConnectorResolver, hosts ...string) (*TaskExecutor, variable.Variable) {
+	t.Helper()
+
+	hostMap := make(map[string]map[string]any, len(hosts))
+	conns := newConnectorRegistry()
+	for _, h := range hosts {
+		hostMap[h] = map[string]any{"connection": "local"}
+		conns.Put(h, &markerConnector{name: h})
+	}
+
+	v := variable.New(ansible.Inventory{Hosts: hostMap})
+	var logBuf bytes.Buffer
+	return NewTaskExecutor(v, nil, conns, &logBuf, resolve), v
+}
+
+func TestDelegateTo_RunsOnDelegateButRegistersOnOriginal(t *testing.T) {
+	executor, v := setupMarkerExecutor(t, nil, "web1", "db1")
+
+	task := ansible.TaskSpec{
+		Hosts:      []string{"web1"},
+		Module:     ansible.ModuleRef{Name: "command", Args: map[string]any{"cmd": "whoami"}},
+		DelegateTo: "db1",
+		Register:   "r",
+	}
+	results := executor.Exec(context.Background(), task)
+
+	if results[0].Host != "web1" {
+		t.Errorf("result host = %q, want the original host web1", results[0].Host)
+	}
+	// The command ran over db1's connection...
+	if got := extractString(results[0].Output, "stdout"); got != "db1" {
+		t.Errorf("expected the task to run over db1's connection, got %q", got)
+	}
+	// ...but the registered variable belongs to web1.
+	web1 := v.Get(variable.GetAllVariable("web1")).(map[string]any)
+	if _, ok := web1["r"]; !ok {
+		t.Error("expected the registered variable on the original host web1")
+	}
+	db1 := v.Get(variable.GetAllVariable("db1")).(map[string]any)
+	if _, ok := db1["r"]; ok {
+		t.Error("registered variable must not leak onto the delegate host")
+	}
+}
+
+func TestDelegateTo_IsTemplated(t *testing.T) {
+	executor, v := setupMarkerExecutor(t, nil, "web1", "db1")
+	v.Merge(variable.MergeHostRuntimeVars("web1", map[string]any{"primary": "db1"}))
+
+	task := ansible.TaskSpec{
+		Hosts:      []string{"web1"},
+		Module:     ansible.ModuleRef{Name: "command", Args: map[string]any{"cmd": "whoami"}},
+		DelegateTo: "{{ .primary }}",
+	}
+	results := executor.Exec(context.Background(), task)
+
+	if got := extractString(results[0].Output, "stdout"); got != "db1" {
+		t.Errorf("expected templated delegate_to to resolve to db1, got %q", got)
+	}
+}
+
+func TestDelegateTo_HostOutsideThePlayIsResolved(t *testing.T) {
+	var created []string
+	resolve := func(_ context.Context, host string) (connector.Connector, error) {
+		created = append(created, host)
+		return &markerConnector{name: "made:" + host}, nil
+	}
+	executor, _ := setupMarkerExecutor(t, resolve, "web1")
+
+	task := ansible.TaskSpec{
+		Hosts:      []string{"web1"},
+		Module:     ansible.ModuleRef{Name: "command", Args: map[string]any{"cmd": "whoami"}},
+		DelegateTo: "bastion",
+	}
+	results := executor.Exec(context.Background(), task)
+
+	if got := extractString(results[0].Output, "stdout"); got != "made:bastion" {
+		t.Errorf("expected the resolver's connector, got %q", got)
+	}
+	if len(created) != 1 || created[0] != "bastion" {
+		t.Errorf("expected the resolver to be asked for bastion, got %v", created)
+	}
+}
+
+func TestDelegateTo_UnknownHostWithoutResolverFails(t *testing.T) {
+	executor, _ := setupMarkerExecutor(t, nil, "web1")
+
+	task := ansible.TaskSpec{
+		Hosts:      []string{"web1"},
+		Module:     ansible.ModuleRef{Name: "command", Args: map[string]any{"cmd": "whoami"}},
+		DelegateTo: "nowhere",
+	}
+	results := executor.Exec(context.Background(), task)
+
+	if results[0].Status != ansible.TaskStatusFailed {
+		t.Fatalf("expected failure for an unreachable delegate, got %q", results[0].Status)
+	}
+	if !strings.Contains(results[0].Error, "nowhere") {
+		t.Errorf("expected the error to name the delegate, got %q", results[0].Error)
+	}
+}
+
+func TestDelegateTo_PlaybookClosesDelegateConnector(t *testing.T) {
+	// A delegate outside the play still has to be torn down with it.
+	inv := ansible.Inventory{
+		Hosts: map[string]map[string]any{
+			"localhost": {"connection": "local"},
+			"other":     {"connection": "local"},
+		},
+	}
+	exec, _ := setupPlaybookExecutor(t, inv, nil)
+
+	playbook := &ansible.Playbook{
+		Play: []ansible.Play{{
+			Base:     ansible.Base{Name: "delegating play"},
+			PlayHost: ansible.PlayHost{Hosts: []string{"localhost"}},
+			Tasks: []ansible.Block{{
+				BlockBase: ansible.BlockBase{
+					Base:      ansible.Base{Name: "delegate somewhere else"},
+					Delegable: ansible.Delegable{DelegateTo: "other"},
+				},
+				Task: ansible.Task{UnknownField: map[string]any{
+					"command": map[string]any{"cmd": "echo delegated"},
+				}},
+			}},
+		}},
+	}
+
+	result, err := exec.Execute(context.Background(), playbook)
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if !result.Success {
+		t.Fatalf("playbook failed: %s", result.Error)
+	}
+	if left := exec.connectors.Snapshot(); len(left) != 0 {
+		t.Errorf("expected every connector closed and dropped, %d left", len(left))
 	}
 }
 

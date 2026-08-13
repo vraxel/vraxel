@@ -61,6 +61,21 @@ func (r *connectorRegistry) Delete(host string) connector.Connector {
 	return c
 }
 
+// Drain removes every registration and returns the connectors it held.
+// Play teardown uses it instead of deleting a known host list because a
+// delegate_to target can add a connector the play never listed, and that
+// one has to be closed too.
+func (r *connectorRegistry) Drain() []connector.Connector {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([]connector.Connector, 0, len(r.m))
+	for host, c := range r.m {
+		out = append(out, c)
+		delete(r.m, host)
+	}
+	return out
+}
+
 // Snapshot returns a slice copy of every registered connector.
 // Iterating the slice is safe under concurrent Put/Delete because
 // the slice itself is independent of the map.
