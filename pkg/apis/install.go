@@ -13,11 +13,15 @@ import (
 	"vraxel.io/vraxel/lib/apiserver"
 	libaudit "vraxel.io/vraxel/lib/audit"
 	"vraxel.io/vraxel/lib/config"
+	"vraxel.io/vraxel/lib/logger"
 	"vraxel.io/vraxel/lib/oidc"
 	"vraxel.io/vraxel/lib/pgnotify"
 	"vraxel.io/vraxel/lib/rest/filters"
+	"vraxel.io/vraxel/pkg/apis/agentgw"
 	"vraxel.io/vraxel/pkg/apis/audit"
+	"vraxel.io/vraxel/pkg/apis/compute"
 	"vraxel.io/vraxel/pkg/apis/iam"
+	pkistore "vraxel.io/vraxel/pkg/apis/pki/store"
 	"vraxel.io/vraxel/pkg/db"
 )
 
@@ -34,6 +38,11 @@ type Result struct {
 	// time, and the checker is constructed later in main.go via
 	// NewAuthorizer. main replays them onto the apiserver.
 	Registrars []func(*apiserver.Server)
+
+	// AgentProtocolHandler serves /api/agent/v1/* (register / control
+	// channel). Not a REST module -- main mounts it as a prefix branch
+	// ahead of the IAM APIHandler.
+	AgentProtocolHandler http.HandlerFunc
 
 	iamResult iam.ModuleResult
 }
@@ -55,10 +64,28 @@ func NewModules(ctx context.Context, database *db.DB) Result {
 
 	iamResult := iam.NewModule(ctx, database)
 
+	// The platform master key: loaded from the DB, generated on first boot.
+	// The agent-token signing key is derived from it.
+	encKey, err := pkistore.LoadOrGenerateEncryptionKey(ctx, database)
+	if err != nil {
+		logger.Fatalf("cannot load/generate encryption key: %v", err)
+	}
+
+	// The agent gateway: machine-facing register + control-channel surface.
+	// Not a REST module; its handler is mounted by main ahead of IAM.
+	agentgwResult := agentgw.NewModule(ctx, database, agentgw.Deps{
+		HostRegistrar: compute.NewAgentHostRegistrar(database),
+		JoinTokens:    agentgw.NewJoinTokenStore(database),
+		EncryptionKey: encKey,
+		ServerName:    config.Get().Server.Name,
+		ExternalURL:   config.Get().Server.ExternalURL,
+	})
+
 	return Result{
-		Mux:        mux,
-		Registrars: moduleRegistrars(database),
-		iamResult:  iamResult,
+		Mux:                  mux,
+		Registrars:           moduleRegistrars(database),
+		AgentProtocolHandler: agentgwResult.ProtocolHandler,
+		iamResult:            iamResult,
 	}
 }
 
