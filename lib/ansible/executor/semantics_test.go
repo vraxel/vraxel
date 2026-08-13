@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -643,6 +645,60 @@ const torturePlaybook = `
         loop_var: svc
       register: loopvar_out
 `
+
+// TestStatDrivesWhen checks the pattern the README documents: stat writes
+// JSON, register_type turns it into a value, and when indexes into it. The
+// three land in different layers, so only an end-to-end run proves they meet.
+func TestStatDrivesWhen(t *testing.T) {
+	dir := t.TempDir()
+	present := filepath.Join(dir, "present.conf")
+	if err := os.WriteFile(present, []byte("x"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	missing := filepath.Join(dir, "missing.conf")
+
+	pb, err := converter.ParsePlaybook(fmt.Appendf(nil, `
+- name: stat drives when
+  hosts:
+    - localhost
+  gather_facts: false
+  tasks:
+    - stat:
+        path: %s
+      register: found
+      register_type: json
+    - stat:
+        path: %s
+      register: absent
+      register_type: json
+    - set_fact:
+        saw_present: "yes"
+      when: '{{ .found.stdout.exists }}'
+    - set_fact:
+        saw_absent: "yes"
+      when: '{{ .absent.stdout.exists }}'
+`, present, missing))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+
+	exec, _ := setupPlaybookExecutor(t, localhostInventory(), nil)
+	result, err := exec.Execute(context.Background(), pb)
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if !result.Success {
+		t.Fatalf("playbook failed: %s", result.Error)
+	}
+
+	vars := exec.variable.Get(variable.GetAllVariable("localhost")).(map[string]any)
+	if vars["saw_present"] != "yes" {
+		t.Error("when should have fired for the existing path")
+	}
+	if _, ok := vars["saw_absent"]; ok {
+		t.Error("when must not fire for the missing path")
+	}
+}
 
 func TestTorturePlaybook(t *testing.T) {
 	pb, err := converter.ParsePlaybook([]byte(torturePlaybook))

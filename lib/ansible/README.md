@@ -251,8 +251,29 @@ inv := ansible.Inventory{
 | `assert` | 条件断言 | — | `assert: {that: ['{{ eq .env "prod" }}'], fail_msg: "非生产环境"}` |
 | `result` | 存储全局执行结果 | — | `result: {version: "{{ .app_version }}"}` |
 | `http_get_file` | HTTP 下载文件 | — | `http_get_file: {url: "https://...", dest: /tmp/pkg.tar.gz}` |
+| `file` | 建目录/软链、touch、删除、改权限 | ✅ (connector) | `file: {path: /opt/app, state: directory, mode: "0750", owner: app}` |
+| `stat` | 查询路径状态（输出 JSON） | ✅ (connector) | `stat: {path: /etc/app.conf}` |
+| `service` / `systemd` | 驱动 systemd 单元 | ✅ (connector) | `service: {name: nginx, state: restarted, enabled: true}` |
+| `wait_for` | 等待端口或路径就绪 | ✅ (connector) | `wait_for: {host: 127.0.0.1, port: 5432, timeout: 60}` |
 
 > `copy` 和 `template` 支持 `owner`/`group` 参数，上传后自动 `chown`。`fetch` 在 become 模式下通过 sudo cp 到临时文件再下载。
+
+`file` 的 `state` 取值：`directory` / `touch` / `link`（需 `src`）/ `absent` / `file`。其中 `file` 只做"断言存在 + 应用权限"，不创建文件——要创建用 `touch`。
+
+`stat` 输出 JSON，配 `register_type: json` 使用；**路径不存在不算失败**（`exists: false`），这样才能当条件用：
+
+```yaml
+- stat: {path: /etc/app.conf}
+  register: cfg
+  register_type: json
+
+- shell: "echo 已存在"
+  when: '{{ .cfg.stdout.exists }}'
+```
+
+`service` 与 `systemd` 是同一实现（本引擎面向 systemd 主机）。同时给 `enabled` 与 `state` 时先 enable 后 start。
+
+`wait_for` 的轮询在 Go 侧进行而非目标主机上，因此取消 playbook 的 context 能立刻中断等待。`state: absent` 则等待端口/路径消失。
 
 ## 权限提升 (become)
 
