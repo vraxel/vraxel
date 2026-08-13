@@ -21,7 +21,7 @@ import (
 	"vraxel.io/vraxel/pkg/apis/audit"
 	"vraxel.io/vraxel/pkg/apis/compute"
 	"vraxel.io/vraxel/pkg/apis/iam"
-	pkistore "vraxel.io/vraxel/pkg/apis/pki/store"
+	"vraxel.io/vraxel/pkg/apis/pki"
 	"vraxel.io/vraxel/pkg/db"
 )
 
@@ -66,7 +66,7 @@ func NewModules(ctx context.Context, database *db.DB) Result {
 
 	// The platform master key: loaded from the DB, generated on first boot.
 	// The agent-token signing key is derived from it.
-	encKey, err := pkistore.LoadOrGenerateEncryptionKey(ctx, database)
+	pkiResult, err := pki.NewModule(ctx, database)
 	if err != nil {
 		logger.Fatalf("cannot load/generate encryption key: %v", err)
 	}
@@ -76,7 +76,7 @@ func NewModules(ctx context.Context, database *db.DB) Result {
 	agentgwResult := agentgw.NewModule(ctx, database, agentgw.Deps{
 		HostRegistrar: compute.NewAgentHostRegistrar(database),
 		JoinTokens:    agentgw.NewJoinTokenStore(database),
-		EncryptionKey: encKey,
+		EncryptionKey: pkiResult.EncryptionKey,
 		ServerName:    config.Get().Server.Name,
 		ExternalURL:   config.Get().Server.ExternalURL,
 	})
