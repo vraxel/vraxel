@@ -181,6 +181,12 @@ type Permission struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+type PkiEncryptionKey struct {
+	ID            int64     `json:"id"`
+	EncryptionKey []byte    `json:"encryption_key"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
 type RefreshToken struct {
 	ID        int64     `json:"id"`
 	TokenHash string    `json:"token_hash"`
