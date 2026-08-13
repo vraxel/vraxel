@@ -42,11 +42,16 @@ func (a *APIServerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // RootHandlerConfig holds the components needed by the top-level request router.
 type RootHandlerConfig struct {
-	APIHandler      *APIServerHandler
-	OIDCMux         http.Handler
-	OpenAPISpec     []byte
-	FrontendFS      fs.FS
-	ReadinessChecks []ReadinessCheck // dependencies probed by /readyz and /healthz
+	APIHandler *APIServerHandler
+	// AgentProtocolHandler serves the machine-facing agent gateway under
+	// /api/agent/v1/*. Anonymous to IAM (bearer tokens validated inside
+	// each route), so it is dispatched before the IAM APIHandler. Nil
+	// disables the surface.
+	AgentProtocolHandler http.HandlerFunc
+	OIDCMux              http.Handler
+	OpenAPISpec          []byte
+	FrontendFS           fs.FS
+	ReadinessChecks      []ReadinessCheck // dependencies probed by /readyz and /healthz
 }
 
 // rootRouter holds the precomputed handlers and config the top-level
@@ -105,6 +110,14 @@ func (rt *rootRouter) route(w http.ResponseWriter, r *http.Request) bool {
 		return true
 	}
 	if rt.routePublic(w, r, urlPath) {
+		return true
+	}
+
+	// The agent gateway serves machine-facing routes under /api/agent/v1/*.
+	// It authenticates with bearer tokens inside each route and must bypass
+	// the IAM APIHandler, so it is matched before the /api/ block.
+	if rt.cfg.AgentProtocolHandler != nil && strings.HasPrefix(urlPath, "/api/agent/v1/") {
+		rt.cfg.AgentProtocolHandler.ServeHTTP(w, r)
 		return true
 	}
 

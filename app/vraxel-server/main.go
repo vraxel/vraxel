@@ -151,10 +151,11 @@ func buildRootHandler(
 	}
 
 	return handler.NewRootHandler(handler.RootHandlerConfig{
-		APIHandler:  apiHandler,
-		OIDCMux:     apis.NewOIDCMux(oidcProvider, auditWriter, apisResult, &cfg.OIDC, cfg.Server.ExternalURL),
-		OpenAPISpec: localapis.OpenAPISpec,
-		FrontendFS:  distFS,
+		APIHandler:           apiHandler,
+		AgentProtocolHandler: apisResult.AgentProtocolHandler,
+		OIDCMux:              apis.NewOIDCMux(oidcProvider, auditWriter, apisResult, &cfg.OIDC, cfg.Server.ExternalURL),
+		OpenAPISpec:          localapis.OpenAPISpec,
+		FrontendFS:           distFS,
 		ReadinessChecks: []handler.ReadinessCheck{
 			{Name: "database", Fn: func(ctx context.Context) error { return database.GetPool().Ping(ctx) }},
 		},
