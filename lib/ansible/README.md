@@ -467,6 +467,8 @@ YAML 层能解析、但引擎没有实现的指令，**在加载 playbook / role
 | `local_action` | 用 `delegate_to: localhost` |
 | `delegate_facts` | 事实始终属于原主机 |
 | `with_*`（除 `with_items` / `with_dict`） | 用 `loop` |
+| play 级 / block 容器级 `environment` | 挂到具体任务上（引擎不做 environment 继承） |
+| 同一任务写多个 loop 指令 | `loop` / `with_items` / `with_dict` 互斥，只写一个 |
 
 `check_mode` / `diff` **不在拒绝之列**：引擎本身没有 dry-run 模式，它们只是无效而非误导，拒绝反而会打断防御性写法。
 

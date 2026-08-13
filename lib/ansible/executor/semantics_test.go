@@ -137,6 +137,40 @@ func TestLoop_WithDictYieldsKeyValueItems(t *testing.T) {
 	}
 }
 
+func TestLoop_WithDictNonMappingFails(t *testing.T) {
+	// A with_dict that renders to a non-mapping is a playbook error; a
+	// silent skip would hide it, which is the class of bug batch 1 removed.
+	executor, v := setupTestExecutor(t)
+	v.Merge(variable.MergeHostRuntimeVars("localhost", map[string]any{
+		"notdict": []any{"a", "b"},
+	}))
+
+	recordItems("_sem_dict_bad")
+	results := executor.Exec(context.Background(),
+		loopTask("_sem_dict_bad", "{{ .notdict }}", ansible.LoopKindDict))
+
+	if results[0].Status != ansible.TaskStatusFailed {
+		t.Fatalf("expected failure for a non-mapping with_dict, got %q", results[0].Status)
+	}
+	if !strings.Contains(results[0].Error, "with_dict") {
+		t.Errorf("error should name with_dict, got %q", results[0].Error)
+	}
+}
+
+func TestLoop_WithDictUnsetVariableSkips(t *testing.T) {
+	// An unset variable is indistinguishable from "nothing to do", so it
+	// stays a skip, consistent with an empty loop.
+	executor, _ := setupTestExecutor(t)
+
+	recordItems("_sem_dict_unset")
+	results := executor.Exec(context.Background(),
+		loopTask("_sem_dict_unset", "{{ .missing }}", ansible.LoopKindDict))
+
+	if results[0].Status != ansible.TaskStatusSkipped {
+		t.Fatalf("expected skip for an unset with_dict variable, got %q", results[0].Status)
+	}
+}
+
 func TestLoop_LoopVarAndIndexVar(t *testing.T) {
 	executor, _ := setupTestExecutor(t)
 
@@ -298,6 +332,28 @@ func TestEnvironment_WholeMapFromTemplate(t *testing.T) {
 
 	if got := executor.hostVars("localhost")["r"].(map[string]any)["stdout"]; got != "yes" {
 		t.Errorf("expected env map resolved from a template, got %v", got)
+	}
+}
+
+func TestEnvironment_ListEntriesCanBeTemplates(t *testing.T) {
+	executor, v := setupTestExecutor(t)
+	v.Merge(variable.MergeHostRuntimeVars("localhost", map[string]any{
+		"proxy_env": map[string]any{"SEM_LIST_A": "one"},
+	}))
+
+	task := ansible.TaskSpec{
+		Hosts:  []string{"localhost"},
+		Module: ansible.ModuleRef{Name: "command", Args: map[string]any{"cmd": "echo $SEM_LIST_A:$SEM_LIST_B"}},
+		Environment: []any{
+			"{{ .proxy_env }}", // template entry resolving to a mapping
+			map[string]any{"SEM_LIST_B": "two"},
+		},
+		Register: "r",
+	}
+	executor.Exec(context.Background(), task)
+
+	if got := executor.hostVars("localhost")["r"].(map[string]any)["stdout"]; got != "one:two" {
+		t.Errorf("expected both list entries applied, got %v", got)
 	}
 }
 

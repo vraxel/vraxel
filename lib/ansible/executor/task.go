@@ -115,7 +115,12 @@ func (e *TaskExecutor) Exec(ctx context.Context, task ansible.TaskSpec) []ansibl
 func (e *TaskExecutor) execTaskHost(ctx context.Context, task ansible.TaskSpec, host string, moduleFn modules.ModuleExecFunc) ansible.TaskResult {
 	result := ansible.TaskResult{Host: host, Status: ansible.TaskStatusOK}
 
-	items := e.resolveLoop(task, e.hostVars(host))
+	items, err := e.resolveLoop(task, e.hostVars(host))
+	if err != nil {
+		result.Status = ansible.TaskStatusFailed
+		result.Error = err.Error()
+		return result
+	}
 
 	allSkipped := true
 	for idx, item := range items {
@@ -405,9 +410,9 @@ func (e *TaskExecutor) executeModuleApplyFailure(host string, task ansible.TaskS
 // resolveLoop resolves the loop items for one host. The loop value is rendered
 // against that host's variables first, so "loop: {{ .list }}" iterates the
 // list the variable holds instead of the string it renders to.
-func (e *TaskExecutor) resolveLoop(task ansible.TaskSpec, vars map[string]any) []any {
+func (e *TaskExecutor) resolveLoop(task ansible.TaskSpec, vars map[string]any) ([]any, error) {
 	if task.Loop == nil {
-		return []any{nil} // single execution, no loop
+		return []any{nil}, nil // single execution, no loop
 	}
 
 	val := resolveTemplatedValue(task.Loop, vars)
@@ -419,7 +424,7 @@ func (e *TaskExecutor) resolveLoop(task ansible.TaskSpec, vars map[string]any) [
 	if task.LoopKind == ansible.LoopKindItems {
 		items = flattenOnce(items)
 	}
-	return items
+	return items, nil
 }
 
 // toItemSlice normalises a resolved loop value into items. A nil value (an
@@ -456,11 +461,16 @@ func flattenOnce(items []any) []any {
 }
 
 // dictItems implements with_dict: a mapping becomes {key, value} items,
-// ordered by key so runs are reproducible.
-func dictItems(v any) []any {
+// ordered by key so runs are reproducible. A nil value (an unset variable)
+// yields no items and surfaces as a skip; any other non-mapping is a playbook
+// error and fails the task rather than silently skipping it.
+func dictItems(v any) ([]any, error) {
+	if v == nil {
+		return nil, nil
+	}
 	m, ok := v.(map[string]any)
 	if !ok {
-		return nil
+		return nil, fmt.Errorf("with_dict requires a mapping, got %T", v)
 	}
 	keys := make([]string, 0, len(m))
 	for k := range m {
@@ -472,7 +482,7 @@ func dictItems(v any) []any {
 	for _, k := range keys {
 		out = append(out, map[string]any{"key": k, "value": m[k]})
 	}
-	return out
+	return out, nil
 }
 
 // loopVarName returns the variable name a loop item is exposed under.
@@ -543,7 +553,8 @@ func resolveEnvironment(raw any, vars map[string]any) map[string]string {
 		mergeEnv(env, val, vars)
 	case []any:
 		for _, entry := range val {
-			if m, ok := entry.(map[string]any); ok {
+			// An entry can itself be a template resolving to a mapping.
+			if m, ok := resolveTemplatedValue(entry, vars).(map[string]any); ok {
 				mergeEnv(env, m, vars)
 			}
 		}

@@ -596,7 +596,7 @@ func TestTaskExecutor_ResolveLoop_NilLoop(t *testing.T) {
 	executor, _ := setupTestExecutor(t)
 
 	task := ansible.TaskSpec{Loop: nil}
-	items := executor.resolveLoop(task, nil)
+	items, _ := executor.resolveLoop(task, nil)
 	if len(items) != 1 {
 		t.Fatalf("expected 1 item for nil loop, got %d", len(items))
 	}
@@ -609,7 +609,7 @@ func TestTaskExecutor_ResolveLoop_SliceAny(t *testing.T) {
 	executor, _ := setupTestExecutor(t)
 
 	task := ansible.TaskSpec{Loop: []any{"x", "y", "z"}}
-	items := executor.resolveLoop(task, nil)
+	items, _ := executor.resolveLoop(task, nil)
 	if len(items) != 3 {
 		t.Fatalf("expected 3 items, got %d", len(items))
 	}
@@ -622,7 +622,7 @@ func TestTaskExecutor_ResolveLoop_SliceString(t *testing.T) {
 	executor, _ := setupTestExecutor(t)
 
 	task := ansible.TaskSpec{Loop: []string{"a", "b"}}
-	items := executor.resolveLoop(task, nil)
+	items, _ := executor.resolveLoop(task, nil)
 	if len(items) != 2 {
 		t.Fatalf("expected 2 items, got %d", len(items))
 	}

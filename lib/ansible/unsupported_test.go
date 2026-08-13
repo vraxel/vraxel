@@ -85,6 +85,49 @@ func TestValidateBlocks_AcceptsImplementedDirectives(t *testing.T) {
 	}
 }
 
+func TestValidateBlocks_RejectsConflictingLoopDirectives(t *testing.T) {
+	err := ValidateBlocks([]Block{taskWith(func(b *Block) {
+		b.Loop = []any{"a"}
+		b.WithItems = "{{ .l }}"
+	})})
+	if err == nil {
+		t.Fatal("expected two loop directives on one task to be rejected")
+	}
+	if !strings.Contains(err.Error(), "mutually exclusive") {
+		t.Errorf("error should say mutually exclusive, got %q", err.Error())
+	}
+}
+
+func TestValidateBlocks_RejectsBlockLevelEnvironment(t *testing.T) {
+	// A container's environment is not inherited by its tasks, so accepting
+	// it would be a silent no-op.
+	container := Block{}
+	container.Name = "c"
+	container.Environment = map[string]any{"A": "b"}
+	container.BlockInfo.Block = []Block{taskWith(func(*Block) {})}
+
+	err := ValidateBlocks([]Block{container})
+	if err == nil {
+		t.Fatal("expected block-level environment to be rejected")
+	}
+	if !strings.Contains(err.Error(), "block-level environment") {
+		t.Errorf("error should name the directive, got %q", err.Error())
+	}
+}
+
+func TestValidatePlay_RejectsPlayLevelEnvironment(t *testing.T) {
+	play := Play{PlayHost: PlayHost{Hosts: []string{"all"}}}
+	play.Environment = map[string]any{"A": "b"}
+
+	err := ValidatePlay(play)
+	if err == nil {
+		t.Fatal("expected play-level environment to be rejected")
+	}
+	if !strings.Contains(err.Error(), "play-level environment") {
+		t.Errorf("error should name the directive, got %q", err.Error())
+	}
+}
+
 func TestValidateBlocks_DescendsIntoBlockRescueAlways(t *testing.T) {
 	for name, build := range map[string]func(Block) Block{
 		"block":  func(inner Block) Block { b := Block{}; b.BlockInfo.Block = []Block{inner}; return b },

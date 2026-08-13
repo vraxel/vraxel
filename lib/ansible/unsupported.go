@@ -53,6 +53,10 @@ func ValidatePlay(play Play) error {
 	case len(play.Handlers) > 0:
 		return unsupported(where, "handlers",
 			"notify/handlers are not implemented; call the task directly or guard it with when")
+	case play.Environment != nil:
+		// Parsed but never inherited into tasks, which would make it a
+		// silent no-op - the exact class this file exists to reject.
+		return unsupported(where, "play-level environment", "set environment on each task")
 	}
 
 	return validateBase(where, play.Base)
@@ -82,6 +86,24 @@ func validateBlock(b Block) error {
 		return unsupported(where, "delegate_facts", "facts always belong to the original host")
 	case b.AsyncVal > 0 || b.Poll > 0:
 		return unsupported(where, "async/poll", "run the command in the background from the shell instead")
+	}
+
+	// The three loop directives share one execution slot; writing two on the
+	// same task would silently drop one, so it is an error, as in Ansible.
+	set := 0
+	for _, v := range []any{b.Loop, b.WithItems, b.WithDict} {
+		if v != nil {
+			set++
+		}
+	}
+	if set > 1 {
+		return fmt.Errorf("%s: loop, with_items and with_dict are mutually exclusive", where)
+	}
+
+	// A block container's environment would not be inherited by the tasks
+	// inside it - a silent no-op, so it is rejected like the play-level one.
+	if len(b.BlockInfo.Block) > 0 && b.Environment != nil {
+		return unsupported(where, "block-level environment", "set environment on each task")
 	}
 
 	if err := validateBase(where, b.Base); err != nil {
