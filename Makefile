@@ -46,7 +46,7 @@ generate: ## Regenerate committed sqlc / OpenAPI / TS artifacts (commit the resu
 # Everything that must pass before a commit. `go test -race ./...` is the
 # deeper pass (~10x slower); run it when touching concurrent code.
 check: ## Run all gates: gofmt, vet, layer guard, Go tests, UI typecheck/lint/tests
-	@out=$$(gofmt -l -s .); if [ -n "$$out" ]; then echo "gofmt -s needed:"; echo "$$out"; exit 1; fi
+	@out=$$(gofmt -l -s . | grep -vE "^\.worktrees/|^\.anvil-dev/" || true); if [ -n "$$out" ]; then echo "gofmt -s needed:"; echo "$$out"; exit 1; fi
 	go vet ./...
 	./scripts/check-layer-leak.sh
 	go test ./...
