@@ -7,7 +7,6 @@ import { z } from "zod/v4"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
 import { Button } from "@/shared/ui/button"
-import { Badge } from "@/shared/ui/badge"
 import { Checkbox } from "@/shared/ui/checkbox"
 import { Input } from "@/shared/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select"
@@ -25,6 +24,8 @@ import { usersDef } from "@/modules/iam/defs"
 import { useQueryClient } from "@tanstack/react-query"
 import { useListQuery } from "@/frameworks/list/use-list-query"
 import { NameCell } from "@/frameworks/list/name-cell"
+import { StatusFilter } from "@/frameworks/list/status-filter"
+import { ActiveStatusBadge } from "@/shared/components/active-status-badge"
 import { ResourceListPage, type ColumnDef } from "@/frameworks/list/resource-list-page"
 import { useApiMutation } from "@/core/query/hooks"
 import { qk } from "@/core/query/keys"
@@ -132,6 +133,7 @@ export default function UserListPage() {
           to={`/iam/users/${user.metadata.id}`}
           displayName={user.spec.displayName}
           name={user.spec.username}
+          trailing={<ActiveStatusBadge status={user.spec.status} />}
         />
       ),
     },
@@ -148,20 +150,6 @@ export default function UserListPage() {
       sortable: true,
       truncate: true,
       cell: (user) => user.spec.phone || "-",
-    },
-    {
-      key: "status",
-      header: t("common.status"),
-      filter: [
-        { value: "all", label: t("common.all") },
-        { value: "active", label: t("common.active") },
-        { value: "inactive", label: t("common.inactive") },
-      ],
-      cell: (user) => (
-        <Badge variant={user.spec.status === "active" ? "default" : "secondary"}>
-          {user.spec.status === "active" ? t("common.active") : t("common.inactive")}
-        </Badge>
-      ),
     },
     {
       key: "created_at",
@@ -190,6 +178,18 @@ export default function UserListPage() {
       titleKey="user.title"
       subtitle={t("user.manage", { count: query.totalCount })}
       searchPlaceholderKey="user.searchPlaceholder"
+      // The status filter follows its column into the toolbar: left on
+      // the name header it would read as filtering by name.
+      toolbarExtra={
+        <StatusFilter
+          value={query.filters.status ?? "all"}
+          onChange={(v) => query.setFilter("status", v)}
+          options={[
+            { value: "active", label: t("common.active") },
+            { value: "inactive", label: t("common.inactive") },
+          ]}
+        />
+      }
       selectable={false}
       emptyKey="user.noData"
       createButton={

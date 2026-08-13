@@ -1,3 +1,4 @@
+import type { ReactNode } from "react"
 import { Link } from "react-router"
 import { TruncateText } from "@/shared/components/truncate-text"
 
@@ -12,6 +13,9 @@ export interface NameCellProps {
   name: string
   /** Width cap for the truncation of both lines. */
   maxWidth?: string
+  /** Status badge shown beside the name, vertically centred against both
+   *  lines. See the component doc for why status belongs here. */
+  trailing?: ReactNode
 }
 
 /**
@@ -26,12 +30,22 @@ export interface NameCellProps {
  * Degenerate cases collapse to a single line rather than showing a dash
  * or repeating the same string: a resource with no display name renders
  * just its name, still linked.
+ *
+ * `trailing` is where a row's status badge goes. Status is what an
+ * operator scans a list for, so it belongs beside the name their eye is
+ * already on rather than in a column of its own three headers to the
+ * right -- and folding it in buys back a column. It is centred against
+ * the pair of lines, because the cell is one line or two depending on
+ * whether the row has a display name and a top-aligned badge would jump
+ * between rows of different heights. The name's width cap tightens when
+ * a badge is present so the two stay adjacent on long names.
  */
-export function NameCell({ to, displayName, name, maxWidth = "max-w-[304px]" }: NameCellProps) {
+export function NameCell({ to, displayName, name, maxWidth, trailing }: NameCellProps) {
   const primary = displayName?.trim() || name
   const secondary = primary === name ? null : name
-  return (
-    <div className={`${maxWidth} min-w-0`}>
+  const width = maxWidth ?? (trailing ? "max-w-[220px]" : "max-w-[304px]")
+  const body = (
+    <div className={`${width} min-w-0`}>
       <TruncateText text={primary}>
         {to ? (
           <Link
@@ -49,6 +63,13 @@ export function NameCell({ to, displayName, name, maxWidth = "max-w-[304px]" }: 
           {secondary}
         </TruncateText>
       )}
+    </div>
+  )
+  if (!trailing) return body
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      {body}
+      <span className="shrink-0">{trailing}</span>
     </div>
   )
 }

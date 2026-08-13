@@ -31,6 +31,8 @@ import { namespacesDef } from "@/modules/iam/defs"
 import { useQueryClient } from "@tanstack/react-query"
 import { useListQuery } from "@/frameworks/list/use-list-query"
 import { NameCell } from "@/frameworks/list/name-cell"
+import { StatusFilter } from "@/frameworks/list/status-filter"
+import { ActiveStatusBadge } from "@/shared/components/active-status-badge"
 import { ResourceListPage, type ColumnDef } from "@/frameworks/list/resource-list-page"
 import { useApiMutation } from "@/core/query/hooks"
 import { qk } from "@/core/query/keys"
@@ -103,6 +105,7 @@ export default function NamespaceListPage() {
             (ns.metadata.name.endsWith("-default") ? t("namespace.builtinDefault") : "")
           }
           name={ns.metadata.name}
+          trailing={<ActiveStatusBadge status={ns.spec.status} />}
         />
       ),
     },
@@ -153,20 +156,6 @@ export default function NamespaceListPage() {
       ),
     },
     {
-      key: "status",
-      header: t("common.status"),
-      filter: [
-        { value: "all", label: t("common.all") },
-        { value: "active", label: t("common.active") },
-        { value: "inactive", label: t("common.inactive") },
-      ],
-      cell: (ns) => (
-        <Badge variant={ns.spec.status === "active" ? "default" : "secondary"}>
-          {ns.spec.status === "active" ? t("common.active") : t("common.inactive")}
-        </Badge>
-      ),
-    },
-    {
       key: "member_count",
       header: t("namespace.memberCount"),
       sortable: true,
@@ -202,6 +191,18 @@ export default function NamespaceListPage() {
       titleKey="namespace.title"
       subtitle={t("namespace.manage", { count: query.totalCount })}
       searchPlaceholderKey="namespace.searchPlaceholder"
+      // The status filter follows its column into the toolbar: left on
+      // the name header it would read as filtering by name.
+      toolbarExtra={
+        <StatusFilter
+          value={query.filters.status ?? "all"}
+          onChange={(v) => query.setFilter("status", v)}
+          options={[
+            { value: "active", label: t("common.active") },
+            { value: "inactive", label: t("common.inactive") },
+          ]}
+        />
+      }
       selectable={canBatch}
       emptyKey="namespace.noData"
       createButton={

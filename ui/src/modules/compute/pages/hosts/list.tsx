@@ -3,10 +3,10 @@ import { Link } from "react-router"
 import { KeyRound, Plus } from "lucide-react"
 import { formatDateTime } from "@/shared/lib/format"
 import { Button } from "@/shared/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select"
 import { useTranslation } from "@/i18n"
 import { useListQuery } from "@/frameworks/list/use-list-query"
 import { NameCell } from "@/frameworks/list/name-cell"
+import { StatusFilter } from "@/frameworks/list/status-filter"
 import { ResourceListPage, type ColumnDef } from "@/frameworks/list/resource-list-page"
 import type { ScopeRef } from "@/core/registry/resource"
 import { hostsApi } from "@/modules/compute/api/hosts"
@@ -32,31 +32,15 @@ export default function HostListPage() {
       key: "name",
       header: t("common.name"),
       sortable: true,
-      // Status rides in the name cell rather than a column of its own.
-      // It is the first thing an operator looks for, so it belongs beside
-      // the name their eye is already on, and folding it in buys back a
-      // column for data that has nowhere else to go. The name's width cap
-      // is tightened from the default so the badge stays adjacent instead
-      // of drifting right on long names.
-      //
-      // Centred rather than aligned to the first line: NameCell is one or
-      // two lines depending on whether the host has a display name, and
-      // top-aligning makes the badge jump between rows of different
-      // heights. Centred, it holds one baseline down the column.
       cell: (h) => (
-        <div className="flex min-w-0 items-center gap-2">
-          <NameCell
-            to={`/compute/hosts/${h.metadata.id}`}
-            displayName={h.spec.displayName}
-            name={h.metadata.name}
-            maxWidth="max-w-[220px]"
-          />
-          <AgentStatusBadge
-            status={h.spec.agentStatus}
-            conflictAt={h.spec.agentConflictAt}
-            className="shrink-0"
-          />
-        </div>
+        <NameCell
+          to={`/compute/hosts/${h.metadata.id}`}
+          displayName={h.spec.displayName}
+          name={h.metadata.name}
+          trailing={
+            <AgentStatusBadge status={h.spec.agentStatus} conflictAt={h.spec.agentConflictAt} />
+          }
+        />
       ),
     },
     {
@@ -117,22 +101,17 @@ export default function HostListPage() {
         // thing offered on an empty table.
         emptyKey="compute.host.empty"
         selectable={false}
-        // The status filter follows its column into the toolbar: left on
-        // the name header it would read as filtering by name.
         toolbarExtra={
-          <Select
+          <StatusFilter
             value={query.filters.agentStatus ?? "all"}
-            onValueChange={(v) => query.setFilter("agentStatus", v)}
-          >
-            <SelectTrigger className="h-9 w-40">
-              <SelectValue placeholder={t("compute.host.agentStatus")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("compute.host.agentStatusAll")}</SelectItem>
-              <SelectItem value="online">{t("compute.agent.online")}</SelectItem>
-              <SelectItem value="offline">{t("compute.agent.offline")}</SelectItem>
-            </SelectContent>
-          </Select>
+            onChange={(v) => query.setFilter("agentStatus", v)}
+            allLabel={t("compute.host.agentStatusAll")}
+            placeholder={t("compute.host.agentStatus")}
+            options={[
+              { value: "online", label: t("compute.agent.online") },
+              { value: "offline", label: t("compute.agent.offline") },
+            ]}
+          />
         }
         createButton={
           <div className="flex items-center gap-2">

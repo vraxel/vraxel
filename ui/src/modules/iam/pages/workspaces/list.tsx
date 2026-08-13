@@ -7,7 +7,6 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
 import { useScopeStore } from "@/core/scope/scope-store"
 import { Button } from "@/shared/ui/button"
-import { Badge } from "@/shared/ui/badge"
 import { Input } from "@/shared/ui/input"
 import { Textarea } from "@/shared/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select"
@@ -23,6 +22,8 @@ import { workspacesDef } from "@/modules/iam/defs"
 import { useQueryClient } from "@tanstack/react-query"
 import { useListQuery } from "@/frameworks/list/use-list-query"
 import { NameCell } from "@/frameworks/list/name-cell"
+import { StatusFilter } from "@/frameworks/list/status-filter"
+import { ActiveStatusBadge } from "@/shared/components/active-status-badge"
 import { ResourceListPage, type ColumnDef } from "@/frameworks/list/resource-list-page"
 import { useApiMutation } from "@/core/query/hooks"
 import { qk } from "@/core/query/keys"
@@ -85,6 +86,7 @@ export default function WorkspaceListPage() {
           to={`/iam/workspaces/${ws.metadata.id}`}
           displayName={ws.spec.displayName}
           name={ws.metadata.name}
+          trailing={<ActiveStatusBadge status={ws.spec.status} />}
         />
       ),
     },
@@ -119,20 +121,6 @@ export default function WorkspaceListPage() {
       cell: (ws) => ws.spec.memberCount ?? 0,
     },
     {
-      key: "status",
-      header: t("common.status"),
-      filter: [
-        { value: "all", label: t("common.all") },
-        { value: "active", label: t("common.active") },
-        { value: "inactive", label: t("common.inactive") },
-      ],
-      cell: (ws) => (
-        <Badge variant={ws.spec.status === "active" ? "default" : "secondary"}>
-          {ws.spec.status === "active" ? t("common.active") : t("common.inactive")}
-        </Badge>
-      ),
-    },
-    {
       key: "created_at",
       header: t("common.created"),
       sortable: true,
@@ -162,6 +150,18 @@ export default function WorkspaceListPage() {
       titleKey="workspace.title"
       subtitle={t("workspace.manage", { count: query.totalCount })}
       searchPlaceholderKey="workspace.searchPlaceholder"
+      // The status filter follows its column into the toolbar: left on
+      // the name header it would read as filtering by name.
+      toolbarExtra={
+        <StatusFilter
+          value={query.filters.status ?? "all"}
+          onChange={(v) => query.setFilter("status", v)}
+          options={[
+            { value: "active", label: t("common.active") },
+            { value: "inactive", label: t("common.inactive") },
+          ]}
+        />
+      }
       selectable={canBatch}
       emptyKey="workspace.noData"
       createButton={
