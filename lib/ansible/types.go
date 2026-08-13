@@ -399,7 +399,7 @@ type Play struct {
 
 	// Flag/Setting Attributes
 	ForceHandlers     bool       `yaml:"force_handlers,omitempty"`
-	MaxFailPercentage float32    `yaml:"percent,omitempty"`
+	MaxFailPercentage float32    `yaml:"max_fail_percentage,omitempty"`
 	Serial            PlaySerial `yaml:"serial,omitempty"`
 	Strategy          string     `yaml:"strategy,omitempty"`
 	Order             string     `yaml:"order,omitempty"`
@@ -454,19 +454,26 @@ type Playbook struct {
 // import_playbook references (which should have been resolved already)
 // and checks that remaining plays have hosts defined.
 func (p *Playbook) Validate() error {
-	var newPlay = make([]Play, 0)
 	for _, play := range p.Play {
-		// import_playbook is a link, should be ignored.
+		// import_playbook used to be dropped here, which turned "run these
+		// other plays too" into "run nothing" without a word.
 		if play.ImportPlaybook != "" {
-			continue
+			return unsupported(describe("play", play.Name), "import_playbook",
+				unsupportedDirectives["import_playbook"])
 		}
 
 		if len(play.PlayHost.Hosts) == 0 {
 			return fmt.Errorf("playbook's hosts must not be empty")
 		}
-		newPlay = append(newPlay, play)
+		if err := ValidatePlay(play); err != nil {
+			return err
+		}
+		for _, blocks := range [][]Block{play.PreTasks, play.Tasks, play.PostTasks} {
+			if err := ValidateBlocks(blocks); err != nil {
+				return err
+			}
+		}
 	}
-	p.Play = newPlay
 	return nil
 }
 

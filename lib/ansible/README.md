@@ -417,6 +417,28 @@ inv := ansible.Inventory{
   environment: "{{ .build_env }}"
 ```
 
+### 不支持的指令会在加载时报错
+
+YAML 层能解析、但引擎没有实现的指令，**在加载 playbook / role / include_tasks 文件时直接报错**，而不是静默忽略。静默忽略会产出"报告成功、行为却和剧本写的不一样"的运行结果——不委派的 `delegate_to`、不循环的 `with_*`、不触发的 handler，这类问题最难排查。
+
+当前会被拒绝的指令：
+
+| 指令 | 替代写法 |
+|------|----------|
+| `notify` / `handlers` / `force_handlers` | 直接调用该任务，或用 `when` 控制 |
+| `async` / `poll` | 在 shell 里自行后台执行 |
+| `strategy`（非 `linear`）/ `order` | 只有默认的 linear 策略、inventory 顺序 |
+| `throttle` | 用 `serial` 限制并发主机数 |
+| `any_errors_fatal` / `max_fail_percentage` | 任一主机失败即中止 play |
+| `timeout` | 给命令本身加超时（如 `timeout(1)`） |
+| `import_playbook` | 把被引用 play 合并进本文件 |
+| `include_role` / `import_role` | 在 play 的 `roles:` 里声明 |
+| `local_action` | 用 `delegate_to: localhost` |
+| `delegate_facts` | 事实始终属于原主机 |
+| `with_*`（除 `with_items` / `with_dict`） | 用 `loop` |
+
+`check_mode` / `diff` **不在拒绝之列**：引擎本身没有 dry-run 模式，它们只是无效而非误导，拒绝反而会打断防御性写法。
+
 ### 重试
 
 ```yaml

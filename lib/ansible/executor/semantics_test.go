@@ -458,6 +458,85 @@ func TestDelegateTo_PlaybookClosesDelegateConnector(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Load-time rejection reaches files the top-level playbook never shows
+// ---------------------------------------------------------------------------
+
+// runPlaybookWithFiles executes a one-task play against an in-memory source.
+func runPlaybookWithFiles(t *testing.T, files map[string][]byte, task ansible.Block) error {
+	t.Helper()
+
+	exec, _ := setupPlaybookExecutor(t, localhostInventory(), files)
+	playbook := &ansible.Playbook{
+		Play: []ansible.Play{{
+			Base:     ansible.Base{Name: "p"},
+			PlayHost: ansible.PlayHost{Hosts: []string{"localhost"}},
+			Tasks:    []ansible.Block{task},
+		}},
+	}
+	result, err := exec.Execute(context.Background(), playbook)
+	if err != nil {
+		return err
+	}
+	if !result.Success {
+		return fmt.Errorf("%s", result.Error)
+	}
+	return nil
+}
+
+func TestUnsupported_RejectedInsideIncludeTasks(t *testing.T) {
+	files := map[string][]byte{
+		"tasks/extra.yml": []byte(`
+- name: globbing task
+  command:
+    cmd: "echo {{ .item }}"
+  with_fileglob: "/etc/*.conf"
+`),
+	}
+	err := runPlaybookWithFiles(t, files, ansible.Block{IncludeTasks: "tasks/extra.yml"})
+
+	if err == nil {
+		t.Fatal("expected the included file's with_fileglob to be rejected")
+	}
+	if !strings.Contains(err.Error(), "with_fileglob") {
+		t.Errorf("error should name the directive, got %q", err.Error())
+	}
+}
+
+func TestUnsupported_RejectedInsideRole(t *testing.T) {
+	files := map[string][]byte{
+		"roles/svc/tasks/main.yml": []byte(`
+- name: notify task
+  command:
+    cmd: echo hi
+  notify: restart svc
+`),
+	}
+
+	exec, _ := setupPlaybookExecutor(t, localhostInventory(), files)
+	playbook := &ansible.Playbook{
+		Play: []ansible.Play{{
+			Base:     ansible.Base{Name: "p"},
+			PlayHost: ansible.PlayHost{Hosts: []string{"localhost"}},
+			Roles:    []ansible.Role{{RoleInfo: ansible.RoleInfo{Role: "svc"}}},
+		}},
+	}
+
+	result, err := exec.Execute(context.Background(), playbook)
+	failed := err != nil || !result.Success
+	if !failed {
+		t.Fatal("expected the role's notify to be rejected")
+	}
+
+	msg := result.Error
+	if err != nil {
+		msg = err.Error()
+	}
+	if !strings.Contains(msg, "notify") {
+		t.Errorf("error should name the directive, got %q", msg)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Torture playbook: the whole chain, YAML -> converter -> planner -> executor
 // ---------------------------------------------------------------------------
 

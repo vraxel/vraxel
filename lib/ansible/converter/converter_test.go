@@ -110,7 +110,9 @@ func TestParsePlaybook_WithRoles(t *testing.T) {
 	}
 }
 
-func TestParsePlaybook_ImportPlaybook(t *testing.T) {
+func TestParsePlaybook_ImportPlaybookRejected(t *testing.T) {
+	// Silently dropping the import used to turn "also run these plays" into
+	// "run nothing", so it is now a load-time error.
 	yamlData := `
 - import_playbook: other.yml
 
@@ -119,16 +121,8 @@ func TestParsePlaybook_ImportPlaybook(t *testing.T) {
     - name: hello
       shell: echo hi
 `
-	pb, err := ParsePlaybook([]byte(yamlData))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	// import_playbook plays should be removed by Validate.
-	if len(pb.Play) != 1 {
-		t.Fatalf("expected 1 play after validation, got %d", len(pb.Play))
-	}
-	if pb.Play[0].PlayHost.Hosts[0] != "all" {
-		t.Fatalf("expected remaining play hosts=['all'], got %v", pb.Play[0].PlayHost.Hosts)
+	if _, err := ParsePlaybook([]byte(yamlData)); err == nil {
+		t.Fatal("expected import_playbook to be rejected, got nil")
 	}
 }
 
@@ -669,7 +663,6 @@ func TestParseAndConvert(t *testing.T) {
       retries: 3
       delay: 10
       until: deploy_result is succeeded
-      notify: restart app
 `
 	pb, err := ParsePlaybook([]byte(yamlData))
 	if err != nil {
@@ -707,9 +700,6 @@ func TestParseAndConvert(t *testing.T) {
 	}
 	if spec.Delay != 10 {
 		t.Fatalf("expected delay 10, got %d", spec.Delay)
-	}
-	if spec.Notify != "restart app" {
-		t.Fatalf("expected notify 'restart app', got %q", spec.Notify)
 	}
 	if len(spec.When) != 1 {
 		t.Fatalf("expected 1 when condition, got %d", len(spec.When))
