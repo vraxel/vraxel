@@ -162,7 +162,7 @@ func (q *Queries) MarkStaleHostAgentsOffline(ctx context.Context, staleAfterSecs
 	return err
 }
 
-const touchHostAgent = `-- name: TouchHostAgent :exec
+const touchHostAgent = `-- name: TouchHostAgent :execrows
 UPDATE host_agents
 SET status        = 'online',
     last_seen_at  = now(),
@@ -184,10 +184,15 @@ type TouchHostAgentParams struct {
 // without this the row stays offline forever while the channel is up,
 // which fails every session-token check for that host.
 // Guarded on instance_id: a touch from a stale socket must not steal a
-// row another instance has since claimed.
-func (q *Queries) TouchHostAgent(ctx context.Context, arg TouchHostAgentParams) error {
-	_, err := q.db.Exec(ctx, touchHostAgent, arg.ClockSkewMs, arg.HostID, arg.InstanceID)
-	return err
+// row another instance has since claimed. Zero rows therefore means "the
+// row is not ours"; the caller re-claims it with MarkHostAgentOnline
+// rather than beating against a guard that can never match again.
+func (q *Queries) TouchHostAgent(ctx context.Context, arg TouchHostAgentParams) (int64, error) {
+	result, err := q.db.Exec(ctx, touchHostAgent, arg.ClockSkewMs, arg.HostID, arg.InstanceID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const upsertHostAgent = `-- name: UpsertHostAgent :one

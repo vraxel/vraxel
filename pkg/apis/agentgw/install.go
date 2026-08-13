@@ -63,9 +63,11 @@ type Deps struct {
 	// ServerName is config server.name, the deployment identity component
 	// of this instance's id.
 	ServerName string
-	// ExternalURL is config server.externalUrl, used only as the port
-	// source for the fallback internal address.
-	ExternalURL string
+	// ListenAddr is the address this process serves HTTP on. It is the
+	// port source for the address siblings use to reach this instance;
+	// externalUrl cannot be, because behind a load balancer it names the
+	// balancer rather than any one instance.
+	ListenAddr string
 }
 
 // NewJoinTokenStore builds the join-token store. Exported as a top-level
@@ -98,7 +100,7 @@ func NewModule(ctx context.Context, database *db.DB, deps Deps) ModuleResult {
 	lease := serverinstance.NewLease(
 		instReg,
 		instanceID,
-		serverinstance.BuildInternalAddr(deps.ExternalURL),
+		serverinstance.BuildInternalAddr(deps.ListenAddr),
 		logAdapter{},
 	)
 	// The stale-agent sweep hangs off the lease tick: agent semantics, safe

@@ -55,7 +55,7 @@ SET status        = 'online',
 WHERE host_id = @host_id
 RETURNING connected_at;
 
--- name: TouchHostAgent :exec
+-- name: TouchHostAgent :execrows
 -- A heartbeat also RESTORES status='online'. The stale sweep can only
 -- ever be a guess (it fires when nobody wrote 'offline' in time), and it
 -- guesses wrong whenever DB writes are unavailable for a minute -- the
@@ -63,7 +63,9 @@ RETURNING connected_at;
 -- without this the row stays offline forever while the channel is up,
 -- which fails every session-token check for that host.
 -- Guarded on instance_id: a touch from a stale socket must not steal a
--- row another instance has since claimed.
+-- row another instance has since claimed. Zero rows therefore means "the
+-- row is not ours"; the caller re-claims it with MarkHostAgentOnline
+-- rather than beating against a guard that can never match again.
 UPDATE host_agents
 SET status        = 'online',
     last_seen_at  = now(),

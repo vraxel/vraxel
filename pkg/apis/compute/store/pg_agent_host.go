@@ -2,8 +2,10 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"vraxel.io/vraxel/pkg/db"
 	"vraxel.io/vraxel/pkg/db/generated"
 	"vraxel.io/vraxel/pkg/db/pgerrors"
@@ -40,6 +42,13 @@ type AgentHostFactsInput struct {
 	PrimaryIP string
 }
 
+// AgentHostScope is the tenancy of an existing agent host.
+type AgentHostScope struct {
+	Scope       string
+	WorkspaceID *int64
+	NamespaceID *int64
+}
+
 // AgentHostStore is the hosts-table surface the agent gateway needs.
 //
 // A dedicated narrow store rather than two more methods on HostStore:
@@ -53,6 +62,9 @@ type AgentHostStore interface {
 	// UpdateFacts refreshes an existing agent host. Returns
 	// pgerrors.ErrNotFound when the row is gone.
 	UpdateFacts(ctx context.Context, hostID int64, in AgentHostFactsInput) error
+	// GetScope reads a host's tenancy. Returns pgerrors.ErrNotFound when
+	// the row is gone.
+	GetScope(ctx context.Context, hostID int64) (*AgentHostScope, error)
 }
 
 type pgAgentHostStore struct {
@@ -82,6 +94,21 @@ func (s *pgAgentHostStore) Create(ctx context.Context, in AgentHostCreateInput) 
 		return 0, fmt.Errorf("create agent host: %w", pgerrors.CheckPG(err))
 	}
 	return id, nil
+}
+
+func (s *pgAgentHostStore) GetScope(ctx context.Context, hostID int64) (*AgentHostScope, error) {
+	row, err := s.Q().GetAgentHostScope(ctx, hostID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("host %d: %w", hostID, pgerrors.ErrNotFound)
+		}
+		return nil, fmt.Errorf("get agent host scope: %w", err)
+	}
+	return &AgentHostScope{
+		Scope:       row.Scope,
+		WorkspaceID: row.WorkspaceID,
+		NamespaceID: row.NamespaceID,
+	}, nil
 }
 
 func (s *pgAgentHostStore) UpdateFacts(ctx context.Context, hostID int64, in AgentHostFactsInput) error {

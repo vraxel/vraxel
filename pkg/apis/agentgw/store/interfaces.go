@@ -24,7 +24,10 @@ type AgentStore interface {
 	MarkOnline(ctx context.Context, hostID int64, instanceID, version string, clockSkewMs int64) (time.Time, error)
 	// Touch records a heartbeat and restores status='online' for the row
 	// this instance owns, so a stale-sweep misfire heals on the next beat.
-	Touch(ctx context.Context, hostID int64, instanceID string, clockSkewMs int64) error
+	// It reports whether the row was ours: false means another instance
+	// (or a failed MarkOnline) holds the claim and the caller must take it
+	// back, since every further beat would be a no-op.
+	Touch(ctx context.Context, hostID int64, instanceID string, clockSkewMs int64) (claimed bool, err error)
 	MarkOffline(ctx context.Context, hostID int64, instanceID string) error
 	MarkInstanceOffline(ctx context.Context, instanceID string) error
 	// MarkStaleOffline sweeps rows with no heartbeat for staleAfter. The

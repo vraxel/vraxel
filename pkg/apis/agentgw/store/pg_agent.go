@@ -82,15 +82,16 @@ func (s *pgAgentStore) MarkOnline(ctx context.Context, hostID int64, instanceID,
 	return *connectedAt, nil
 }
 
-func (s *pgAgentStore) Touch(ctx context.Context, hostID int64, instanceID string, clockSkewMs int64) error {
-	if err := s.Q().TouchHostAgent(ctx, generated.TouchHostAgentParams{
+func (s *pgAgentStore) Touch(ctx context.Context, hostID int64, instanceID string, clockSkewMs int64) (bool, error) {
+	n, err := s.Q().TouchHostAgent(ctx, generated.TouchHostAgentParams{
 		ClockSkewMs: clockSkewMs,
 		HostID:      hostID,
 		InstanceID:  instanceID,
-	}); err != nil {
-		return fmt.Errorf("touch host agent: %w", err)
+	})
+	if err != nil {
+		return false, fmt.Errorf("touch host agent: %w", err)
 	}
-	return nil
+	return n > 0, nil
 }
 
 func (s *pgAgentStore) MarkOffline(ctx context.Context, hostID int64, instanceID string) error {

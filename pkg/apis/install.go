@@ -55,7 +55,11 @@ func (r Result) SyncPermissions(ctx context.Context, srv *apiserver.Server) erro
 }
 
 // NewModules assembles all API modules and returns the aggregated result.
-func NewModules(ctx context.Context, database *db.DB) Result {
+//
+// listenAddr is where this process serves HTTP. The agent gateway
+// advertises it to sibling instances, so it has to be the real listener
+// rather than anything derived from externalUrl.
+func NewModules(ctx context.Context, database *db.DB, listenAddr string) Result {
 	// Cross-instance pgnotify multiplexer. Single dedicated PG connection
 	// multiplexed across every module's LISTEN channel. Modules call
 	// XxxChannel.Subscribe(mux, handler) inside NewModule; main calls
@@ -78,7 +82,7 @@ func NewModules(ctx context.Context, database *db.DB) Result {
 		JoinTokens:    agentgw.NewJoinTokenStore(database),
 		EncryptionKey: pkiResult.EncryptionKey,
 		ServerName:    config.Get().Server.Name,
-		ExternalURL:   config.Get().Server.ExternalURL,
+		ListenAddr:    listenAddr,
 	})
 
 	return Result{

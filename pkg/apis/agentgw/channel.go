@@ -87,27 +87,37 @@ func (h *protocolHandler) handleChannel(w http.ResponseWriter, r *http.Request) 
 	// authSession rejects a token whose epoch no longer matches
 	// host_agents.connected_at, so it dies on reconnect. A zero time means
 	// MarkOnline failed; skip issuing rather than mint a token that can
-	// never validate.
+	// never validate, and let the first heartbeat re-claim the row and
+	// issue one then.
 	if !connectedAt.IsZero() {
-		h.issueSessionToken(sessCtx, sess, connectedAt, 1)
-		go h.refreshSessionToken(sessCtx, sess, connectedAt)
+		sess.SetEpoch(connectedAt)
+		h.issueSessionToken(sessCtx, sess)
 	}
+	go h.refreshSessionToken(sessCtx, sess)
 
 	h.readLoop(sessCtx, sess)
 	_ = conn.Close(ws.StatusNormalClosure, "")
 }
 
-// issueSessionToken mints and delivers one session token for this
-// connection.
-func (h *protocolHandler) issueSessionToken(ctx context.Context, sess *Session, connectedAt time.Time, gen int) {
-	token, err := h.sessionSigner.Issue(sess.HostID, h.registry.InstanceID(), connectedAt.UnixMicro())
+// issueSessionToken mints and delivers one session token for the epoch
+// the session currently holds. A delivery failure is recorded so the next
+// heartbeat retries it.
+func (h *protocolHandler) issueSessionToken(ctx context.Context, sess *Session) {
+	epoch := sess.Epoch()
+	if epoch.IsZero() {
+		return
+	}
+	gen := sess.tokenGen.Add(1)
+	token, err := h.sessionSigner.Issue(sess.HostID, h.registry.InstanceID(), epoch.UnixMicro())
 	if err != nil {
 		logger.Warnf("agentgw: issue session token for agent %s: %v", sess.AgentID, err)
 		return
 	}
-	if err := WriteFrame(ctx, sess.Conn, agenttypes.Frame{
+	err = WriteFrame(ctx, sess.Conn, agenttypes.Frame{
 		Type: agenttypes.FrameTypeSessionToken, ID: fmt.Sprintf("st-%d", gen), Token: token,
-	}); err != nil {
+	})
+	sess.tokenSent.Store(err == nil)
+	if err != nil {
 		logger.Warnf("agentgw: send session token to agent %s: %v", sess.AgentID, err)
 	}
 }
@@ -123,15 +133,15 @@ func (h *protocolHandler) issueSessionToken(ctx context.Context, sess *Session, 
 // TTL is still worth having (it bounds how long a leaked token is usable
 // even while its channel lives), so the answer is to keep renewing it
 // rather than to widen it.
-func (h *protocolHandler) refreshSessionToken(ctx context.Context, sess *Session, connectedAt time.Time) {
+func (h *protocolHandler) refreshSessionToken(ctx context.Context, sess *Session) {
 	t := time.NewTicker(sessionTokenRefresh)
 	defer t.Stop()
-	for gen := 2; ; gen++ {
+	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			h.issueSessionToken(ctx, sess, connectedAt, gen)
+			h.issueSessionToken(ctx, sess)
 		}
 	}
 }
@@ -237,6 +247,21 @@ func (h *protocolHandler) readLoop(ctx context.Context, sess *Session) {
 	}
 }
 
+// touch records a heartbeat and keeps the agent's session token in step
+// with it: the beat is the only regular event on an idle channel, so it
+// is where both the re-claim and the delivery retry belong.
+func (h *protocolHandler) touch(ctx context.Context, sess *Session, skew int64) {
+	if reclaimedAt := h.registry.Touch(ctx, sess, skew); !reclaimedAt.IsZero() {
+		// The epoch moved, so every token minted for the old one is dead.
+		sess.SetEpoch(reclaimedAt)
+		h.issueSessionToken(ctx, sess)
+		return
+	}
+	if !sess.tokenSent.Load() {
+		h.issueSessionToken(ctx, sess)
+	}
+}
+
 func (h *protocolHandler) handleFrame(ctx context.Context, sess *Session, f *agenttypes.Frame) {
 	switch f.Type {
 	case agenttypes.FrameTypeHeartbeat:
@@ -245,11 +270,11 @@ func (h *protocolHandler) handleFrame(ctx context.Context, sess *Session, f *age
 			logger.Warnf("agentgw: agent %s clock skew %dms exceeds %dms; metric timestamps from this host will be wrong until NTP is fixed",
 				sess.AgentID, skew, clockSkewWarnMs)
 		}
-		h.registry.Touch(ctx, sess.HostID, skew)
+		h.touch(ctx, sess, skew)
 	case agenttypes.FrameTypeHello:
 		// A second hello on an established channel is harmless; treat it
 		// as a heartbeat so a reconnect-confused agent still stays fresh.
-		h.registry.Touch(ctx, sess.HostID, clockSkew(f.ClockUnixMs))
+		h.touch(ctx, sess, clockSkew(f.ClockUnixMs))
 	case agenttypes.FrameTypeJobAck:
 		// The agent accepted a dispatched job: flip it to running so the
 		// driver stops re-dispatching and starts its timeout clock.

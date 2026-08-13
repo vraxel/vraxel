@@ -99,7 +99,15 @@ func (h *protocolHandler) handleRegister(w http.ResponseWriter, r *http.Request)
 	})
 	if err != nil {
 		logger.Warnf("agentgw register: register host for agent %s: %v", agentID, err)
-		http.Error(w, "register host: "+err.Error(), http.StatusInternalServerError)
+		// A rejected rebind is the caller's problem to fix (wrong token for
+		// that host), everything else is ours. Neither answer carries the
+		// underlying error: the peer holds nothing but a join token, and
+		// constraint names and table names are not its business.
+		if apierrors.IsForbidden(err) {
+			http.Error(w, "this join token may not claim that host", http.StatusForbidden)
+		} else {
+			http.Error(w, "register host", http.StatusInternalServerError)
+		}
 		return
 	}
 

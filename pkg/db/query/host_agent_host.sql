@@ -36,3 +36,11 @@ SET hostname            = @hostname,
     connectivity_mode   = 'agent',
     updated_at          = now()
 WHERE id = @id;
+
+-- name: GetAgentHostScope :one
+-- Tenancy of an existing agent host, read before a re-registration is
+-- allowed to rebind it. The agent id in a register request is derived
+-- from the machine id the caller reports, which is not a secret, so the
+-- scope of the join token presented has to be checked against the scope
+-- of the host being claimed.
+SELECT scope, workspace_id, namespace_id FROM hosts WHERE id = @id;
