@@ -12,7 +12,7 @@ import type { ScopeRef } from "@/core/registry/resource"
 import { hostsApi } from "@/modules/compute/api/hosts"
 import type { Host } from "@/modules/compute/api/types"
 import { hostsDef } from "@/modules/compute/defs"
-import { AgentStatusBadge, AgentStatusDot } from "@/modules/compute/components/agent-status-badge"
+import { AgentStatusBadge } from "@/modules/compute/components/agent-status-badge"
 import { PendingTokensSheet } from "@/modules/compute/components/pending-tokens-sheet"
 
 export default function HostListPage() {
@@ -33,20 +33,24 @@ export default function HostListPage() {
       header: t("common.name"),
       sortable: true,
       // Status rides in the name cell rather than a column of its own.
-      // It is the first thing an operator looks for, so it belongs on the
-      // line their eye is already on, and folding it in buys back a
-      // column for data that has nowhere else to go.
+      // It is the first thing an operator looks for, so it belongs beside
+      // the name their eye is already on, and folding it in buys back a
+      // column for data that has nowhere else to go. The name's width cap
+      // is tightened from the default so the badge stays adjacent instead
+      // of drifting right on long names.
       cell: (h) => (
-        <div className="flex min-w-0 items-center gap-2">
-          <AgentStatusDot status={h.spec.agentStatus} conflictAt={h.spec.agentConflictAt} />
+        <div className="flex min-w-0 items-start gap-2">
           <NameCell
             to={`/compute/hosts/${h.metadata.id}`}
             displayName={h.spec.displayName}
             name={h.metadata.name}
+            maxWidth="max-w-[220px]"
           />
-          {h.spec.agentConflictAt && (
-            <AgentStatusBadge status={h.spec.agentStatus} conflictAt={h.spec.agentConflictAt} />
-          )}
+          <AgentStatusBadge
+            status={h.spec.agentStatus}
+            conflictAt={h.spec.agentConflictAt}
+            className="mt-0.5 shrink-0"
+          />
         </div>
       ),
     },
