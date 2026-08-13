@@ -44,7 +44,7 @@ func HashToken(token string) []byte {
 
 // AgentTokenPrefix tags the token format so a future rotation to a
 // different signing scheme is distinguishable on sight.
-const AgentTokenPrefix = "lcpa1"
+const AgentTokenPrefix = "vra1"
 
 // AgentClaims is the payload an agent token carries. The gateway
 // validates it against host_agents: agent_id must exist, host_id must
@@ -71,7 +71,7 @@ var ErrInvalidToken = errors.New("invalid agent token")
 
 // TokenSigner mints and verifies agent tokens.
 //
-// Format: "lcpa1.<base64url(payload)>.<base64url(hmac-sha256)>".
+// Format: "vra1.<base64url(payload)>.<base64url(hmac-sha256)>".
 //
 // A JWT library would add a dependency and a parser surface for a token
 // that only this package issues and only this package reads. The signing
@@ -89,7 +89,7 @@ type TokenSigner struct {
 // master key.
 func NewTokenSigner(masterKey []byte) *TokenSigner {
 	mac := hmac.New(sha256.New, masterKey)
-	mac.Write([]byte("lcp-agent-token-v1"))
+	mac.Write([]byte("agent-token-v1"))
 	return &TokenSigner{key: mac.Sum(nil)}
 }
 
@@ -148,7 +148,7 @@ func (s *TokenSigner) sign(body string) []byte {
 
 // --- agent identity ---
 
-// agentIDNamespace is the UUIDv5 namespace for lcp-agent identities. A
+// agentIDNamespace is the UUIDv5 namespace for the agent identities. A
 // fixed random UUID, generated once for this purpose.
 var agentIDNamespace = uuid.MustParse("6f1d4b2e-9c3a-5f77-8d21-0a5e6b74c910")
 

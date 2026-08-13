@@ -16,7 +16,7 @@ import (
 
 // SessionTokenPrefix tags the session-token format so it is
 // distinguishable on sight from an agent token (AgentTokenPrefix).
-const SessionTokenPrefix = "lcps1"
+const SessionTokenPrefix = "vrs1"
 
 // sessionTokenTTL is the exp stamped into a session token. The token's
 // real lifecycle is the control channel: authSession additionally
@@ -56,7 +56,7 @@ var ErrInvalidSession = errors.New("invalid session token")
 
 // SessionTokenSigner mints and verifies session tokens.
 //
-// Format: "lcps1.<base64url(payload)>.<base64url(hmac-sha256)>". Same
+// Format: "vrs1.<base64url(payload)>.<base64url(hmac-sha256)>". Same
 // scheme as TokenSigner but keyed off a DIFFERENT domain separator, so a
 // session token can never be confused with, or forged from, an agent
 // token even though both derive from the one master key.
@@ -75,7 +75,7 @@ type SessionTokenSigner struct {
 // PKI master key under its own domain separator.
 func NewSessionTokenSigner(masterKey []byte) *SessionTokenSigner {
 	mac := hmac.New(sha256.New, masterKey)
-	mac.Write([]byte("the agent-session-v1"))
+	mac.Write([]byte("agent-session-v1"))
 	return &SessionTokenSigner{key: mac.Sum(nil), now: time.Now}
 }
 
