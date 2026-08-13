@@ -23,6 +23,9 @@
 
 ## Rules
 
+- **禁止整条 lint 规则降级。** 一条规则要么在 `error`，要么不启用；**任何规则都不许停在 `warn`**。`ui` 的 lint 脚本带 `--max-warnings 0`，`warn` 对 CI 等价于 `error`，降级换不来绿灯，只换来看不见的债——种子仓库(lcp)就是这么攒出 ~340 处违规而 CI 全程绿灯的（`eslint .` 对 warning 退出码是 0，已实测：同样 3 个 warning，`eslint .` 退出 0，`eslint . --max-warnings 0` 退出 1）。需要例外时，在**出问题的那一行**写 `// eslint-disable-next-line <rule>` 并在上一行写明理由：它出现在 diff 里、grep 得到、随被豁免的代码一起消失。整条降级三样都不占。
+- **规则严重性决策的源头在 lcp 的 `eslint.shared.js`**，本仓 `ui/eslint.config.js` 顶部持有一份标注为 MIRROR 的副本（没有私有 npm registry，无法真共享包）。改任何一边都要同步另一边。本仓的 config 曾经原样抄来 lcp 的降级块——而本仓对那些规则**一处违规都没有**。规则决策靠复制粘贴传播，就会在两个地方同时是错的。
+- **新规则族只能以 `error` 引入，否则就先别引入。** 升级 lint 插件大版本（如 `eslint-plugin-react-hooks` v7 带进来的 React Compiler 规则族）时，要么当场把违规清零并置于 `error`，要么把新规则关掉、留 issue 排期。以 `warn` 引入等于引入一笔没有负责人、没有期限的债；更麻烦的是**这类规则按组件只报一次**（一处 `Compilation Skipped` 会掩盖同组件其余全部问题），所以修的过程中总数会**先涨后降**，warning 计数既不能当进度也做不了 ratchet，唯一稳定状态是零。
 - 所有代码变动，都要新建一个 worktree（分支），在 worktree 上改动后等我 Review 确定再合并；清理 worktree 时同步清理掉分支。
 - If a new feature requires adding new API endpoints, **MUST confirm with the user before implementation**. Do not create new routes, resources, or API groups without explicit approval.
 - When designing any concurrency/locking mechanism, **MUST account for vraxel-server horizontal scaling** (multiple instances). In-process locks (`sync.Mutex`, etc.) are insufficient — use distributed locks (e.g., PostgreSQL advisory locks) since all instances share the same database.
@@ -78,6 +81,10 @@ cp -r ui/dist .worktrees/<branch>/ui/dist
 ```
 
 **禁止在 worktree 里跑 `pnpm install` / `pnpm typecheck` / `pnpm build`**。worktree 只用来改前端源码；改完 commit → merge 回 main 后，**在 main 上跑 `pnpm typecheck`**（main 已有 `node_modules`，0 成本）。理由：worktree 各装一份 `node_modules` 数百 MB，pnpm 跨 worktree 共享会被 `.modules.yaml` 的 `virtualStoreDir` 打架；把 typecheck 推到 merge 之后是「一处装、一处验」。同理**禁止用 symlink 把 worktree 的 `ui/node_modules` 指向 main**。
+
+**例外：跨模块的大批量机械重构（一次动 20+ 文件的 codemod / 规则清理 / 符号搬迁）直接在主检出上开分支做，不要用 worktree。** 这类改动每一批都需要立刻 typecheck 才能收敛——盲改到 merge 才发现错误，会把「改一批、验一批」变成「改六十个文件、一次性面对几十个报错」。主检出有 `node_modules`，边改边验是 0 成本。做完照常等 Review 再合。
+
+**这类重构的 codemod 必须基于 AST（`ts-morph` / `jscodeshift`），不许用正则或按行切。** 正则切不动多行 `import {}` 和跨行箭头函数体，会静默产出「看着对」的残缺文件；lcp 那次就切坏了 5 个文件，全靠 `tsc` 才捞回来。
 
 ### 生成物与校验
 

@@ -22,25 +22,35 @@ export default defineConfig([
       globals: globals.browser,
     },
     rules: {
-      // The react-hooks v7 compiler-family rules and
-      // react-refresh/only-export-components used to be pinned to 'warn' here,
-      // carried over from the repo this UI was seeded from, where the
-      // fetchData-in-useEffect idiom fired them a few hundred times pending a
-      // data-layer migration. That does not describe this tree: every page
-      // reads through useApiQuery already, and eslint reports zero hits for
-      // all six rules. Holding them at 'warn' bought nothing and quietly
-      // licensed new code to reintroduce the idiom, so they stay at the
-      // recommended 'error'.
-      // Unused imports are auto-removed by unused-imports (AST-safe
-      // autofix, used heavily by the W3 migration to strip imports the
-      // framework replaced). no-unused-imports subsumes the import half
-      // of no-unused-vars, so the ts rule keeps only the non-import half.
-      // exhaustive-deps ships as 'warn' in the recommended config. This tree
-      // reports zero hits, and the class it catches (a `?? []` view rebuilt
-      // every render, defeating the memo or tracker keyed on it) is exactly
-      // what breaks the render-phase transition pattern used throughout. Held
-      // at error so it stays at zero.
+      // --- shared decisions -------------------------------------------------
+      // MIRROR of `sharedRules` in lcp's eslint.shared.js. That file is the
+      // source of truth; there is no private npm registry to share a package
+      // through, so this copy is deliberate and must be kept identical.
+      //
+      // The standing rule: a rule is either at 'error' or it is not enabled.
+      // Nothing lives at 'warn'. `eslint . --max-warnings 0` makes the two
+      // identical to CI anyway, so a downgrade buys nothing except invisible
+      // debt -- which is exactly how ~340 violations accumulated in the repo
+      // this UI was seeded from, behind a green CI. Exceptions go on the
+      // offending line as `// eslint-disable-next-line <rule>` with the reason
+      // above it: greppable, visible in the diff, and dies with the code it
+      // excuses.
+      //
+      // exhaustive-deps ships as 'warn' in the recommended config. The class it
+      // catches (a `?? []` view rebuilt every render, defeating the memo or
+      // tracker keyed on it) is exactly what breaks the render-phase transition
+      // pattern used throughout this tree.
       'react-hooks/exhaustive-deps': 'error',
+      // --- local ------------------------------------------------------------
+      // The react-hooks v7 compiler-family rules and
+      // react-refresh/only-export-components were briefly pinned to 'warn'
+      // here, carried over from the seed repo where the fetchData-in-useEffect
+      // idiom fired them a few hundred times. That never described this tree --
+      // every page reads through useApiQuery and eslint reports zero hits -- so
+      // they sit at the recommended 'error'.
+      // Unused imports are auto-removed by unused-imports (AST-safe
+      // autofix). no-unused-imports subsumes the import half of
+      // no-unused-vars, so the ts rule keeps only the non-import half.
       'unused-imports/no-unused-imports': 'error',
       // `const { kind: _kind, ...rest } = obj` omit idiom: rest siblings
       // and _-prefixed bindings are intentional discards.
