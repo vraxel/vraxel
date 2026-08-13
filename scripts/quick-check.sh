@@ -24,12 +24,14 @@ pass() { printf '  %sok%s   %s\n' "$GRN" "$OFF" "$1"; }
 bad()  { printf '  %sFAIL%s %s\n' "$RED" "$OFF" "$1"; [ -n "${2:-}" ] && printf '       %s%s%s\n' "$DIM" "$2" "$OFF"; fail=1; }
 warn() { printf '  %swarn%s %s\n' "$YEL" "$OFF" "$1"; [ -n "${2:-}" ] && printf '       %s%s%s\n' "$DIM" "$2" "$OFF"; }
 
-changed() { git diff --cached --name-only --diff-filter=ACMR; }
-# Nothing staged -> fall back to unstaged, so this is useful mid-edit too.
-if [ -z "$(changed)" ]; then
-  changed() { git diff --name-only --diff-filter=ACMR; }
+FILES="$(git diff --cached --name-only --diff-filter=ACMR)"
+# Nothing staged -> fall back to the working tree, so this is useful mid-edit.
+# Untracked files are listed explicitly: `git diff` does not report them, and a
+# brand-new file is exactly the one you most want checked.
+if [ -z "$FILES" ]; then
+  FILES="$(git diff --name-only --diff-filter=ACMR; git ls-files --others --exclude-standard)"
 fi
-FILES="$(changed)"
+FILES="$(echo "$FILES" | grep -v '^$' | sort -u)"
 
 echo
 echo "gate integrity"
@@ -78,7 +80,11 @@ else
   if [ -n "$GO" ]; then
     unformatted=$(echo "$GO" | xargs gofmt -l -s 2>/dev/null || true)
     if [ -n "$unformatted" ]; then bad "gofmt" "$(echo "$unformatted" | tr '\n' ' ')  -- run: make fmt"; else pass "gofmt"; fi
-    if out=$(go build ./... 2>&1); then pass "go build"; else bad "go build" "$out"; fi
+    # -o a temp dir: a plain `go build` on a main package drops the binary in
+    # the repo root. Compilation is what we want, not the artifact.
+    tmp=$(mktemp -d)
+    if out=$(go build -o "$tmp/" ./... 2>&1); then pass "go build"; else bad "go build" "$out"; fi
+    rm -rf "$tmp"
     # Only meaningful when pkg/apis moved; cheap enough to always run.
     if out=$(./scripts/check-layer-leak.sh 2>&1); then pass "layer guard"; else bad "layer guard" "$out"; fi
   fi
