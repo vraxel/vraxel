@@ -28,13 +28,20 @@ type Filter struct {
 // scopePartsForCreate copies.
 func (f Filter) PartsForCreate() (string, *int64, *int64) {
 	if f.NamespaceID != nil {
-		return "namespace", f.WorkspaceID, f.NamespaceID
+		return Namespace, f.WorkspaceID, f.NamespaceID
 	}
 	if f.WorkspaceID != nil {
-		return "workspace", f.WorkspaceID, nil
+		return Workspace, f.WorkspaceID, nil
 	}
-	return "platform", nil, nil
+	return Platform, nil, nil
 }
+
+// The values of the scope column on every scoped table.
+const (
+	Platform  = "platform"
+	Workspace = "workspace"
+	Namespace = "namespace"
+)
 
 // From builds a Filter from REST PathParams. The keys "workspaceId"
 // and "namespaceId" are the framework-standard names produced by

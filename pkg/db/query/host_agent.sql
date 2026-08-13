@@ -55,7 +55,7 @@ SET status        = 'online',
 WHERE host_id = @host_id
 RETURNING connected_at;
 
--- name: TouchHostAgent :exec
+-- name: TouchHostAgent :execrows
 -- A heartbeat also RESTORES status='online'. The stale sweep can only
 -- ever be a guess (it fires when nobody wrote 'offline' in time), and it
 -- guesses wrong whenever DB writes are unavailable for a minute -- the
@@ -63,7 +63,9 @@ RETURNING connected_at;
 -- without this the row stays offline forever while the channel is up,
 -- which fails every session-token check for that host.
 -- Guarded on instance_id: a touch from a stale socket must not steal a
--- row another instance has since claimed.
+-- row another instance has since claimed. Zero rows therefore means "the
+-- row is not ours"; the caller re-claims it with MarkHostAgentOnline
+-- rather than beating against a guard that can never match again.
 UPDATE host_agents
 SET status        = 'online',
     last_seen_at  = now(),
@@ -79,12 +81,25 @@ SET status      = 'offline',
     updated_at  = now()
 WHERE host_id = @host_id AND instance_id = @instance_id;
 
--- name: MarkInstanceHostAgentsOffline :exec
--- Startup residue cleanup: an instance that died without closing its
--- sockets leaves rows claiming 'online' under its instance_id.
+-- name: MarkOrphanedHostAgentsOffline :exec
+-- Startup residue cleanup: rows still claiming 'online' under an instance
+-- that no longer holds a lease. That covers this process's own previous
+-- life, which is the common case after a hard kill.
+--
+-- Matching on the dead instance rather than on our own id is what makes
+-- it work at all: instance_id carries the pid, so a restarted process
+-- never shares an id with its predecessor and a self-targeted cleanup
+-- could only ever match zero rows.
+--
+-- Live siblings are excluded by the lease join, so this is safe to run on
+-- every boot in a horizontally scaled deployment.
 UPDATE host_agents
 SET status = 'offline', updated_at = now()
-WHERE instance_id = @instance_id AND status = 'online';
+WHERE status = 'online'
+  AND instance_id NOT IN (
+      SELECT instance_id FROM server_instances
+      WHERE last_seen_at >= now() - make_interval(secs => @stale_after_secs::float8)
+  );
 
 -- name: MarkStaleHostAgentsOffline :exec
 -- Backstop for the case where neither the agent nor its owning instance

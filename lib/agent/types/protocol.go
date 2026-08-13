@@ -38,9 +38,9 @@ const (
 	FrameTypeConfigReload = "config.reload"
 	// FrameTypeSessionToken delivers the short-lived session token the
 	// agent must use on every REST endpoint (design §4.1 three-tier
-	// credential model). Reserved here so the wire vocabulary is fixed;
-	// issuing is Step 5 work, since Step 4's three endpoints
-	// (register / channel / binary) need no session token.
+	// credential model). The server sends one as soon as the channel is
+	// registered and renews it for as long as the channel lives, since a
+	// channel routinely outlasts the token's expiry.
 	FrameTypeSessionToken = "session.token"
 	// FrameTypeProbeConfig replaces the host's whole probe set
 	// (design §5.6).

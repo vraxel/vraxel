@@ -3,6 +3,7 @@ package agentgw
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"vraxel.io/vraxel/lib/logger"
@@ -28,7 +29,34 @@ type Session struct {
 	// stop cancels ctx. Held so a reconnect that supersedes an older
 	// socket can tear the old one down.
 	stop context.CancelFunc
+
+	// epoch is host_agents.connected_at for the claim this session
+	// currently holds, as UnixMicro. It is not fixed for the life of the
+	// channel: re-claiming the row (Registry.Touch) rewrites connected_at,
+	// and every session token must be signed with the value the row holds
+	// or it will not validate. Zero means "not claimed yet".
+	epoch atomic.Int64
+	// tokenGen numbers the session tokens sent on this channel, for logs.
+	tokenGen atomic.Int64
+	// tokenSent records whether the newest token reached the agent. A
+	// write can time out on an otherwise live socket, and without this the
+	// agent would sit without REST credentials until the next scheduled
+	// refresh half an hour later; the heartbeat retries instead.
+	tokenSent atomic.Bool
 }
+
+// Epoch returns the connection epoch this session's tokens are signed
+// with, or the zero time before the row has been claimed.
+func (s *Session) Epoch() time.Time {
+	micro := s.epoch.Load()
+	if micro == 0 {
+		return time.Time{}
+	}
+	return time.UnixMicro(micro)
+}
+
+// SetEpoch records the connected_at a claim stamped on the row.
+func (s *Session) SetEpoch(t time.Time) { s.epoch.Store(t.UnixMicro()) }
 
 // Context returns the session's lifetime context.
 func (s *Session) Context() context.Context { return s.ctx }
@@ -128,6 +156,12 @@ func (r *Registry) Add(ctx context.Context, sess *Session, clockSkewMs int64) ti
 
 	r.mu.Lock()
 	prev, superseded := r.byAgent[sess.AgentID]
+	// An agent whose host row was recreated comes back under a new host
+	// id; without dropping the old key byHost would keep handing out the
+	// dead session forever, since Remove only ever deletes the new one.
+	if superseded && prev.HostID != sess.HostID {
+		delete(r.byHost, prev.HostID)
+	}
 	r.byAgent[sess.AgentID] = sess
 	r.byHost[sess.HostID] = sess
 	r.mu.Unlock()
@@ -175,7 +209,11 @@ func (r *Registry) Remove(ctx context.Context, sess *Session) {
 		return
 	}
 	delete(r.byAgent, sess.AgentID)
-	delete(r.byHost, sess.HostID)
+	// Guarded for the same reason as the delete above: another agent may
+	// already own this host id after a rebind.
+	if r.byHost[sess.HostID] == sess {
+		delete(r.byHost, sess.HostID)
+	}
 	r.mu.Unlock()
 
 	// MarkOffline is guarded by instance_id in SQL, so even a delayed
@@ -190,10 +228,39 @@ func (r *Registry) Remove(ctx context.Context, sess *Session) {
 // row this instance owns (see the SQL): the stale sweep can misfire while
 // DB writes are unavailable, and the next beat must heal that rather than
 // leave a connected agent marked offline forever.
-func (r *Registry) Touch(ctx context.Context, hostID int64, clockSkewMs int64) {
-	if err := r.agents.Touch(ctx, hostID, r.instanceID, clockSkewMs); err != nil {
-		logger.Warnf("agentgw: touch host %d: %v", hostID, err)
+//
+// It returns a non-zero time when the row had to be re-claimed, which the
+// caller must treat as a new connection epoch (see below).
+func (r *Registry) Touch(ctx context.Context, sess *Session, clockSkewMs int64) time.Time {
+	claimed, err := r.agents.Touch(ctx, sess.HostID, r.instanceID, clockSkewMs)
+	if err != nil {
+		logger.Warnf("agentgw: touch host %d: %v", sess.HostID, err)
+		return time.Time{}
 	}
+	if claimed {
+		return time.Time{}
+	}
+
+	// The heartbeat matched nothing, so host_agents says some other
+	// instance owns this agent while we are the one holding its socket.
+	// Two ways in: MarkOnline failed when this channel was accepted, or a
+	// sibling's delayed write landed after ours during a reconnect. Both
+	// are silent and permanent if left alone -- the guard makes every
+	// later beat a no-op too, so the row stays wrong (offline, or pointing
+	// at an instance that cannot reach this agent) until the agent happens
+	// to reconnect, which a healthy channel never does.
+	//
+	// Taking the row back rewrites connected_at, which is precisely what
+	// invalidates the session tokens minted for the old epoch, so the
+	// caller has to issue a fresh one.
+	connectedAt, err := r.agents.MarkOnline(ctx, sess.HostID, r.instanceID, sess.Version, clockSkewMs)
+	if err != nil {
+		logger.Warnf("agentgw: reclaim host %d: %v", sess.HostID, err)
+		return time.Time{}
+	}
+	logger.Infof("agentgw: agent %s (host %d) re-claimed by instance %s; its row had drifted to another owner",
+		sess.AgentID, sess.HostID, r.instanceID)
+	return connectedAt
 }
 
 // Get returns the live session for an agent, or nil.

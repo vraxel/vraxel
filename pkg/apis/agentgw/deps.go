@@ -56,4 +56,8 @@ type HostRegistrar interface {
 	// be idempotent for a given ExistingHostID: repeated registrations of
 	// one machine converge on one row.
 	RegisterAgentHost(ctx context.Context, spec AgentHostSpec) (int64, error)
+	// UnregisterAgentHost deletes a host row this registration created but
+	// failed to finish binding. Only ever called with an id
+	// RegisterAgentHost just returned from its create branch.
+	UnregisterAgentHost(ctx context.Context, hostID int64) error
 }

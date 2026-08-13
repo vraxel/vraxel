@@ -279,3 +279,47 @@ func (q *Queries) ListHostAgentJoinTokens(ctx context.Context, arg ListHostAgent
 	}
 	return items, nil
 }
+
+const peekHostAgentJoinToken = `-- name: PeekHostAgentJoinToken :one
+SELECT id, name, token_hash, scope, workspace_id, namespace_id, max_uses, used_count, expires_at, created_by, created_at FROM host_agent_join_tokens
+WHERE token_hash = $1
+  AND expires_at > now()
+  AND used_count < max_uses
+`
+
+// Non-consuming liveness check, used by /register before it does any
+// work an unauthenticated caller should not be able to trigger. It burns
+// no use, so the atomic claim above stays the only thing that does.
+func (q *Queries) PeekHostAgentJoinToken(ctx context.Context, tokenHash []byte) (HostAgentJoinToken, error) {
+	row := q.db.QueryRow(ctx, peekHostAgentJoinToken, tokenHash)
+	var i HostAgentJoinToken
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.TokenHash,
+		&i.Scope,
+		&i.WorkspaceID,
+		&i.NamespaceID,
+		&i.MaxUses,
+		&i.UsedCount,
+		&i.ExpiresAt,
+		&i.CreatedBy,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const refundHostAgentJoinToken = `-- name: RefundHostAgentJoinToken :exec
+UPDATE host_agent_join_tokens
+SET used_count = used_count - 1
+WHERE id = $1 AND used_count > 0
+`
+
+// Give a use back when registration failed after the claim. The token is
+// typically single-use, so without this a machine whose registration
+// broke halfway can never retry: its token is spent and only an operator
+// minting a new one gets it onboarded.
+func (q *Queries) RefundHostAgentJoinToken(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, refundHostAgentJoinToken, id)
+	return err
+}

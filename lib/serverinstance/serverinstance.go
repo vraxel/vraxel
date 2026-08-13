@@ -19,7 +19,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"net/url"
+	"net"
 	"os"
 	"strings"
 	"time"
@@ -70,10 +70,21 @@ func (r *Registry) Register(ctx context.Context, instanceID, internalAddr string
 	return nil
 }
 
-// Touch renews the lease.
-func (r *Registry) Touch(ctx context.Context, instanceID string) error {
-	_, err := r.pool.Exec(ctx,
-		`UPDATE server_instances SET last_seen_at = now() WHERE instance_id = $1`, instanceID)
+// Touch renews the lease, re-creating the row if it has gone missing.
+//
+// An UPDATE would match nothing when the row is absent, and report no
+// error for it -- which is exactly the state a failed Register or a
+// mistaken sweep leaves behind. The instance would then stay invisible to
+// every sibling for the rest of the process's life. Upserting makes each
+// renewal self-healing. started_at is left alone so it keeps meaning
+// "when this instance came up", not "when it last renewed".
+func (r *Registry) Touch(ctx context.Context, instanceID, internalAddr string) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO server_instances (instance_id, internal_addr)
+		VALUES ($1, $2)
+		ON CONFLICT (instance_id) DO UPDATE
+		SET internal_addr = EXCLUDED.internal_addr,
+		    last_seen_at  = now()`, instanceID, internalAddr)
 	if err != nil {
 		return fmt.Errorf("renew server instance %s: %w", instanceID, err)
 	}
@@ -90,10 +101,19 @@ func (r *Registry) Delete(ctx context.Context, instanceID string) error {
 	return nil
 }
 
-// DeleteStale drops rows whose lease expired before staleBefore.
-func (r *Registry) DeleteStale(ctx context.Context, staleBefore time.Time) error {
+// DeleteStale drops rows whose lease has expired.
+//
+// The cutoff is computed from the DB clock, never the caller's:
+// last_seen_at is written with now() on the server, so subtracting
+// StaleAfter from a Go-side timestamp folds every instance's clock drift
+// straight into the liveness window. With a 10s renewal and a 30s
+// expiry, a machine whose clock runs 20s fast would delete the rows of
+// instances that had just renewed -- and, before Touch became an upsert,
+// they would never have come back.
+func (r *Registry) DeleteStale(ctx context.Context) error {
 	_, err := r.pool.Exec(ctx,
-		`DELETE FROM server_instances WHERE last_seen_at < $1`, staleBefore)
+		`DELETE FROM server_instances
+		 WHERE last_seen_at < now() - make_interval(secs => $1)`, StaleAfter.Seconds())
 	if err != nil {
 		return fmt.Errorf("sweep stale server instances: %w", err)
 	}
@@ -105,8 +125,8 @@ func (r *Registry) DeleteStale(ctx context.Context, staleBefore time.Time) error
 // (design §6.3).
 func (r *Registry) ListAlive(ctx context.Context) ([]string, error) {
 	rows, err := r.pool.Query(ctx,
-		`SELECT instance_id FROM server_instances WHERE last_seen_at >= $1`,
-		time.Now().Add(-StaleAfter))
+		`SELECT instance_id FROM server_instances
+		 WHERE last_seen_at >= now() - make_interval(secs => $1)`, StaleAfter.Seconds())
 	if err != nil {
 		return nil, fmt.Errorf("list alive server instances: %w", err)
 	}
@@ -130,8 +150,9 @@ func (r *Registry) IsAlive(ctx context.Context, instanceID string) (bool, error)
 	err := r.pool.QueryRow(ctx, `
 		SELECT EXISTS (
 			SELECT 1 FROM server_instances
-			WHERE instance_id = $1 AND last_seen_at >= $2
-		)`, instanceID, time.Now().Add(-StaleAfter)).Scan(&ok)
+			WHERE instance_id = $1
+			  AND last_seen_at >= now() - make_interval(secs => $2)
+		)`, instanceID, StaleAfter.Seconds()).Scan(&ok)
 	if err != nil {
 		return false, fmt.Errorf("check server instance %s liveness: %w", instanceID, err)
 	}
@@ -189,10 +210,10 @@ func (l *Lease) run(ctx context.Context) {
 			cancel()
 			return
 		case <-ticker.C:
-			if err := l.registry.Touch(ctx, l.instanceID); err != nil {
+			if err := l.registry.Touch(ctx, l.instanceID, l.internalAddr); err != nil {
 				l.log.Warnf("serverinstance: %v", err)
 			}
-			if err := l.registry.DeleteStale(ctx, time.Now().Add(-StaleAfter)); err != nil {
+			if err := l.registry.DeleteStale(ctx); err != nil {
 				l.log.Warnf("serverinstance: %v", err)
 			}
 			if l.OnTick != nil {
@@ -232,17 +253,23 @@ func BuildInstanceID(serverName string) string {
 }
 
 // InternalAddrEnv overrides the derived inter-instance address.
-const InternalAddrEnv = "LCP_INTERNAL_ADDR"
+const InternalAddrEnv = "VRAXEL_INTERNAL_ADDR"
 
 // BuildInternalAddr resolves the address sibling instances use to reach
-// this one.
+// this one, from the address this process actually listens on.
 //
 // The env var wins because only the deployment knows the answer in
-// general: a K8s pod IP, a second NIC, a mesh address. The fallback --
-// this host's name with externalUrl's port -- is correct for bare-metal
-// and single-node installs and harmlessly wrong elsewhere, since a bad
-// value degrades to a failed forward plus a retry, not to data loss.
-func BuildInternalAddr(externalURL string) string {
+// general: a K8s pod IP, a second NIC, a mesh address. The fallback is
+// this host's name with the listener's port, which is correct for
+// bare-metal and single-node installs.
+//
+// The port must come from the listener and not from externalUrl. Behind a
+// load balancer -- which is the only reason to run several instances --
+// externalUrl carries the LB's port, so every sibling would advertise a
+// port that reaches the balancer instead of itself; and two instances on
+// one box (the standard dev setup) would advertise the same address while
+// listening on different ones.
+func BuildInternalAddr(listenAddr string) string {
 	if v := strings.TrimSpace(os.Getenv(InternalAddrEnv)); v != "" {
 		return v
 	}
@@ -250,8 +277,11 @@ func BuildInternalAddr(externalURL string) string {
 	if err != nil || host == "" {
 		host = "127.0.0.1"
 	}
-	if u, err := url.Parse(externalURL); err == nil && u.Port() != "" {
-		return host + ":" + u.Port()
+	// listenAddr is a net.Listen address (":9099", "0.0.0.0:9099"): the
+	// host half is a bind wildcard, never something a sibling can dial, so
+	// only the port is kept.
+	if _, port, err := net.SplitHostPort(listenAddr); err == nil && port != "" {
+		return net.JoinHostPort(host, port)
 	}
 	return host
 }

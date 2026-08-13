@@ -15,6 +15,10 @@ SELECT kind, cnt
 FROM (
     SELECT ''::TEXT AS kind, 0::BIGINT AS cnt
     WHERE FALSE AND $1::BIGINT IS NOT NULL
+
+    UNION ALL
+    SELECT 'host'::TEXT, COUNT(*)::BIGINT
+        FROM hosts WHERE hosts.namespace_id = $1::BIGINT
 ) t
 WHERE cnt > 0
 ORDER BY kind
@@ -34,15 +38,14 @@ type CountNamespaceBlockingResourcesRow struct {
 // (credentials, role bindings, roles) intentionally cascades and is not
 // listed here.
 //
-// No business module is registered yet, so both queries carry a single
-// always-false branch that keeps them well-typed. To register a blocking
-// resource, add one branch:
+// To register a blocking resource, add one branch per query following the
+// hosts pair below.
 //
-//	UNION ALL
-//	SELECT 'host', COUNT(*)::BIGINT
-//	    FROM hosts WHERE hosts.namespace_id = sqlc.narg('ns_id')
-//
-// and the equivalent workspace_id / namespace-in-workspace branch below.
+// hosts has no FK to workspaces / namespaces (unlike, say,
+// host_agent_join_tokens, which cascades). Without this check deleting a
+// namespace left its hosts behind pointing at an id that no longer
+// exists, with their agents still connected and still being managed on
+// behalf of a tenant that is gone.
 func (q *Queries) CountNamespaceBlockingResources(ctx context.Context, nsID *int64) ([]CountNamespaceBlockingResourcesRow, error) {
 	rows, err := q.db.Query(ctx, countNamespaceBlockingResources, nsID)
 	if err != nil {
@@ -68,6 +71,14 @@ SELECT kind, cnt
 FROM (
     SELECT ''::TEXT AS kind, 0::BIGINT AS cnt
     WHERE FALSE AND $1::BIGINT IS NOT NULL
+
+    UNION ALL
+    SELECT 'host'::TEXT, COUNT(*)::BIGINT
+        FROM hosts
+        WHERE hosts.workspace_id = $1::BIGINT
+           OR hosts.namespace_id IN (
+               SELECT id FROM namespaces WHERE workspace_id = $1::BIGINT
+           )
 ) t
 WHERE cnt > 0
 ORDER BY kind

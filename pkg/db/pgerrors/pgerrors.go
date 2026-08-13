@@ -26,6 +26,7 @@ var (
 // Codes handled:
 //
 //	22001 string_data_right_truncation -> ErrBadRequest
+//	23514 check_violation              -> ErrBadRequest
 //	23001 restrict_violation           -> ErrConflict
 //	23503 foreign_key_violation        -> ErrConflict
 //	23505 unique_violation             -> ErrConflict
@@ -42,7 +43,10 @@ func CheckPG(err error) error {
 		return err
 	}
 	switch pgErr.Code {
-	case "22001":
+	// A violated CHECK is the database rejecting a value the business
+	// layer should have rejected first, so it is the caller's input that
+	// is wrong -- a 400, not the 500 an unmapped error becomes.
+	case "22001", "23514":
 		return fmt.Errorf("%w: %w", ErrBadRequest, err)
 	case "23001", "23503", "23505":
 		return fmt.Errorf("%w: %w", ErrConflict, err)

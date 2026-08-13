@@ -76,8 +76,16 @@ func main() {
 	auditWriter := apis.NewAuditWriter(database)
 	auditWriter.Start(ctx)
 
+	// Resolved before the modules are built: the agent gateway advertises
+	// this address to sibling instances, so it has to be the address we
+	// actually bind.
+	listenAddrs := *httpListenAddrs
+	if len(listenAddrs) == 0 {
+		listenAddrs = []string{":9099"}
+	}
+
 	// API modules (admin + role seeding)
-	apisResult := apis.NewModules(ctx, database)
+	apisResult := apis.NewModules(ctx, database, listenAddrs[0])
 
 	// OIDC provider (depends on iam module stores)
 	oidcProvider := apis.NewOIDCProvider(database, apisResult, &cfg.OIDC)
@@ -92,11 +100,6 @@ func main() {
 	apisResult.Mux.Start(ctx)
 
 	// 2. Start HTTP server
-	listenAddrs := *httpListenAddrs
-	if len(listenAddrs) == 0 {
-		listenAddrs = []string{":9099"}
-	}
-
 	startTime := time.Now()
 
 	rootHandler := buildRootHandler(ctx, cfg, database, apisResult, oidcProvider, authorizer, auditWriter)

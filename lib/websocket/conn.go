@@ -39,6 +39,21 @@ type Conn struct {
 	cancel context.CancelFunc
 }
 
+// pingInterval is how often the keepalive probes the connection;
+// pingTimeout bounds one probe.
+//
+// The timeout is the load-bearing half. Ping waits for the peer's pong,
+// and on a path that has gone away silently -- a dropped NAT entry, a
+// powered-off host -- that pong never arrives. An unbounded Ping then
+// blocks forever: the keepalive stops probing, and because a dead path
+// delivers no data either, the reader is parked as well. Nothing notices
+// until the kernel abandons the TCP connection, which on Linux is about
+// fifteen minutes rather than the fifteen seconds this exists to detect.
+const (
+	pingInterval = 15 * time.Second
+	pingTimeout  = 10 * time.Second
+)
+
 // NewConn creates a Conn wrapping the given coder/websocket connection.
 // Starts a background goroutine that sends ping frames every 15 seconds.
 func NewConn(c *cws.Conn) *Conn {
@@ -46,12 +61,20 @@ func NewConn(c *cws.Conn) *Conn {
 	conn := &Conn{inner: c, cancel: cancel}
 
 	go func() {
-		ticker := time.NewTicker(15 * time.Second)
+		ticker := time.NewTicker(pingInterval)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-ticker.C:
-				if err := c.Ping(ctx); err != nil {
+				pctx, pcancel := context.WithTimeout(ctx, pingTimeout)
+				err := c.Ping(pctx)
+				pcancel()
+				if err != nil {
+					// Closing is what makes the failed probe useful:
+					// returning alone would leave every reader and writer
+					// parked on a connection this goroutine has already
+					// established is dead.
+					_ = c.CloseNow()
 					return
 				}
 			case <-ctx.Done():
