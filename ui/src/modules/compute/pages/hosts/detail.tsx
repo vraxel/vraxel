@@ -47,7 +47,10 @@ export default function HostDetailPage() {
             <h1 className="truncate text-xl font-semibold tracking-tight">
               {host.spec.displayName || host.metadata.name}
             </h1>
-            <AgentStatusBadge status={host.spec.agentStatus} conflictAt={host.spec.agentConflictAt} />
+            <AgentStatusBadge
+              status={host.spec.agentStatus}
+              conflictAt={host.spec.agentConflictAt}
+            />
           </div>
           <p className="text-muted-foreground mt-0.5 text-sm">{host.metadata.name}</p>
         </div>
@@ -101,9 +104,7 @@ export default function HostDetailPage() {
             {/* Everything above the description line is reported by the
                 agent, not entered by anyone. Saying so once removes the
                 question of why none of it is editable. */}
-            <p className="text-muted-foreground mt-4 text-xs">
-              {t("compute.host.reportedNote")}
-            </p>
+            <p className="text-muted-foreground mt-4 text-xs">{t("compute.host.reportedNote")}</p>
           </CardContent>
         </Card>
 

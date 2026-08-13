@@ -69,9 +69,7 @@ export function StepInstall({ command, reservedName, registeredHost }: Props) {
         ) : (
           <Skeleton className="h-24 w-full rounded-lg" />
         )}
-        <p className="text-muted-foreground text-xs">
-          {t("compute.onboard.install.rootHint")}
-        </p>
+        <p className="text-muted-foreground text-xs">{t("compute.onboard.install.rootHint")}</p>
       </div>
 
       <div className="border-border-subtle rounded-xl border p-4">

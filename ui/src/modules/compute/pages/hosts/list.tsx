@@ -74,21 +74,26 @@ export default function HostListPage() {
       header: t("compute.host.spec"),
       cell: (h) => (
         <span className="text-sm">
-          {h.spec.cpuCores ?? 0} {t("compute.host.cores")} / {Math.round((h.spec.memoryMb ?? 0) / 1024)} GiB
+          {h.spec.cpuCores ?? 0} {t("compute.host.cores")} /{" "}
+          {Math.round((h.spec.memoryMb ?? 0) / 1024)} GiB
         </span>
       ),
     },
     {
       key: "agentVersion",
       header: t("compute.host.agentVersion"),
-      cell: (h) => <span className="text-muted-foreground text-xs">{h.spec.agentVersion || "-"}</span>,
+      cell: (h) => (
+        <span className="text-muted-foreground text-xs">{h.spec.agentVersion || "-"}</span>
+      ),
     },
     {
       key: "createdAt",
       header: t("common.created"),
       sortable: true,
       cell: (h) => (
-        <span className="text-muted-foreground text-sm">{formatDateTime(h.metadata.createdAt)}</span>
+        <span className="text-muted-foreground text-sm">
+          {formatDateTime(h.metadata.createdAt)}
+        </span>
       ),
     },
     {

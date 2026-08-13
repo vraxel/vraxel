@@ -28,7 +28,7 @@ export function StepMethod({ value, onChange }: Props) {
               selected
                 ? "border-primary bg-primary-subtle/40"
                 : "border-border-subtle hover:border-border",
-              !m.available && "cursor-not-allowed opacity-55 hover:border-border-subtle",
+              !m.available && "hover:border-border-subtle cursor-not-allowed opacity-55",
             )}
           >
             <span

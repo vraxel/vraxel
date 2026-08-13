@@ -44,9 +44,7 @@ export function StepIdentity({
             {t("compute.onboard.identity.scope")}
             <span className="ml-1.5 font-medium">{scopeLabel}</span>
           </p>
-          <p className="text-muted-foreground text-xs">
-            {t("compute.onboard.identity.scopeHint")}
-          </p>
+          <p className="text-muted-foreground text-xs">{t("compute.onboard.identity.scopeHint")}</p>
         </div>
       </div>
 
@@ -70,9 +68,7 @@ export function StepIdentity({
           {mode === "reserved" && (
             <div className="mt-4 space-y-4 pl-7">
               <div className="space-y-1.5">
-                <Label htmlFor="onboard-host-name">
-                  {t("compute.onboard.identity.hostName")}
-                </Label>
+                <Label htmlFor="onboard-host-name">{t("compute.onboard.identity.hostName")}</Label>
                 <Input
                   id="onboard-host-name"
                   value={hostName}
@@ -104,9 +100,7 @@ export function StepIdentity({
       </RadioGroup>
 
       {/* The point worth making loudly: there is no spec form. */}
-      <p className="text-muted-foreground text-xs">
-        {t("compute.onboard.identity.noSpecForm")}
-      </p>
+      <p className="text-muted-foreground text-xs">{t("compute.onboard.identity.noSpecForm")}</p>
     </div>
   )
 }

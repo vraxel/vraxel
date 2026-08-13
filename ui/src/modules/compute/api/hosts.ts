@@ -30,7 +30,10 @@ function matches(host: Host, search: string): boolean {
 }
 
 export const hostsApi = {
-  list: async (_scope: ScopeRef, params?: ListParams): Promise<{ items: Host[]; totalCount: number }> => {
+  list: async (
+    _scope: ScopeRef,
+    params?: ListParams,
+  ): Promise<{ items: Host[]; totalCount: number }> => {
     const search = String(params?.search ?? "")
     // useListQuery drops a filter set to "all" before it reaches here, so
     // an empty string is the only "unset" this has to handle.

@@ -31,7 +31,8 @@ const compute = {
   "compute.host.connectedAt": "连接时间",
   "compute.host.lastSeenAt": "最近心跳",
   "compute.host.revokeAgentToken": "吊销 Agent 令牌",
-  "compute.host.reportedNote": "以上信息由 agent 自动上报，不支持手工修改；仅显示名称与描述可编辑。",
+  "compute.host.reportedNote":
+    "以上信息由 agent 自动上报，不支持手工修改；仅显示名称与描述可编辑。",
 
   // agent status
   "compute.agent.online": "在线",
@@ -42,7 +43,8 @@ const compute = {
 
   // join tokens
   "compute.token.pending": "待使用令牌",
-  "compute.token.pendingHint": "已发放但尚未被使用的接入令牌。令牌明文只在创建时显示一次，若已外泄请在此吊销。",
+  "compute.token.pendingHint":
+    "已发放但尚未被使用的接入令牌。令牌明文只在创建时显示一次，若已外泄请在此吊销。",
   "compute.token.nonePending": "没有待使用的令牌",
   "compute.token.unnamed": "未命名令牌",
   "compute.token.reserves": "预留主机名",
@@ -84,14 +86,18 @@ const compute = {
   "compute.onboard.scope.namespace": "项目 {name}",
 
   "compute.onboard.identity.scope": "接入后归属：",
-  "compute.onboard.identity.scopeHint": "由当前所在范围决定。要接入到其他范围，请切换到该范围后再操作。",
+  "compute.onboard.identity.scopeHint":
+    "由当前所在范围决定。要接入到其他范围，请切换到该范围后再操作。",
   "compute.onboard.identity.auto.title": "快速接入（推荐）",
-  "compute.onboard.identity.auto.desc": "主机名由 agent 上报的 hostname 自动生成，接入后可随时修改显示名称。",
+  "compute.onboard.identity.auto.desc":
+    "主机名由 agent 上报的 hostname 自动生成，接入后可随时修改显示名称。",
   "compute.onboard.identity.reserved.title": "指定主机名",
-  "compute.onboard.identity.reserved.desc": "预先指定主机名，agent 接入时使用该名称。适用于有命名规范的场景。",
+  "compute.onboard.identity.reserved.desc":
+    "预先指定主机名，agent 接入时使用该名称。适用于有命名规范的场景。",
   "compute.onboard.identity.hostName": "主机名",
   "compute.onboard.identity.hostNamePlaceholder": "例如 db-primary-01",
-  "compute.onboard.identity.hostNameHint": "3-50 个字符，可用字母、数字、下划线和连字符，首尾须为字母或数字。",
+  "compute.onboard.identity.hostNameHint":
+    "3-50 个字符，可用字母、数字、下划线和连字符，首尾须为字母或数字。",
   "compute.onboard.identity.nameInvalid": "主机名格式不合法。",
   "compute.onboard.identity.noSpecForm":
     "无需填写 IP、操作系统、CPU、内存、磁盘 —— 这些信息在 agent 接入时自动上报。",
@@ -102,7 +108,8 @@ const compute = {
   "compute.onboard.install.copy": "复制",
   "compute.onboard.install.copied": "已复制到剪贴板",
   "compute.onboard.install.copyFailed": "复制失败，请手动选择命令文本",
-  "compute.onboard.install.rootHint": "需要 root 权限。脚本会下载 agent、校验哈希、注册为 systemd 服务并完成接入。",
+  "compute.onboard.install.rootHint":
+    "需要 root 权限。脚本会下载 agent、校验哈希、注册为 systemd 服务并完成接入。",
   "compute.onboard.install.waiting": "等待主机接入…",
   "compute.onboard.install.waitingHint": "命令执行成功后，主机会自动出现在列表中。",
   "compute.onboard.install.canLeave": "可离开本页",

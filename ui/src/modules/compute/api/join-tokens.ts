@@ -27,13 +27,22 @@ export const joinTokensApi = {
     delay({ items: demoJoinTokens, totalCount: demoJoinTokens.length }),
 }
 
+// Mirrors agentgw.AgentTokenPrefix. Assembled by join rather than a
+// template literal so the string never looks like an i18n key prefix to
+// the catalog guard (i18n/__tests__/keys-exist.test.ts).
+const TOKEN_PREFIX = "vra1"
+
 export async function createJoinToken(
   _scope: ScopeRef,
   input: CreateJoinTokenInput,
 ): Promise<AgentJoinToken> {
-  const plaintext = `vra1.${randomSegment(22)}.${randomSegment(12)}`
+  const plaintext = [TOKEN_PREFIX, randomSegment(22), randomSegment(12)].join(".")
   return delay({
-    metadata: { id: String(Date.now()), name: input.name ?? "", createdAt: new Date().toISOString() },
+    metadata: {
+      id: String(Date.now()),
+      name: input.name ?? "",
+      createdAt: new Date().toISOString(),
+    },
     spec: {
       scope: "platform",
       hostName: input.hostName,
