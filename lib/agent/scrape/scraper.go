@@ -300,10 +300,31 @@ func (s *Scraper) stopAll() {
 	}
 }
 
-// record stores a target's outcome for the synthetic series.
-func (s *Scraper) record(targetURL string, r result) {
+// record stores a loop's outcome for the synthetic series, and only
+// while that loop is still the registered one for its target.
+//
+// Stopping a loop is a context cancel, not a join: refresh cancels the
+// loop and deletes its results entry under s.mu, while a round already
+// in flight runs to completion, blocks here on the mutex refresh is
+// holding, and writes back afterwards. Two things go wrong without the
+// guard, both leaving a false up=0 in the synthetic push:
+//
+//   - a REMOVED target's entry is restored after the delete, and nothing
+//     ever takes it out again, since every later refresh reconciles
+//     against s.targets and that URL is no longer in it. The series then
+//     runs until the process restarts.
+//   - a REPLACED target (same URL, new interval or labels) is torn down
+//     and recreated in one pass, so the outgoing loop's cancelled round
+//     lands on its successor's entry -- which is why this checks loop
+//     identity rather than merely that the URL is still known.
+//
+// A live loop can never lose a legitimate sample: refresh registers it
+// in s.targets before starting its goroutine.
+func (s *Scraper) record(l *targetLoop, r result) {
 	s.mu.Lock()
-	s.results[targetURL] = r
+	if s.targets[l.target.URL] == l {
+		s.results[l.target.URL] = r
+	}
 	s.mu.Unlock()
 }
 
