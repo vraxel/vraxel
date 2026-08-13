@@ -1,0 +1,264 @@
+---
+# End-to-end exercise of lib/ansible against a real Linux host.
+#
+# Every task asserts, so a green run means the engine behaved, not merely that
+# it finished. What only a real host can prove: SSH transport, sudo wrapping of
+# shell-quoted paths, systemd, and the module commands themselves.
+#
+#   go run ./cmd/ansible -host 10.1.1.10 -user root -password secret
+#
+# Everything it creates lives under /tmp/vraxel-e2e plus one throwaway systemd
+# unit, and the always: block removes both even when an assertion fails.
+
+- name: lib/ansible end-to-end
+  hosts: all
+  gather_facts: true
+  vars:
+    workdir: /tmp/vraxel-e2e
+    unit_name: vraxel-e2e
+    # Loop inputs. The awkward names are deliberate: paths with spaces and a
+    # quote are what break naive shell interpolation.
+    packages:
+      - alpha
+      - beta
+    nested_groups:
+      - [one, two]
+      - [three]
+    settings:
+      beta_key: beta_value
+      alpha_key: alpha_value
+    services:
+      - {name: kept, tier: db, enabled: true}
+      - {name: dropped, tier: cache, enabled: false}
+      - {name: also_kept, tier: db, enabled: true}
+
+  pre_tasks:
+    - name: facts were gathered over ssh
+      assert:
+        that:
+          - '{{ ne .os_release.ID "" }}'
+        msg: "gather_facts produced no os_release.ID"
+        success_msg: "facts ok"
+
+    - name: clean any leftovers from an earlier run
+      file:
+        path: "{{ .workdir }}"
+        state: absent
+
+    - name: create the work directory
+      file:
+        path: "{{ .workdir }}"
+        state: directory
+        mode: "0755"
+
+  roles:
+    - e2e_role
+
+  tasks:
+    - name: a fact set inside the role survived into the play
+      assert:
+        that:
+          - '{{ eq .role_ran "yes" }}'
+        msg: "set_fact from the role did not reach the play"
+
+    - include_tasks: tasks/loops.yml
+    - import_tasks: tasks/modules.yml
+
+    # -----------------------------------------------------------------
+    # systemd, through a unit we own entirely
+    # -----------------------------------------------------------------
+    - name: install a throwaway unit
+      tags: [remote-only]
+      copy:
+        dest: "/etc/systemd/system/{{ .unit_name }}.service"
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=vraxel lib/ansible e2e probe
+
+          [Service]
+          Type=simple
+          ExecStart=/bin/sh -c 'while true; do sleep 3600; done'
+          Restart=no
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: start and enable the unit
+      tags: [remote-only]
+      systemd:
+        name: "{{ .unit_name }}"
+        state: started
+        enabled: true
+        daemon_reload: true
+
+    - name: unit reports active and enabled
+      tags: [remote-only]
+      shell: "systemctl is-active {{ .unit_name }} && systemctl is-enabled {{ .unit_name }}"
+      register: unit_state
+      changed_when: false
+
+    - name: assert the unit came up
+      tags: [remote-only]
+      assert:
+        that:
+          - '{{ contains "active" .unit_state.stdout }}'
+          - '{{ contains "enabled" .unit_state.stdout }}'
+        msg: "unit did not reach active+enabled: {{ .unit_state.stdout }}"
+
+    - name: stop and disable the unit
+      tags: [remote-only]
+      service:
+        name: "{{ .unit_name }}"
+        state: stopped
+        enabled: false
+
+    - name: unit reports inactive
+      tags: [remote-only]
+      shell: "systemctl is-active {{ .unit_name }} || true"
+      register: unit_stopped
+      changed_when: false
+
+    - name: assert the unit went down
+      tags: [remote-only]
+      assert:
+        that:
+          - '{{ not (contains "\nactive" (printf "\n%s" .unit_stopped.stdout)) }}'
+        msg: "unit still active after stop: {{ .unit_stopped.stdout }}"
+
+    # -----------------------------------------------------------------
+    # wait_for against the ssh port we are already connected through
+    # -----------------------------------------------------------------
+    - name: the ssh port is reachable
+      tags: [remote-only]
+      wait_for:
+        host: 127.0.0.1
+        port: 22
+        timeout: 10
+
+    - name: a path that will never appear times out
+      wait_for:
+        path: "{{ .workdir }}/never-appears"
+        timeout: 2
+        sleep: 1
+      register: wait_miss
+      ignore_errors: true
+
+    - name: assert the timeout was reported
+      assert:
+        that:
+          - '{{ .wait_miss.failed }}'
+        msg: "wait_for should have timed out but reported success"
+
+    # -----------------------------------------------------------------
+    # delegate_to runs elsewhere: the delegate is a local connection while
+    # the play itself is running over ssh, so this crosses connector types.
+    # -----------------------------------------------------------------
+    - name: run a task on the controller instead of the target
+      command:
+        cmd: "echo delegated-to-controller"
+      delegate_to: localhost
+      register: delegated
+
+    - name: assert the delegated task produced output
+      assert:
+        that:
+          - '{{ eq .delegated.stdout "delegated-to-controller" }}'
+        msg: "delegate_to did not run: {{ .delegated.stdout }}"
+
+    # -----------------------------------------------------------------
+    # block / rescue / always
+    # -----------------------------------------------------------------
+    - name: a failing block is rescued
+      block:
+        - name: fail on purpose
+          command:
+            cmd: "false"
+        - name: this must never run
+          file:
+            path: "{{ .workdir }}/unreachable"
+            state: touch
+      rescue:
+        - name: record that rescue ran
+          file:
+            path: "{{ .workdir }}/rescued"
+            state: touch
+      always:
+        - name: record that always ran
+          file:
+            path: "{{ .workdir }}/always-ran"
+            state: touch
+
+    - name: check the rescue path
+      stat:
+        path: "{{ .workdir }}/rescued"
+      register: rescued
+      register_type: json
+
+    - name: check the skipped task left nothing
+      stat:
+        path: "{{ .workdir }}/unreachable"
+      register: unreachable
+      register_type: json
+
+    - name: check the always path
+      stat:
+        path: "{{ .workdir }}/always-ran"
+      register: always_ran
+      register_type: json
+
+    - name: assert block/rescue/always behaved
+      assert:
+        that:
+          - '{{ .rescued.stdout.exists }}'
+          - '{{ not .unreachable.stdout.exists }}'
+          - '{{ .always_ran.stdout.exists }}'
+        msg: "block/rescue/always did not behave as declared"
+
+    # -----------------------------------------------------------------
+    # until / retries
+    # -----------------------------------------------------------------
+    - name: retry until a marker appears
+      shell: "test -e {{ .workdir }}/always-ran && echo ready"
+      register: retried
+      retries: 3
+      delay: 1
+      until: '{{ eq .stdout "ready" }}'
+      changed_when: false
+
+    - name: assert the retry loop settled
+      assert:
+        that:
+          - '{{ eq .retried.stdout "ready" }}'
+        msg: "until/retries did not converge"
+
+  post_tasks:
+    - name: remove the throwaway unit
+      tags: [remote-only]
+      file:
+        path: "/etc/systemd/system/{{ .unit_name }}.service"
+        state: absent
+
+    - name: reload systemd after removing the unit
+      tags: [remote-only]
+      systemd:
+        name: "{{ .unit_name }}"
+        daemon_reload: true
+
+    - name: remove the work directory
+      file:
+        path: "{{ .workdir }}"
+        state: absent
+
+    - name: confirm cleanup
+      stat:
+        path: "{{ .workdir }}"
+      register: leftover
+      register_type: json
+
+    - name: assert nothing was left behind
+      assert:
+        that:
+          - '{{ not .leftover.stdout.exists }}'
+        msg: "cleanup left {{ .workdir }} behind"
+        success_msg: "e2e complete: every assertion passed"

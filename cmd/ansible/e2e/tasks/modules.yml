@@ -1,0 +1,159 @@
+---
+# file / stat / copy / template / environment / changed_when, reached through
+# import_tasks. Paths here carry a space and a quote on purpose: those are what
+# break shell interpolation, and every module builds a shell command.
+
+- name: create a directory whose name needs quoting
+  file:
+    path: "{{ .workdir }}/awk ward'dir"
+    state: directory
+    mode: "0750"
+
+- name: stat the awkward directory
+  stat:
+    path: "{{ .workdir }}/awk ward'dir"
+  register: awkward
+  register_type: json
+
+- name: assert the awkward path survived the shell
+  assert:
+    that:
+      - '{{ .awkward.stdout.exists }}'
+      - '{{ .awkward.stdout.isdir }}'
+      - '{{ eq .awkward.stdout.mode "750" }}'
+    msg: "awkward directory wrong: {{ .awkward.stdout }}"
+
+- name: touch a file inside it
+  file:
+    path: "{{ .workdir }}/awk ward'dir/inner.txt"
+    state: touch
+    mode: "0640"
+
+- name: link to that file
+  file:
+    path: "{{ .workdir }}/link-to-inner"
+    state: link
+    src: "{{ .workdir }}/awk ward'dir/inner.txt"
+
+- name: stat the link
+  stat:
+    path: "{{ .workdir }}/link-to-inner"
+  register: link_stat
+  register_type: json
+
+- name: assert the link is a link
+  assert:
+    that:
+      - '{{ .link_stat.stdout.exists }}'
+      - '{{ .link_stat.stdout.islnk }}'
+    msg: "symlink not created: {{ .link_stat.stdout }}"
+
+- name: stat a path that does not exist
+  stat:
+    path: "{{ .workdir }}/definitely-absent"
+  register: absent
+  register_type: json
+
+- name: assert a missing path is a result, not a failure
+  assert:
+    that:
+      - '{{ not .absent.stdout.exists }}'
+      - '{{ not .absent.failed }}'
+    msg: "stat on a missing path should succeed with exists=false"
+
+- name: remove the awkward directory
+  file:
+    path: "{{ .workdir }}/awk ward'dir"
+    state: absent
+
+- name: stat it again
+  stat:
+    path: "{{ .workdir }}/awk ward'dir"
+  register: removed
+  register_type: json
+
+- name: assert removal worked
+  assert:
+    that:
+      - '{{ not .removed.stdout.exists }}'
+    msg: "state=absent did not remove the directory"
+
+# ---------------------------------------------------------------------------
+# environment
+# ---------------------------------------------------------------------------
+
+- name: environment reaches the shell
+  shell: "echo $E2E_PLAIN:$E2E_TEMPLATED"
+  environment:
+    E2E_PLAIN: plain-value
+    E2E_TEMPLATED: "{{ .unit_name }}-templated"
+  register: env_out
+  changed_when: false
+
+- name: assert both environment values arrived
+  assert:
+    that:
+      - '{{ eq .env_out.stdout (printf "plain-value:%s-templated" .unit_name) }}'
+    msg: "environment not applied: {{ .env_out.stdout }}"
+
+- name: environment values needing quotes survive
+  shell: "echo \"$E2E_QUOTED\""
+  environment:
+    E2E_QUOTED: "a b'c"
+  register: env_quoted
+  changed_when: false
+
+- name: assert the quoted environment value survived
+  assert:
+    # A literal single quote is doubled inside a YAML single-quoted scalar.
+    that:
+      - '{{ eq .env_quoted.stdout "a b''c" }}'
+    msg: "quoted environment value mangled: {{ .env_quoted.stdout }}"
+
+# ---------------------------------------------------------------------------
+# changed_when
+# ---------------------------------------------------------------------------
+
+- name: a task that declares itself changed
+  command:
+    cmd: "echo mutated"
+  register: did_change
+  changed_when: '{{ eq .stdout "mutated" }}'
+
+- name: a task that declares itself unchanged
+  command:
+    cmd: "echo mutated"
+  register: no_change
+  changed_when: false
+
+- name: assert changed_when drove the reported state
+  assert:
+    that:
+      - '{{ .did_change.changed }}'
+      - '{{ not .no_change.changed }}'
+    msg: "changed_when wrong: {{ .did_change.changed }} / {{ .no_change.changed }}"
+
+# ---------------------------------------------------------------------------
+# template module, exercising the list-of-map filters
+# ---------------------------------------------------------------------------
+
+- name: render a report through the template module
+  template:
+    src: templates/report.conf
+    dest: "{{ .workdir }}/report.conf"
+    mode: "0644"
+
+- name: read the rendered report
+  command:
+    cmd: "cat {{ .workdir }}/report.conf"
+  register: report
+  changed_when: false
+
+- name: assert the filters produced the expected report
+  assert:
+    that:
+      - '{{ contains "enabled=kept,also_kept" .report.stdout }}'
+      - '{{ contains "db_tier=kept,also_kept" .report.stdout }}'
+      - '{{ contains "flat=one,two,three" .report.stdout }}'
+      - '{{ contains "from_role=role-default" .report.stdout }}'
+    msg: "rendered report wrong:\n{{ .report.stdout }}"
