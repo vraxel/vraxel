@@ -61,7 +61,7 @@ func (e *ExitError) Unwrap() error { return e.Err }
 // reach without a network protocol: the local machine.
 //
 // SSH lives in the sibling package connector/ssh, and that split is the
-// point. vr-agent runs one play against the box it is installed on and
+// point. the agent runs one play against the box it is installed on and
 // never dials anything, so linking a full SSH client and SFTP library
 // into every agent would put 0.79 MB of unreachable code on ten thousand
 // customer machines -- and contradict the design's central claim that

@@ -26,7 +26,7 @@ func (l testLogger) Warnf(f string, a ...any) { l.t.Logf("WARN  "+f, a...) }
 // the way the real one does, printing the full build string rather than
 // the short version the server announces.
 func fakeAgent(version string) []byte {
-	return []byte("#!/bin/sh\necho \"vr-agent-" + version + "-20260812-061329-heads-main-0-g7fd60a64a\"\n")
+	return []byte("#!/bin/sh\necho \"agent-" + version + "-20260812-061329-heads-main-0-g7fd60a64a\"\n")
 }
 
 func sha256Hex(b []byte) string {
@@ -46,7 +46,7 @@ type harness struct {
 func newHarness(t *testing.T, current string, served []byte) *harness {
 	t.Helper()
 	dir := t.TempDir()
-	binary := filepath.Join(dir, "vr-agent")
+	binary := filepath.Join(dir, "agent")
 	if err := os.WriteFile(binary, fakeAgent(current), 0o755); err != nil {
 		t.Fatalf("seed binary: %v", err)
 	}

@@ -282,7 +282,7 @@ func TestGetAllVariable_DefaultVarsLowestPriority(t *testing.T) {
 	// This is the exact scenario that broke repo_url.
 	inv := ansible.Inventory{
 		Hosts: map[string]map[string]any{
-			"node1": {"repo_url": "http://lcp.io:8088/packages"},
+			"node1": {"repo_url": "http://repo.example:8088/packages"},
 		},
 	}
 
@@ -297,8 +297,8 @@ func TestGetAllVariable_DefaultVarsLowestPriority(t *testing.T) {
 	vars := result.(map[string]any)
 
 	// Inventory host vars should override role defaults.
-	if vars["repo_url"] != "http://lcp.io:8088/packages" {
-		t.Errorf("expected repo_url from inventory (http://lcp.io:8088/packages), got %q — role defaults should NOT override inventory", vars["repo_url"])
+	if vars["repo_url"] != "http://repo.example:8088/packages" {
+		t.Errorf("expected repo_url from inventory (http://repo.example:8088/packages), got %q — role defaults should NOT override inventory", vars["repo_url"])
 	}
 }
 

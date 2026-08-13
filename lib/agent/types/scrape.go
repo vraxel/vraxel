@@ -1,7 +1,7 @@
 package types
 
 // ScrapeTargetsPath is where the agent fetches the list of exporters to
-// scrape on its own host. The list is derived from vraxel's database (which
+// scrape on its own host. The list is derived from the platform's database (which
 // middleware is deployed here, on which ports, with which labels), so it
 // can only come from the server; the agent contributes the scraping.
 const ScrapeTargetsPath = ProtocolPathPrefix + "scrape-targets"

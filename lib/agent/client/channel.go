@@ -24,8 +24,8 @@ const (
 	// reconnect attempts. Capped at 60s because a control channel is
 	// cheap and an agent that stays disconnected is an unmanaged host --
 	// the cost of retrying a dead server once a minute is negligible next
-	// to the cost of a host taking ten minutes to come back after an
-	// vraxel-server restart.
+	// to the cost of a host taking ten minutes to come back after a
+	// server restart.
 	reconnectMin = 1 * time.Second
 	reconnectMax = 60 * time.Second
 	// dialTimeout bounds one connection attempt including the upgrade.
@@ -46,7 +46,7 @@ type Logger interface {
 	Warnf(format string, args ...any)
 }
 
-// Channel maintains the persistent control channel to vraxel-server.
+// Channel maintains the persistent control channel to the server.
 type Channel struct {
 	ServerURL string
 	// AgentToken returns the durable credential, read fresh on every
@@ -106,7 +106,7 @@ type SendFunc func(agenttypes.Frame) error
 //
 // Never returns an error: a disconnected agent is a transient state, not
 // a fatal one. The process staying alive and retrying is what lets a host
-// survive a vraxel-server restart without operator action.
+// survive a server restart without operator action.
 func (c *Channel) Run(ctx context.Context) {
 	backoff := reconnectMin
 	for {
@@ -153,8 +153,8 @@ func (c *Channel) Run(ctx context.Context) {
 
 // jittered spreads a backoff delay uniformly over [d/2, d] (equal
 // jitter): still exponential in the worst case, but the retry instant is
-// randomised. Without it a mass disconnect -- an
-// vraxel-server instance dying with thousands of agents pinned to it --
+// randomised. Without it a mass disconnect -- a
+// server instance dying with thousands of agents pinned to it --
 // would have every agent retry in lockstep and stampede the surviving
 // instances. Spreading the wait desynchronises the reconnect storm, which
 // is a hard requirement at the ten-thousand-agent scale this targets.

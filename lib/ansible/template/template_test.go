@@ -30,8 +30,8 @@ func TestIsIP(t *testing.T) {
 }
 
 func TestToTOML(t *testing.T) {
-	got := toTOML(map[string]any{"name": "vraxel", "count": 3})
-	if !strings.Contains(got, `name = "vraxel"`) || !strings.Contains(got, "count = 3") {
+	got := toTOML(map[string]any{"name": "app", "count": 3})
+	if !strings.Contains(got, `name = "app"`) || !strings.Contains(got, "count = 3") {
 		t.Errorf("toTOML output missing expected keys:\n%s", got)
 	}
 	// marshal error is swallowed to empty string.

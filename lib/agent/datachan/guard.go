@@ -16,13 +16,13 @@ import (
 //
 //  1. The target must be a loopback address. This is unconditional and
 //     not configurable. It is the property the whole agent design rests
-//     on (design §4.3): an attacker who owns vraxel-server still cannot use
+//     on (design §4.3): an attacker who owns the server still cannot use
 //     an agent to reach anything else in the customer's network, which is
 //     what distinguishes this from a VPN or an overlay.
 //
 //  2. The port must be in the allowlist, when one has been set. The
 //     server derives that list from what it knows about the host (ssh
-//     port, agent port, the service ports vraxel itself deployed there,
+//     port, agent port, the service ports the platform itself deployed there,
 //     6443 on a k8s node) and pushes it; until it does, any loopback port
 //     is reachable. Rule 1 already bounds the blast radius to processes
 //     on the host itself, so this is defence in depth, not the barrier.

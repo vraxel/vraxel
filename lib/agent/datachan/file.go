@@ -132,7 +132,7 @@ func (c *Channel) fileRead(ctx context.Context, stream net.Conn, mu *sync.Mutex,
 // upload leaves the previous file intact instead of a truncated one.
 func fileWrite(stream net.Conn, open agenttypes.StreamOpen) (int64, error) {
 	dir := filepath.Dir(open.Path)
-	tmp, err := os.CreateTemp(dir, ".vraxel-upload-*")
+	tmp, err := os.CreateTemp(dir, ".agent-upload-*")
 	if err != nil {
 		return 0, err
 	}

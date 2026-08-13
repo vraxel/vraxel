@@ -2,9 +2,9 @@
 // pushes them to VictoriaMetrics (design §5.9).
 //
 // This is not a push model. Pull semantics are intact -- the target list
-// comes from vraxel, collection is periodic, and `up` still exists -- only
+// comes from the platform, collection is periodic, and `up` still exists -- only
 // the origin of the pull moved from the control plane to the host, which
-// is what vmagent and Prometheus agent mode do. It exists because vraxel
+// is what vmagent and Prometheus agent mode do. It exists because the platform
 // cannot dial the host at all, and it costs no fidelity: extra_label has
 // override semantics, so the series are identical to VM scraping the
 // host directly.
@@ -37,7 +37,7 @@ const (
 	// defaultInterval is the scrape period.
 	defaultInterval = 15 * time.Second
 	// refreshInterval is how often the target list is refetched. The list
-	// changes only when vraxel deploys or removes something on this host, and
+	// changes only when the platform deploys or removes something on this host, and
 	// config.reload makes that immediate, so this is the fallback.
 	refreshInterval = 60 * time.Second
 	// maxWorkers bounds concurrent scrape+push operations. Bounded and
@@ -76,11 +76,11 @@ type Logger interface {
 
 // Config is what the host program supplies.
 type Config struct {
-	// ServerURL is the vraxel-server base URL, used to fetch targets.
+	// ServerURL is the server base URL, used to fetch targets.
 	ServerURL string
 	// Token returns the current session token.
 	Token func() string
-	// TLS carries the trust store for vraxel-server and VictoriaMetrics. Nil
+	// TLS carries the trust store for the server and VictoriaMetrics. Nil
 	// uses the system defaults. Exporters are on loopback and plain HTTP,
 	// so it never applies to them.
 	TLS *tls.Config
@@ -91,7 +91,7 @@ type Config struct {
 type Scraper struct {
 	cfg Config
 	// exporters talks to this host's exporters and enforces the loopback
-	// rule in its dialer. remote talks to vraxel-server and to VM, which are
+	// rule in its dialer. remote talks to the server and to VM, which are
 	// remote by definition -- pointing the loopback dialer at those would
 	// make the agent refuse to fetch its own target list.
 	exporters *http.Client
@@ -162,7 +162,7 @@ func New(cfg Config) *Scraper {
 	}
 }
 
-// remoteTransport is the transport for vraxel-server and VictoriaMetrics.
+// remoteTransport is the transport for the server and VictoriaMetrics.
 // Compression stays off here too: a push body is bytes the exporter
 // already gzipped, forwarded with the encoding header set by hand.
 func remoteTransport(tlsCfg *tls.Config) *http.Transport {

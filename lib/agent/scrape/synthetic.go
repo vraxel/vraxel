@@ -17,7 +17,7 @@ import (
 // distinguishes "the exporter is down" from "no data", and with
 // collection moved onto the host it is the only signal that survives an
 // exporter dying while the agent stays healthy. (The agent itself dying
-// is covered from the other side: vraxel-server writes vraxel_agent_up from
+// is covered from the other side: the server writes the agent-up metric from
 // heartbeats, design §6.4.)
 //
 // Only these two. Anything else promscrape reports (scrape_samples_*)

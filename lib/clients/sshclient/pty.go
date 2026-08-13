@@ -45,7 +45,7 @@ type WindowSize struct {
 //
 // EchoOff disables PTY echo (termios ECHO=0). Required when feeding a
 // password via Stdin so the password isn't reflected back into
-// LiveOutput / Stdout. Most vraxel deploy paths run non-interactive
+// LiveOutput / Stdout. Most deploy paths run non-interactive
 // commands that never read stdin, so disabling echo is also harmless
 // for the no-password case.
 type PtyOpts struct {

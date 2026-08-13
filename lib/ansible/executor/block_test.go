@@ -371,7 +371,7 @@ func TestBlockExecutor_IncludeTasks_FileNotFound(t *testing.T) {
 // safety net against an include_tasks file that includes itself. Was
 // the production etcd-deploy bug class (member-replace.yml line 62
 // re-included main.yml, recursion via main.yml's include of
-// member-replace.yml emitted ~5,200 task rounds before vraxel-server OOM).
+// member-replace.yml emitted ~5,200 task rounds before the server OOM).
 // The fix is per-call-stack cycle detection in dealIncludeTasks; this
 // test pins it as a regression guard.
 func TestBlockExecutor_IncludeTasks_DirectSelfReference(t *testing.T) {

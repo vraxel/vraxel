@@ -28,7 +28,7 @@ func (l testLogger) Infof(f string, a ...any) { l.t.Logf("INFO  "+f, a...) }
 func (l testLogger) Warnf(f string, a ...any) { l.t.Logf("WARN  "+f, a...) }
 
 // gateway is the server half of the data channel, standing in for
-// pkg/apis/agentgw. It is also the reference for what the gateway must
+// the server gateway. It is also the reference for what the gateway must
 // do: upgrade, wrap in a yamux client, open one stream per session.
 type gateway struct {
 	srv     *httptest.Server
