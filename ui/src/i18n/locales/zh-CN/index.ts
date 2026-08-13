@@ -2,11 +2,13 @@ import type { Messages } from "../../types"
 import common from "./common"
 import iam from "./iam"
 import audit from "./audit"
+import compute from "./compute"
 
 const zhCN = {
   ...common,
   ...iam,
   ...audit,
+  ...compute,
 } satisfies Messages
 
 // Every message key in the catalog. zh-CN is the source of truth for the
