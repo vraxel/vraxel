@@ -35,6 +35,12 @@ export default defineConfig([
       // autofix, used heavily by the W3 migration to strip imports the
       // framework replaced). no-unused-imports subsumes the import half
       // of no-unused-vars, so the ts rule keeps only the non-import half.
+      // exhaustive-deps ships as 'warn' in the recommended config. This tree
+      // reports zero hits, and the class it catches (a `?? []` view rebuilt
+      // every render, defeating the memo or tracker keyed on it) is exactly
+      // what breaks the render-phase transition pattern used throughout. Held
+      // at error so it stays at zero.
+      'react-hooks/exhaustive-deps': 'error',
       'unused-imports/no-unused-imports': 'error',
       // `const { kind: _kind, ...rest } = obj` omit idiom: rest siblings
       // and _-prefixed bindings are intentional discards.
