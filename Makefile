@@ -11,7 +11,7 @@ LDFLAGS := -X '$(PKG_PREFIX)/lib/buildinfo.Version=$(APP_NAME)-$(VERSION)'
 CONFIG := $(if $(wildcard app/$(APP_NAME)/config.dev.yaml),app/$(APP_NAME)/config.dev.yaml,app/$(APP_NAME)/config.yaml)
 
 .DEFAULT_GOAL := help
-.PHONY: help dev build generate check fmt clean new-migration setup-hooks
+.PHONY: help dev build generate quick check fmt clean new-migration setup-hooks
 
 help: ## List available commands
 	@awk 'BEGIN{FS=":.*## "} /^[a-z][a-z-]*:.*## /{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -45,6 +45,9 @@ generate: ## Regenerate committed sqlc / OpenAPI / TS artifacts (commit the resu
 
 # Everything that must pass before a commit. `go test -race ./...` is the
 # deeper pass (~10x slower); run it when touching concurrent code.
+quick: ## Fast pre-commit check: gate integrity + only what changed
+	@./scripts/quick-check.sh
+
 check: ## Run all gates: gofmt, vet, layer guard, Go tests, UI typecheck/lint/tests
 	@out=$$(gofmt -l -s . | grep -vE "^\.worktrees/|^\.anvil-dev/" || true); if [ -n "$$out" ]; then echo "gofmt -s needed:"; echo "$$out"; exit 1; fi
 	go vet ./...
