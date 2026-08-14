@@ -52,12 +52,19 @@ type AgentHostSpec struct {
 // is the same shape as every other cross-module data path in the tree:
 // interface declared by the consumer, impl exposed by the owner.
 type HostRegistrar interface {
-	// RegisterAgentHost returns the host id bound to this agent. It must
-	// be idempotent for a given ExistingHostID: repeated registrations of
-	// one machine converge on one row.
-	RegisterAgentHost(ctx context.Context, spec AgentHostSpec) (int64, error)
-	// UnregisterAgentHost deletes a host row this registration created but
-	// failed to finish binding. Only ever called with an id
-	// RegisterAgentHost just returned from its create branch.
+	// RegisterAgentHost returns the host id bound to this agent, and
+	// whether this call created that row rather than adopting one that
+	// already existed. It must be idempotent for a given ExistingHostID:
+	// repeated registrations of one machine converge on one row.
+	//
+	// created is what makes the rollback safe. Only the registrar knows
+	// which branch it took, and the caller must not guess: today an
+	// empty ExistingHostID happens to imply the create branch, but the
+	// moment a join token can name a host to attach to, that inference
+	// silently becomes "delete the row the operator just imported".
+	RegisterAgentHost(ctx context.Context, spec AgentHostSpec) (hostID int64, created bool, err error)
+	// UnregisterAgentHost deletes a host row this registration created
+	// but failed to finish binding. Only ever called with an id
+	// RegisterAgentHost just reported as created.
 	UnregisterAgentHost(ctx context.Context, hostID int64) error
 }

@@ -33,7 +33,10 @@ type agentHostRegistrar struct {
 // two different machines can legitimately share a hostname (two "node-1"s
 // in different customer networks) and the hosts unique index is per-scope
 // on name.
-func (r *agentHostRegistrar) RegisterAgentHost(ctx context.Context, spec agentgw.AgentHostSpec) (int64, error) {
+//
+// The second return value says which branch ran, so the gateway can roll
+// back exactly the rows this request added and nothing else.
+func (r *agentHostRegistrar) RegisterAgentHost(ctx context.Context, spec agentgw.AgentHostSpec) (int64, bool, error) {
 	facts := modstore.AgentHostFactsInput{
 		Hostname:  spec.Hostname,
 		OS:        spec.OS,
@@ -56,23 +59,23 @@ func (r *agentHostRegistrar) RegisterAgentHost(ctx context.Context, spec agentgw
 			// token, evicting the real agent (the upsert bumps
 			// token_version) and inheriting whatever its jobs are handed.
 			if !rebindAuthorised(spec, cur) {
-				return 0, apierrors.NewForbidden(fmt.Sprintf(
+				return 0, false, apierrors.NewForbidden(fmt.Sprintf(
 					"host %d is scoped to %s; this join token cannot rebind it",
 					spec.ExistingHostID, cur.Scope))
 			}
 			if err := r.store.UpdateFacts(ctx, spec.ExistingHostID, facts); err != nil {
 				if se := apierrors.FromDomain(err, "host"); se == nil || !apierrors.IsNotFound(se) {
-					return 0, err
+					return 0, false, err
 				}
 				break // deleted between the two reads; re-create below
 			}
-			return spec.ExistingHostID, nil
+			return spec.ExistingHostID, false, nil
 		case apierrors.IsNotFound(apierrors.FromDomain(err, "host")):
 			// The host row was deleted while host_agents still pointed at it
 			// (only reachable if the FK cascade was bypassed). Fall through
 			// and re-create rather than failing the agent forever.
 		default:
-			return 0, err
+			return 0, false, err
 		}
 	}
 
@@ -94,13 +97,13 @@ func (r *agentHostRegistrar) RegisterAgentHost(ctx context.Context, spec agentgw
 			CreatedBy:   spec.CreatedBy,
 		})
 		if err == nil {
-			return id, nil
+			return id, true, nil
 		}
 		if se := apierrors.FromDomain(err, "host"); se == nil || !apierrors.IsConflict(se) {
-			return 0, err
+			return 0, false, err
 		}
 	}
-	return 0, fmt.Errorf("host name %q is taken and no disambiguated variant was free", base)
+	return 0, false, fmt.Errorf("host name %q is taken and no disambiguated variant was free", base)
 }
 
 // UnregisterAgentHost removes a host row whose registration failed after
