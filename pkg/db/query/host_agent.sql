@@ -218,3 +218,17 @@ WHERE status = 'online'
   AND (last_seen_at IS NULL
        OR last_seen_at < now() - make_interval(secs => @stale_after_secs::float8))
 RETURNING host_id;
+
+-- name: MoveHostAgentBinding :one
+-- Re-points a live agent at a different host, for a merge: two rows turn
+-- out to be one machine, and the surviving row inherits the machine.
+--
+-- Only the host_id moves. agent_id, token_version and the credential
+-- built from them stay put, which is what lets the agent keep running
+-- across a merge -- it authenticates as an agent, and the host it belongs
+-- to is looked up rather than carried in the token.
+UPDATE host_agents
+SET host_id    = @to_host_id,
+    updated_at = now()
+WHERE host_id = @from_host_id
+RETURNING *;

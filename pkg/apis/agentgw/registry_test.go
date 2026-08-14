@@ -58,6 +58,7 @@ func (f *fakeAgentStore) FindByMachineID(context.Context, string) ([]gwstore.Age
 func (f *fakeAgentStore) RefreshFingerprint(context.Context, int64, gwstore.FingerprintInput) error {
 	return nil
 }
+func (f *fakeAgentStore) MoveBinding(context.Context, int64, int64) error { return nil }
 func (f *fakeAgentStore) GetByAgentID(context.Context, string) (*gwstore.AgentRow, error) {
 	return nil, nil
 }

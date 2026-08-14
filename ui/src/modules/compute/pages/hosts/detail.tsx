@@ -19,6 +19,7 @@ import { hostsDef } from "@/modules/compute/defs"
 import { AgentStatusBadge } from "@/modules/compute/components/agent-status-badge"
 import { HostEditDialog } from "@/modules/compute/components/host-edit-dialog"
 import { AgentInstallDialog } from "@/modules/compute/components/agent-install-dialog"
+import { HostMergeDialog } from "@/modules/compute/components/host-merge-dialog"
 import { useHostWatch } from "@/modules/compute/use-host-watch"
 import { ConfirmDialog } from "@/shared/components/confirm-dialog"
 
@@ -42,6 +43,7 @@ export default function HostDetailPage() {
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [installOpen, setInstallOpen] = useState(false)
+  const [mergeOpen, setMergeOpen] = useState(false)
 
   const query = useApiQuery({
     queryKey: qk.detail(hostsDef, scope, hostId ?? ""),
@@ -117,6 +119,27 @@ export default function HostDetailPage() {
         </div>
       </div>
 
+      {(host.spec.imageGroupSize ?? 0) > 1 && (
+        <div className="border-warning/25 bg-warning/10 mb-6 flex items-start justify-between gap-3 rounded-lg border p-3 text-sm">
+          <div>
+            <p className="font-medium">{t("compute.host.imageGroup")}</p>
+            <p className="text-muted-foreground mt-1 text-xs">
+              {t("compute.host.imageGroupHint", { count: host.spec.imageGroupSize ?? 0 })}
+            </p>
+          </div>
+          {canDelete && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              onClick={() => setMergeOpen(true)}
+            >
+              {t("compute.host.merge")}
+            </Button>
+          )}
+        </div>
+      )}
+
       {host.spec.agentConflictAt && (
         <div className="border-destructive/25 bg-destructive/10 mb-6 rounded-lg border p-3 text-sm">
           <p className="font-medium">{t("compute.agent.conflict")}</p>
@@ -186,6 +209,13 @@ export default function HostDetailPage() {
         host={installOpen ? host : null}
         scope={scope}
         onClose={() => setInstallOpen(false)}
+      />
+
+      <HostMergeDialog
+        host={mergeOpen ? host : null}
+        scope={scope}
+        onClose={() => setMergeOpen(false)}
+        onMerged={() => navigate(listPath)}
       />
 
       <ConfirmDialog

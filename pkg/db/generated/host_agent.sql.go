@@ -458,6 +458,53 @@ func (q *Queries) MarkStaleHostAgentsOffline(ctx context.Context, staleAfterSecs
 	return items, nil
 }
 
+const moveHostAgentBinding = `-- name: MoveHostAgentBinding :one
+UPDATE host_agents
+SET host_id    = $1,
+    updated_at = now()
+WHERE host_id = $2
+RETURNING host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at, boot_nonce, prev_boot_nonce, conflict_at, product_uuid, macs, machine_id, identity_source, boot_at
+`
+
+type MoveHostAgentBindingParams struct {
+	ToHostID   int64 `json:"to_host_id"`
+	FromHostID int64 `json:"from_host_id"`
+}
+
+// Re-points a live agent at a different host, for a merge: two rows turn
+// out to be one machine, and the surviving row inherits the machine.
+//
+// Only the host_id moves. agent_id, token_version and the credential
+// built from them stay put, which is what lets the agent keep running
+// across a merge -- it authenticates as an agent, and the host it belongs
+// to is looked up rather than carried in the token.
+func (q *Queries) MoveHostAgentBinding(ctx context.Context, arg MoveHostAgentBindingParams) (HostAgent, error) {
+	row := q.db.QueryRow(ctx, moveHostAgentBinding, arg.ToHostID, arg.FromHostID)
+	var i HostAgent
+	err := row.Scan(
+		&i.HostID,
+		&i.AgentID,
+		&i.TokenVersion,
+		&i.Version,
+		&i.InstanceID,
+		&i.Status,
+		&i.ConnectedAt,
+		&i.LastSeenAt,
+		&i.ClockSkewMs,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.BootNonce,
+		&i.PrevBootNonce,
+		&i.ConflictAt,
+		&i.ProductUuid,
+		&i.Macs,
+		&i.MachineID,
+		&i.IdentitySource,
+		&i.BootAt,
+	)
+	return i, err
+}
+
 const rebindHostAgent = `-- name: RebindHostAgent :one
 UPDATE host_agents
 SET host_id         = $1,

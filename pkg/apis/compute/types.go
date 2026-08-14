@@ -64,6 +64,13 @@ type HostSpec struct {
 	// host's identity, which is what a cloned disk produces. The gateway
 	// refuses every channel for the host until it clears.
 	AgentConflictAt *time.Time `json:"agentConflictAt,omitempty"`
+	// ImageGroupSize is how many hosts were built from this host's disk
+	// image, this one included. Above 1 means somebody cloned a machine
+	// without resetting /etc/machine-id: the hosts are distinct and
+	// working, but they are indistinguishable by that id everywhere else
+	// it surfaces, and one of them may be a duplicate record of another.
+	// 0 or 1 is the ordinary answer and the UI says nothing.
+	ImageGroupSize int64 `json:"imageGroupSize,omitempty"`
 }
 
 // Host is a managed machine.
@@ -124,3 +131,19 @@ type AgentJoinToken struct {
 }
 
 func (t *AgentJoinToken) GetTypeMeta() *runtime.TypeMeta { return &t.TypeMeta }
+
+// HostMergeRequest folds one host record into another.
+type HostMergeRequest struct {
+	// SourceHostID is the record to absorb and delete. Its agent, if it
+	// has one, moves to the host named in the URL.
+	SourceHostID string `json:"sourceHostId"`
+}
+
+// HostMergeResponse reports what the merge did.
+type HostMergeResponse struct {
+	// HostID is the surviving record.
+	HostID string `json:"hostId"`
+	// AgentMoved is true when the surviving record gained an agent from
+	// the one that was absorbed.
+	AgentMoved bool `json:"agentMoved"`
+}

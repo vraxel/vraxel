@@ -162,7 +162,17 @@ SELECT h.id, h.name, h.display_name, h.description, h.hostname, h.os, h.arch, h.
     a.version        AS agent_version,
     a.connected_at   AS agent_connected_at,
     a.last_seen_at   AS agent_last_seen_at,
-    a.conflict_at    AS agent_conflict_at
+    a.conflict_at    AS agent_conflict_at,
+    -- How many hosts were built from this host's disk image, this one
+    -- included. 1 (or 0 for an agentless record) is the ordinary answer.
+    --
+    -- A scalar subquery rather than a join: the count is over ALL hosts
+    -- sharing the machine id, which the WHERE clause below is busy
+    -- narrowing away. It is also the whole point -- the sibling an
+    -- operator needs to know about is often the one their current filter
+    -- hides.
+    (SELECT count(*) FROM host_agents s
+      WHERE s.machine_id <> '' AND s.machine_id = a.machine_id) AS image_group_size
 FROM hosts h
 LEFT JOIN users u ON u.id = h.created_by
 LEFT JOIN host_agents a ON a.host_id = h.id
@@ -214,6 +224,7 @@ type GetHostByIDRow struct {
 	AgentConnectedAt  *time.Time  `json:"agent_connected_at"`
 	AgentLastSeenAt   *time.Time  `json:"agent_last_seen_at"`
 	AgentConflictAt   *time.Time  `json:"agent_conflict_at"`
+	ImageGroupSize    int64       `json:"image_group_size"`
 }
 
 func (q *Queries) GetHostByID(ctx context.Context, arg GetHostByIDParams) (GetHostByIDRow, error) {
@@ -256,6 +267,7 @@ func (q *Queries) GetHostByID(ctx context.Context, arg GetHostByIDParams) (GetHo
 		&i.AgentConnectedAt,
 		&i.AgentLastSeenAt,
 		&i.AgentConflictAt,
+		&i.ImageGroupSize,
 	)
 	return i, err
 }
@@ -288,7 +300,17 @@ SELECT h.id, h.name, h.display_name, h.description, h.hostname, h.os, h.arch, h.
     a.version        AS agent_version,
     a.connected_at   AS agent_connected_at,
     a.last_seen_at   AS agent_last_seen_at,
-    a.conflict_at    AS agent_conflict_at
+    a.conflict_at    AS agent_conflict_at,
+    -- How many hosts were built from this host's disk image, this one
+    -- included. 1 (or 0 for an agentless record) is the ordinary answer.
+    --
+    -- A scalar subquery rather than a join: the count is over ALL hosts
+    -- sharing the machine id, which the WHERE clause below is busy
+    -- narrowing away. It is also the whole point -- the sibling an
+    -- operator needs to know about is often the one their current filter
+    -- hides.
+    (SELECT count(*) FROM host_agents s
+      WHERE s.machine_id <> '' AND s.machine_id = a.machine_id) AS image_group_size
 FROM hosts h
 LEFT JOIN users u ON u.id = h.created_by
 LEFT JOIN host_agents a ON a.host_id = h.id
@@ -364,6 +386,7 @@ type ListHostsRow struct {
 	AgentConnectedAt  *time.Time  `json:"agent_connected_at"`
 	AgentLastSeenAt   *time.Time  `json:"agent_last_seen_at"`
 	AgentConflictAt   *time.Time  `json:"agent_conflict_at"`
+	ImageGroupSize    int64       `json:"image_group_size"`
 }
 
 func (q *Queries) ListHosts(ctx context.Context, arg ListHostsParams) ([]ListHostsRow, error) {
@@ -423,6 +446,7 @@ func (q *Queries) ListHosts(ctx context.Context, arg ListHostsParams) ([]ListHos
 			&i.AgentConnectedAt,
 			&i.AgentLastSeenAt,
 			&i.AgentConflictAt,
+			&i.ImageGroupSize,
 		); err != nil {
 			return nil, err
 		}

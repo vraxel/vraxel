@@ -191,6 +191,23 @@ func (s *pgAgentStore) RefreshFingerprint(ctx context.Context, hostID int64, fp 
 	return nil
 }
 
+func (s *pgAgentStore) MoveBinding(ctx context.Context, fromHostID, toHostID int64) error {
+	if _, err := s.Q().MoveHostAgentBinding(ctx, generated.MoveHostAgentBindingParams{
+		ToHostID:   toHostID,
+		FromHostID: fromHostID,
+	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("host agent for host %d: %w", fromHostID, pgerrors.ErrNotFound)
+		}
+		return fmt.Errorf("move host agent binding: %w", pgerrors.CheckPG(err))
+	}
+	// Both rows change what the list draws: one gains an agent, the other
+	// is about to disappear.
+	s.notifyHost(ctx, fromHostID)
+	s.notifyHost(ctx, toHostID)
+	return nil
+}
+
 func (s *pgAgentStore) GetByAgentID(ctx context.Context, agentID string) (*AgentRow, error) {
 	uid, err := parseAgentUUID(agentID)
 	if err != nil {

@@ -36,6 +36,11 @@ type AgentStore interface {
 	// accepts is a machine that kept its hardware identity and reset
 	// /etc/machine-id, which is the fix we ask cloned hosts to apply.
 	RefreshFingerprint(ctx context.Context, hostID int64, fp FingerprintInput) error
+	// MoveBinding re-points a live agent at another host, for a merge of
+	// two rows that turn out to be one machine. Only host_id moves: the
+	// agent keeps its id, its token_version and therefore its credential,
+	// so the merge does not require the machine to re-onboard.
+	MoveBinding(ctx context.Context, fromHostID, toHostID int64) error
 	GetByAgentID(ctx context.Context, agentID string) (*AgentRow, error)
 	GetByHostID(ctx context.Context, hostID int64) (*AgentRow, error)
 

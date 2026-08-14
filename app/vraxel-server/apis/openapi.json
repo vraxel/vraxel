@@ -504,6 +504,103 @@
         }
       }
     },
+    "/api/compute/v1/hosts/{hostId}/image-siblings": {
+      "get": {
+        "summary": "Get image-siblings of Host",
+        "operationId": "listHostsImageSiblings",
+        "tags": [
+          "Host"
+        ],
+        "parameters": [
+          {
+            "name": "hostId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "sortBy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Image-siblingList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/compute/v1/hosts/{hostId}/merge": {
+      "post": {
+        "summary": "merge Host",
+        "operationId": "mergeHosts",
+        "tags": [
+          "Host"
+        ],
+        "parameters": [
+          {
+            "name": "hostId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/compute/v1/workspaces/{workspaceId}/agent-join-tokens": {
       "get": {
         "summary": "List agent-join-tokens",
@@ -913,6 +1010,119 @@
         "responses": {
           "204": {
             "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/compute/v1/workspaces/{workspaceId}/hosts/{hostId}/image-siblings": {
+      "get": {
+        "summary": "Get image-siblings of Host",
+        "operationId": "listWorkspacesHostsImageSiblings",
+        "tags": [
+          "Host"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hostId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "sortBy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Image-siblingList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/compute/v1/workspaces/{workspaceId}/hosts/{hostId}/merge": {
+      "post": {
+        "summary": "merge Host",
+        "operationId": "mergeWorkspacesHosts",
+        "tags": [
+          "Host"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hostId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
           }
         }
       }
@@ -1406,6 +1616,135 @@
         "responses": {
           "204": {
             "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/compute/v1/workspaces/{workspaceId}/namespaces/{namespaceId}/hosts/{hostId}/image-siblings": {
+      "get": {
+        "summary": "Get image-siblings of Host",
+        "operationId": "listWorkspacesNamespacesHostsImageSiblings",
+        "tags": [
+          "Host"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "namespaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hostId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "sortBy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Image-siblingList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/compute/v1/workspaces/{workspaceId}/namespaces/{namespaceId}/hosts/{hostId}/merge": {
+      "post": {
+        "summary": "merge Host",
+        "operationId": "mergeWorkspacesNamespacesHosts",
+        "tags": [
+          "Host"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "namespaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hostId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
           }
         }
       }
@@ -5148,6 +5487,10 @@
           "hostname": {
             "type": "string"
           },
+          "imageGroupSize": {
+            "type": "integer",
+            "format": "int64"
+          },
           "ip": {
             "type": "string"
           },
@@ -5176,6 +5519,20 @@
           },
           "workspaceId": {
             "type": "string"
+          }
+        }
+      },
+      "Image-siblingList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "totalCount": {
+            "type": "integer"
           }
         }
       },

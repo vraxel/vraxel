@@ -15,6 +15,7 @@ type (
 	JoinTokenRow         = gwstore.JoinTokenRow
 	JoinTokenCreateInput = gwstore.JoinTokenCreateInput
 	AgentRow             = gwstore.AgentRow
+	AgentStore           = gwstore.AgentStore
 )
 
 // AgentHostSpec is what an agent reports about the machine it runs on,

@@ -82,6 +82,11 @@ type Deps struct {
 // otherwise be a circular assembly order.
 func NewJoinTokenStore(d *db.DB) JoinTokenStore { return gwstore.NewPGJoinTokenStore(d) }
 
+// NewAgentStore builds the host_agents store. Exported for the same
+// reason as NewJoinTokenStore: compute's host merge has to move an agent
+// binding, and host_agents belongs to this module.
+func NewAgentStore(d *db.DB) AgentStore { return gwstore.NewPGAgentStore(d) }
+
 // NewModule boots the agent gateway: the instance lease, the
 // control-channel registry, and the /api/agent/v1/ handler.
 func NewModule(ctx context.Context, database *db.DB, deps Deps) ModuleResult {
