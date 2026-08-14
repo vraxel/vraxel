@@ -21,6 +21,10 @@ const (
 type joinTokenOps struct {
 	store     agentgw.JoinTokenStore
 	hostStore modstore.HostStore
+	// serverURL is this deployment's externally reachable address
+	// (server.externalUrl), handed to the operator with the token so the
+	// install command points somewhere the host can actually reach.
+	serverURL string
 }
 
 // AgentJoinTokensDef declares the pending-onboarding resource at all
@@ -39,8 +43,8 @@ type joinTokenOps struct {
 //
 // Sensitive keeps the create response, which carries the only copy of
 // the plaintext, out of the audit log.
-func AgentJoinTokensDef(store agentgw.JoinTokenStore, hostStore modstore.HostStore) apiserver.ResourceDef[AgentJoinToken] {
-	o := joinTokenOps{store: store, hostStore: hostStore}
+func AgentJoinTokensDef(store agentgw.JoinTokenStore, hostStore modstore.HostStore, serverURL string) apiserver.ResourceDef[AgentJoinToken] {
+	o := joinTokenOps{store: store, hostStore: hostStore, serverURL: serverURL}
 	return apiserver.ResourceDef[AgentJoinToken]{
 		Group: "compute", Name: "agent-join-tokens",
 		Scopes:            apiserver.ScopeAll,
@@ -168,6 +172,7 @@ func (o joinTokenOps) create(ctx apiserver.Ctx, in *AgentJoinToken) (*AgentJoinT
 	out := joinTokenToAPI(row, targetHostName)
 	out.Spec.Token = plaintext
 	out.Spec.TTLHours = ttl
+	out.Spec.ServerURL = o.serverURL
 	return &out, nil
 }
 

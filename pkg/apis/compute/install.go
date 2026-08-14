@@ -23,7 +23,11 @@ func NewAgentHostRegistrar(d *db.DB) agentgw.HostRegistrar {
 // the stores only wraps the handle, so a nil database yields a registrar
 // that declares every route without touching Postgres -- that is what
 // lets openapi-gen read the real route table offline.
-func Registrar(database *db.DB) func(*apiserver.Server) {
+// serverURL is server.externalUrl: where agents reach this deployment.
+// Passed in rather than read from the config global so the module has no
+// opinion about where configuration comes from, matching how agentgw
+// receives ServerName.
+func Registrar(database *db.DB, serverURL string) func(*apiserver.Server) {
 	hosts := modstore.NewPGHostStore(database)
 	// The join-token table belongs to the gateway, which owns the
 	// /register path that consumes them. compute reaches it through the
@@ -32,6 +36,6 @@ func Registrar(database *db.DB) func(*apiserver.Server) {
 	tokens := agentgw.NewJoinTokenStore(database)
 	return func(s *apiserver.Server) {
 		apiserver.Register(s, HostsDef(hosts))
-		apiserver.Register(s, AgentJoinTokensDef(tokens, hosts))
+		apiserver.Register(s, AgentJoinTokensDef(tokens, hosts, serverURL))
 	}
 }

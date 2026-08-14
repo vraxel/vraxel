@@ -428,6 +428,12 @@ func (g *Generator) goTypeToSchema(goType, currentGroup string) *Schema {
 		// Arbitrary JSON: emitting a $ref produced a dangling
 		// #/components/schemas/RawMessage and an invalid document.
 		return &Schema{}
+	case "time.Time", "Time":
+		// Same trap as RawMessage: time.Time is a struct the parser
+		// never emits a schema for, so falling through to the default
+		// left a dangling #/components/schemas/Time. It marshals as an
+		// RFC3339 string, which is what every client already reads it as.
+		return &Schema{Type: "string", Format: "date-time"}
 	default:
 		if strings.HasPrefix(goType, "[]") {
 			elemType := strings.TrimPrefix(goType, "[]")
