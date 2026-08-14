@@ -114,12 +114,18 @@ WHERE id = @id
   AND (sqlc.narg('workspace_id_filter')::BIGINT IS NULL OR workspace_id IS NOT DISTINCT FROM sqlc.narg('workspace_id_filter')::BIGINT)
   AND (sqlc.narg('namespace_id_filter')::BIGINT IS NULL OR namespace_id IS NOT DISTINCT FROM sqlc.narg('namespace_id_filter')::BIGINT);
 
--- name: DeleteHost :execrows
+-- name: DeleteHost :one
 -- host_agents and any bound join token cascade with the row.
+--
+-- RETURNING the tenancy is what lets the deletion be announced: the watch
+-- event needs a scope to route by, and after this statement there is no
+-- row left to read one from. No rows means "not found" here, the same
+-- thing zero affected rows used to mean.
 DELETE FROM hosts
 WHERE id = @id
   AND (sqlc.narg('workspace_id_filter')::BIGINT IS NULL OR workspace_id IS NOT DISTINCT FROM sqlc.narg('workspace_id_filter')::BIGINT)
-  AND (sqlc.narg('namespace_id_filter')::BIGINT IS NULL OR namespace_id IS NOT DISTINCT FROM sqlc.narg('namespace_id_filter')::BIGINT);
+  AND (sqlc.narg('namespace_id_filter')::BIGINT IS NULL OR namespace_id IS NOT DISTINCT FROM sqlc.narg('namespace_id_filter')::BIGINT)
+RETURNING scope, workspace_id, namespace_id;
 
 -- name: HostScopeByID :one
 -- Tenancy of one host, read before a scope-bound join token is minted

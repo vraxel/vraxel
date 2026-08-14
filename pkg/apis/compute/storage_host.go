@@ -7,6 +7,7 @@ import (
 	"vraxel.io/vraxel/lib/apiserver"
 	"vraxel.io/vraxel/lib/list"
 	"vraxel.io/vraxel/lib/oidc"
+	"vraxel.io/vraxel/lib/statushub"
 	modstore "vraxel.io/vraxel/pkg/apis/compute/store"
 	"vraxel.io/vraxel/pkg/apis/shared/scope"
 )
@@ -23,7 +24,7 @@ type hostOps struct {
 // fields, so a partial update of it is the same request as a full one,
 // and a host is deleted one at a time because deleting it detaches a
 // machine that is probably still running.
-func HostsDef(store modstore.HostStore) apiserver.ResourceDef[Host] {
+func HostsDef(store modstore.HostStore, hub *statushub.Hub) apiserver.ResourceDef[Host] {
 	o := hostOps{store: store}
 	return apiserver.ResourceDef[Host]{
 		Group: "compute", Name: "hosts",
@@ -34,6 +35,14 @@ func HostsDef(store modstore.HostStore) apiserver.ResourceDef[Host] {
 			Create: o.create,
 			Update: o.update,
 			Delete: o.delete,
+		},
+		Actions: []apiserver.ActionDef{
+			// On the collection, and borrowing the collection's own
+			// permission: watching this URL shows exactly what listing it
+			// shows. A separate code would only add a way to hold
+			// compute:hosts:list and still watch a page that never updates.
+			apiserver.WSAction("watch", []string{"compute:hosts:list"},
+				NewHostWatchHandler(hub), apiserver.OnCollection()),
 		},
 	}
 }

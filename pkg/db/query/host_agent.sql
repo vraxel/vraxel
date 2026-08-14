@@ -88,32 +88,41 @@ WHERE host_id = @host_id
 RETURNING connected_at;
 
 -- name: TouchHostAgent :execrows
--- A heartbeat also RESTORES status='online'. The stale sweep can only
--- ever be a guess (it fires when nobody wrote 'offline' in time), and it
--- guesses wrong whenever DB writes are unavailable for a minute -- the
--- touches fail, the sweep then marks a perfectly live agent offline, and
--- without this the row stays offline forever while the channel is up,
--- which fails every session-token check for that host.
--- Guarded on instance_id: a touch from a stale socket must not steal a
--- row another instance has since claimed. Zero rows therefore means "the
--- row is not ours"; the caller re-claims it with MarkHostAgentOnline
--- rather than beating against a guard that can never match again.
+-- The pure heartbeat: it moves last_seen_at and nothing else.
+--
+-- Guarded on instance_id AND status, so zero rows means "this row is not
+-- ours, or it is not marked online" -- and both are repaired the same
+-- way, by re-claiming it with MarkHostAgentOnline. The second half of
+-- that guard is what the stale sweep needs: the sweep can only ever be a
+-- guess (it fires when nobody wrote 'offline' in time) and it guesses
+-- wrong whenever DB writes are unavailable for a minute, so a live
+-- channel has to be able to heal a row that was marked offline under it.
+--
+-- Restoring status here instead (SET status='online', no guard) would
+-- also heal it, but then every beat -- one per agent per 15s -- would
+-- look identical to a real online transition, and the watch stream has
+-- no way to tell them apart. Leaving the transition to
+-- MarkHostAgentOnline keeps the hot path silent and makes every status
+-- write an actual change.
 UPDATE host_agents
-SET status        = 'online',
-    last_seen_at  = now(),
+SET last_seen_at  = now(),
     clock_skew_ms = @clock_skew_ms,
     updated_at    = now()
-WHERE host_id = @host_id AND instance_id = @instance_id;
+WHERE host_id = @host_id AND instance_id = @instance_id AND status = 'online';
 
--- name: MarkHostAgentOffline :exec
+-- name: MarkHostAgentOffline :execrows
 -- Guarded by instance_id: a stale disconnect handler must not flip a row
 -- that another instance has since taken over via a fresh reconnect.
+--
+-- The status guard makes the affected-row count mean "the agent just went
+-- offline" rather than "the statement ran", which is what the caller
+-- announces on the watch channel.
 UPDATE host_agents
 SET status      = 'offline',
     updated_at  = now()
-WHERE host_id = @host_id AND instance_id = @instance_id;
+WHERE host_id = @host_id AND instance_id = @instance_id AND status <> 'offline';
 
--- name: MarkOrphanedHostAgentsOffline :exec
+-- name: MarkOrphanedHostAgentsOffline :many
 -- Startup residue cleanup: rows still claiming 'online' under an instance
 -- that no longer holds a lease. That covers this process's own previous
 -- life, which is the common case after a hard kill.
@@ -125,22 +134,30 @@ WHERE host_id = @host_id AND instance_id = @instance_id;
 --
 -- Live siblings are excluded by the lease join, so this is safe to run on
 -- every boot in a horizontally scaled deployment.
+--
+-- RETURNING names the hosts that actually changed, which is the set the
+-- watch channel announces. The status guard above is what keeps that set
+-- to real transitions.
 UPDATE host_agents
 SET status = 'offline', updated_at = now()
 WHERE status = 'online'
   AND instance_id NOT IN (
       SELECT instance_id FROM server_instances
       WHERE last_seen_at >= now() - make_interval(secs => @stale_after_secs::float8)
-  );
+  )
+RETURNING host_id;
 
--- name: MarkStaleHostAgentsOffline :exec
+-- name: MarkStaleHostAgentsOffline :many
 -- Backstop for the case where neither the agent nor its owning instance
 -- got to write 'offline' (host powered off, instance SIGKILLed).
 -- The cutoff is computed from the DB clock, not the caller's: last_seen_at
 -- is written with now() here, so comparing it against a Go-side timestamp
 -- would fold server/DB clock drift straight into the staleness window.
+--
+-- RETURNING names the hosts that actually changed, for the watch channel.
 UPDATE host_agents
 SET status = 'offline', updated_at = now()
 WHERE status = 'online'
   AND (last_seen_at IS NULL
-       OR last_seen_at < now() - make_interval(secs => @stale_after_secs::float8));
+       OR last_seen_at < now() - make_interval(secs => @stale_after_secs::float8))
+RETURNING host_id;

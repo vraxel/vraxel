@@ -13,6 +13,7 @@ import type { Host } from "@/modules/compute/api/types"
 import { hostsDef } from "@/modules/compute/defs"
 import { buildScopedPath } from "@/core/registry/nav-config"
 import { AgentStatusBadge } from "@/modules/compute/components/agent-status-badge"
+import { useHostWatch } from "@/modules/compute/use-host-watch"
 
 export default function HostListPage() {
   const { t } = useTranslation()
@@ -29,6 +30,9 @@ export default function HostListPage() {
     scope,
     filterKeys: ["agentStatus"],
   })
+  // Agents come and go without anyone touching this page, and a machine
+  // running the install script adds itself to this list.
+  useHostWatch(scope)
 
   // Links stay inside the current scope; a detail page reached from a
   // workspace list must keep that workspace in its URL.

@@ -121,11 +121,12 @@ func (q *Queries) CreateHost(ctx context.Context, arg CreateHostParams) (int64, 
 	return id, err
 }
 
-const deleteHost = `-- name: DeleteHost :execrows
+const deleteHost = `-- name: DeleteHost :one
 DELETE FROM hosts
 WHERE id = $1
   AND ($2::BIGINT IS NULL OR workspace_id IS NOT DISTINCT FROM $2::BIGINT)
   AND ($3::BIGINT IS NULL OR namespace_id IS NOT DISTINCT FROM $3::BIGINT)
+RETURNING scope, workspace_id, namespace_id
 `
 
 type DeleteHostParams struct {
@@ -134,13 +135,23 @@ type DeleteHostParams struct {
 	NamespaceIDFilter *int64 `json:"namespace_id_filter"`
 }
 
+type DeleteHostRow struct {
+	Scope       string `json:"scope"`
+	WorkspaceID *int64 `json:"workspace_id"`
+	NamespaceID *int64 `json:"namespace_id"`
+}
+
 // host_agents and any bound join token cascade with the row.
-func (q *Queries) DeleteHost(ctx context.Context, arg DeleteHostParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteHost, arg.ID, arg.WorkspaceIDFilter, arg.NamespaceIDFilter)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+//
+// RETURNING the tenancy is what lets the deletion be announced: the watch
+// event needs a scope to route by, and after this statement there is no
+// row left to read one from. No rows means "not found" here, the same
+// thing zero affected rows used to mean.
+func (q *Queries) DeleteHost(ctx context.Context, arg DeleteHostParams) (DeleteHostRow, error) {
+	row := q.db.QueryRow(ctx, deleteHost, arg.ID, arg.WorkspaceIDFilter, arg.NamespaceIDFilter)
+	var i DeleteHostRow
+	err := row.Scan(&i.Scope, &i.WorkspaceID, &i.NamespaceID)
+	return i, err
 }
 
 const getHostByID = `-- name: GetHostByID :one

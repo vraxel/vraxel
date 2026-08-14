@@ -12,6 +12,7 @@ import { hostsDef } from "@/modules/compute/defs"
 import { buildScopedPath } from "@/core/registry/nav-config"
 import type { ScopeRef } from "@/core/registry/resource"
 import { AgentStatusBadge } from "@/modules/compute/components/agent-status-badge"
+import { useHostWatch } from "@/modules/compute/use-host-watch"
 
 export default function HostDetailPage() {
   const { hostId, workspaceId, namespaceId } = useParams()
@@ -25,6 +26,9 @@ export default function HostDetailPage() {
     enabled: !!hostId,
   })
   const host = query.data ?? null
+  // The agent card is the whole reason this page is worth watching: it
+  // goes online / offline on its own schedule, not on the operator's.
+  useHostWatch(scope)
 
   if (query.isPending) {
     return (

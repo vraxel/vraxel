@@ -17,6 +17,7 @@ import (
 	"vraxel.io/vraxel/lib/oidc"
 	"vraxel.io/vraxel/lib/pgnotify"
 	"vraxel.io/vraxel/lib/rest/filters"
+	"vraxel.io/vraxel/lib/statushub"
 	"vraxel.io/vraxel/pkg/apis/agentgw"
 	"vraxel.io/vraxel/pkg/apis/audit"
 	"vraxel.io/vraxel/pkg/apis/compute"
@@ -88,9 +89,14 @@ func NewModules(ctx context.Context, database *db.DB, listenAddr string) Result 
 		ListenAddr:    listenAddr,
 	})
 
+	// Host watch: cross-instance host / agent-status events onto this
+	// instance's WebSocket subscribers. Subscribes on mux, so it has to be
+	// built before main calls Start.
+	computeResult := compute.NewModule(ctx, database, mux)
+
 	return Result{
 		Mux:                  mux,
-		Registrars:           moduleRegistrars(database, config.Get().Server.ExternalURL),
+		Registrars:           moduleRegistrars(database, config.Get().Server.ExternalURL, computeResult.Hub),
 		AgentProtocolHandler: agentgwResult.ProtocolHandler,
 		InstallScriptHandler: agentgwResult.InstallScriptHandler,
 		iamResult:            iamResult,
@@ -100,11 +106,11 @@ func NewModules(ctx context.Context, database *db.DB, listenAddr string) Result 
 // moduleRegistrars is the single list of modules. Both the running
 // server and openapi-gen go through it, so a module cannot be wired
 // into one and forgotten in the other.
-func moduleRegistrars(database *db.DB, serverURL string) []func(*apiserver.Server) {
+func moduleRegistrars(database *db.DB, serverURL string, hostWatch *statushub.Hub) []func(*apiserver.Server) {
 	return []func(*apiserver.Server){
 		iam.Registrar(database),
 		audit.Registrar(database),
-		compute.Registrar(database, serverURL),
+		compute.Registrar(database, serverURL, hostWatch),
 	}
 }
 
@@ -113,8 +119,10 @@ func moduleRegistrars(database *db.DB, serverURL string) []func(*apiserver.Serve
 // the real route table and nothing else -- the input openapi-gen needs
 // to describe exactly the endpoints that exist.
 // The empty serverURL is correct here: openapi-gen describes routes and
-// schemas, and no response body is produced.
-func Registrars() []func(*apiserver.Server) { return moduleRegistrars(nil, "") }
+// schemas, and no response body is produced. The hub is real but
+// unattached -- nothing publishes to it and no client subscribes, which
+// is cheaper than teaching every route to tolerate a nil one.
+func Registrars() []func(*apiserver.Server) { return moduleRegistrars(nil, "", statushub.New()) }
 
 // NewAuthorizer creates a fully-wired Authorizer from API group definitions.
 // Subscribes RBAC invalidation on the shared multiplexer -- the LAST
