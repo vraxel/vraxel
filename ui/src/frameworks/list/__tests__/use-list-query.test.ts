@@ -36,7 +36,9 @@ describe("useListQuery", () => {
     const api = fakeApi(seen)
     const { result } = renderHook(
       () => useListQuery<Row>({ def, api, scope: {}, filterKeys: ["status"] }),
-      { wrapper: wrapper(["/?page=3&pageSize=50&sortBy=name&sortOrder=asc&q=db&status=active"]) },
+      {
+        wrapper: wrapper(["/?page=3&page_size=50&sort_by=name&sort_order=asc&q=db&status=active"]),
+      },
     )
     await waitFor(() => expect(result.current.rows.length).toBe(1))
     expect(result.current.page).toBe(3)
@@ -44,12 +46,14 @@ describe("useListQuery", () => {
     expect(result.current.sortBy).toBe("name")
     expect(result.current.sortOrder).toBe("asc")
     expect(result.current.search).toBe("db")
-    expect(result.current.filters.status).toBe("active")
+    // A filter holds a SET: the column headers are multi-select, and one
+    // URL value carries several choices as a comma-separated list.
+    expect([...result.current.filters.status]).toEqual(["active"])
     expect(seen.at(-1)?.params).toMatchObject({
       page: 3,
-      pageSize: 50,
-      sortBy: "name",
-      sortOrder: "asc",
+      page_size: 50,
+      sort_by: "name",
+      sort_order: "asc",
       search: "db",
       status: "active",
     })
@@ -63,9 +67,11 @@ describe("useListQuery", () => {
       { wrapper: wrapper(["/?page=5"]) },
     )
     await waitFor(() => expect(result.current.rows.length).toBe(1))
-    act(() => result.current.setFilter("status", "active"))
+    act(() => result.current.setFilter("status", new Set(["active", "pending"])))
     await waitFor(() => expect(result.current.page).toBe(1))
-    expect(result.current.filters.status).toBe("active")
+    // Sorted, so the URL a filter produces does not depend on the order
+    // the operator ticked the boxes.
+    expect([...result.current.filters.status]).toEqual(["active", "pending"])
   })
 
   it("sort toggles asc<->desc on the same field, resets to asc on a new field", async () => {
@@ -79,7 +85,7 @@ describe("useListQuery", () => {
           defaultSortBy: "created_at",
           defaultSortOrder: "desc",
         }),
-      { wrapper: wrapper(["/?sortBy=name&sortOrder=asc"]) },
+      { wrapper: wrapper(["/?sort_by=name&sort_order=asc"]) },
     )
     await waitFor(() => expect(result.current.rows.length).toBe(1))
     act(() => result.current.handleSort("name"))

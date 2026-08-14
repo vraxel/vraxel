@@ -23,13 +23,7 @@ interface Props {
   className?: string
 }
 
-export function StatusFilter({
-  selected,
-  onChange,
-  options,
-  allLabel,
-  className,
-}: Props) {
+export function StatusFilter({ selected, onChange, options, allLabel, className }: Props) {
   const { t } = useTranslation()
   const isFiltered = selected.size > 0 && selected.size < options.length
 
@@ -43,21 +37,26 @@ export function StatusFilter({
   }
 
   const label = isFiltered
-    ? options.filter((o) => selected.has(o.value)).map((o) => o.label).join(", ")
-    : allLabel ?? t("common.all")
+    ? options
+        .filter((o) => selected.has(o.value))
+        .map((o) => o.label)
+        .join(", ")
+    : (allLabel ?? t("common.all"))
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm" className={className}>
-          <Filter className={isFiltered ? "fill-primary text-primary h-3 w-3" : "text-muted-foreground h-3 w-3"} />
+          <Filter
+            className={
+              isFiltered ? "fill-primary text-primary h-3 w-3" : "text-muted-foreground h-3 w-3"
+            }
+          />
           <span className="max-w-32 truncate">{label}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
-        <DropdownMenuItem onClick={selectAll}>
-          {allLabel ?? t("common.all")}
-        </DropdownMenuItem>
+        <DropdownMenuItem onClick={selectAll}>{allLabel ?? t("common.all")}</DropdownMenuItem>
         <DropdownMenuSeparator />
         {options.map((opt) => (
           <DropdownMenuCheckboxItem

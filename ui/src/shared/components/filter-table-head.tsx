@@ -73,17 +73,13 @@ export function FilterTableHead<T extends string = string>({
             >
               <Filter
                 className={
-                  isFiltered
-                    ? "fill-primary text-primary h-3 w-3"
-                    : "text-muted-foreground h-3 w-3"
+                  isFiltered ? "fill-primary text-primary h-3 w-3" : "text-muted-foreground h-3 w-3"
                 }
               />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
-            <DropdownMenuItem onClick={selectAll}>
-              {allLabel ?? t("common.all")}
-            </DropdownMenuItem>
+            <DropdownMenuItem onClick={selectAll}>{allLabel ?? t("common.all")}</DropdownMenuItem>
             <DropdownMenuSeparator />
             {options.map((opt) => (
               <DropdownMenuCheckboxItem

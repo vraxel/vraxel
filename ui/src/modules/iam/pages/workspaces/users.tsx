@@ -84,7 +84,12 @@ export default function WorkspaceUsersPage() {
       statusFilter,
     ],
     queryFn: () => {
-      const params: ListParams = { page, page_size: pageSize, sort_by: sortBy, sort_order: sortOrder }
+      const params: ListParams = {
+        page,
+        page_size: pageSize,
+        sort_by: sortBy,
+        sort_order: sortOrder,
+      }
       if (search) params.search = search
       if (statusFilter !== "all") params.status = statusFilter
       return listWorkspaceUsers(workspaceId, params)

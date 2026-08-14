@@ -87,7 +87,12 @@ export default function WorkspaceNamespacesPage() {
       visibilityFilter,
     ],
     queryFn: () => {
-      const params: ListParams = { page, page_size: pageSize, sort_by: sortBy, sort_order: sortOrder }
+      const params: ListParams = {
+        page,
+        page_size: pageSize,
+        sort_by: sortBy,
+        sort_order: sortOrder,
+      }
       if (search) params.search = search
       if (statusFilter !== "all") params.status = statusFilter
       if (visibilityFilter !== "all") params.visibility = visibilityFilter

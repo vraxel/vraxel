@@ -105,14 +105,18 @@ export default function HostListPage() {
           return (
             <div className="min-w-0">
               <div className="truncate text-sm">{h.spec.namespaceName || "-"}</div>
-              <div className="text-muted-foreground truncate text-xs">{h.spec.workspaceName || "-"}</div>
+              <div className="text-muted-foreground truncate text-xs">
+                {h.spec.workspaceName || "-"}
+              </div>
             </div>
           )
         }
         if (h.spec.scope === "workspace") {
           return <span className="text-sm">{h.spec.workspaceName || "-"}</span>
         }
-        return <span className="text-muted-foreground text-sm">{t("compute.host.scopePlatform")}</span>
+        return (
+          <span className="text-muted-foreground text-sm">{t("compute.host.scopePlatform")}</span>
+        )
       },
     },
     {
