@@ -17,7 +17,7 @@ export function SortIcon({
 }) {
   if (sortBy !== field) {
     return (
-      <ArrowUpDown className="text-muted-foreground/40 ml-1 inline h-3 w-3" />
+      <ArrowUpDown className="text-muted-foreground ml-1 inline h-3 w-3" />
     )
   }
   return sortOrder === "asc" ? (
