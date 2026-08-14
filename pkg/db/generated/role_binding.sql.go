@@ -85,7 +85,7 @@ WITH members AS (
 SELECT count(*)
 FROM members m
 JOIN users u ON u.id = m.user_id
-WHERE ($1::VARCHAR IS NULL OR u.status = $1)
+WHERE ($1::VARCHAR IS NULL OR u.status = ANY(string_to_array($1::VARCHAR, ',')))
   AND ($2::VARCHAR IS NULL OR (
        u.username ILIKE '%' || $2 || '%'
        OR u.display_name ILIKE '%' || $2 || '%'
@@ -114,7 +114,7 @@ WHERE u.id NOT IN (
     SELECT rb.user_id FROM role_bindings rb
     WHERE rb.scope = 'namespace' AND rb.namespace_id = $1
 )
-  AND ($2::VARCHAR IS NULL OR u.status = $2)
+  AND ($2::VARCHAR IS NULL OR u.status = ANY(string_to_array($2::VARCHAR, ',')))
   AND ($3::VARCHAR IS NULL OR (
        u.username ILIKE '%' || $3 || '%'
        OR u.display_name ILIKE '%' || $3 || '%'
@@ -305,7 +305,7 @@ WITH user_ns AS (
 SELECT count(*)
 FROM user_ns un
 JOIN namespaces ns ON ns.id = un.namespace_id
-WHERE ($1::VARCHAR IS NULL OR ns.status = $1)
+WHERE ($1::VARCHAR IS NULL OR ns.status = ANY(string_to_array($1::VARCHAR, ',')))
   AND ($2::VARCHAR IS NULL OR ns.visibility = $2)
   AND ($3::BIGINT IS NULL OR ns.workspace_id = $3)
   AND ($4::VARCHAR IS NULL OR (
@@ -351,7 +351,7 @@ WITH user_ws AS (
 SELECT count(*)
 FROM user_ws uw
 JOIN workspaces ws ON ws.id = uw.workspace_id
-WHERE ($1::VARCHAR IS NULL OR ws.status = $1)
+WHERE ($1::VARCHAR IS NULL OR ws.status = ANY(string_to_array($1::VARCHAR, ',')))
   AND ($2::VARCHAR IS NULL OR (
        ws.name ILIKE '%' || $2 || '%'
        OR ws.display_name ILIKE '%' || $2 || '%'
@@ -384,7 +384,7 @@ WITH members AS (
 SELECT count(*)
 FROM members m
 JOIN users u ON u.id = m.user_id
-WHERE ($1::VARCHAR IS NULL OR u.status = $1)
+WHERE ($1::VARCHAR IS NULL OR u.status = ANY(string_to_array($1::VARCHAR, ',')))
   AND ($2::VARCHAR IS NULL OR (
        u.username ILIKE '%' || $2 || '%'
        OR u.display_name ILIKE '%' || $2 || '%'
@@ -414,7 +414,7 @@ WHERE u.id NOT IN (
     SELECT rb.user_id FROM role_bindings rb
     WHERE rb.scope = 'workspace' AND rb.workspace_id = $1
 )
-  AND ($2::VARCHAR IS NULL OR u.status = $2)
+  AND ($2::VARCHAR IS NULL OR u.status = ANY(string_to_array($2::VARCHAR, ',')))
   AND ($3::VARCHAR IS NULL OR (
        u.username ILIKE '%' || $3 || '%'
        OR u.display_name ILIKE '%' || $3 || '%'
@@ -993,7 +993,7 @@ SELECT u.id, u.username, u.email, u.display_name, u.phone, u.avatar_url, u.statu
        m.role_names, m.joined_at
 FROM members m
 JOIN users u ON u.id = m.user_id
-WHERE ($1::VARCHAR IS NULL OR u.status = $1)
+WHERE ($1::VARCHAR IS NULL OR u.status = ANY(string_to_array($1::VARCHAR, ',')))
   AND ($2::VARCHAR IS NULL OR (
        u.username ILIKE '%' || $2 || '%'
        OR u.display_name ILIKE '%' || $2 || '%'
@@ -1094,7 +1094,7 @@ WHERE u.id NOT IN (
     SELECT rb.user_id FROM role_bindings rb
     WHERE rb.scope = 'namespace' AND rb.namespace_id = $1
 )
-  AND ($2::VARCHAR IS NULL OR u.status = $2)
+  AND ($2::VARCHAR IS NULL OR u.status = ANY(string_to_array($2::VARCHAR, ',')))
   AND ($3::VARCHAR IS NULL OR (
        u.username ILIKE '%' || $3 || '%'
        OR u.display_name ILIKE '%' || $3 || '%'
@@ -1609,7 +1609,7 @@ FROM user_ns un
 JOIN namespaces ns ON ns.id = un.namespace_id
 JOIN users u ON ns.owner_id = u.id
 JOIN workspaces w ON ns.workspace_id = w.id
-WHERE ($1::VARCHAR IS NULL OR ns.status = $1)
+WHERE ($1::VARCHAR IS NULL OR ns.status = ANY(string_to_array($1::VARCHAR, ',')))
   AND ($2::VARCHAR IS NULL OR ns.visibility = $2)
   AND ($3::BIGINT IS NULL OR ns.workspace_id = $3)
   AND ($4::VARCHAR IS NULL OR (
@@ -1741,7 +1741,7 @@ SELECT ws.id, ws.name, ws.display_name, ws.description, ws.owner_id, ws.status,
 FROM user_ws uw
 JOIN workspaces ws ON ws.id = uw.workspace_id
 JOIN users u ON ws.owner_id = u.id
-WHERE ($1::VARCHAR IS NULL OR ws.status = $1)
+WHERE ($1::VARCHAR IS NULL OR ws.status = ANY(string_to_array($1::VARCHAR, ',')))
   AND ($2::VARCHAR IS NULL OR (
        ws.name ILIKE '%' || $2 || '%'
        OR ws.display_name ILIKE '%' || $2 || '%'
@@ -1858,7 +1858,7 @@ SELECT u.id, u.username, u.email, u.display_name, u.phone, u.avatar_url, u.statu
        m.role_names, m.joined_at
 FROM members m
 JOIN users u ON u.id = m.user_id
-WHERE ($1::VARCHAR IS NULL OR u.status = $1)
+WHERE ($1::VARCHAR IS NULL OR u.status = ANY(string_to_array($1::VARCHAR, ',')))
   AND ($2::VARCHAR IS NULL OR (
        u.username ILIKE '%' || $2 || '%'
        OR u.display_name ILIKE '%' || $2 || '%'
@@ -1959,7 +1959,7 @@ WHERE u.id NOT IN (
     SELECT rb.user_id FROM role_bindings rb
     WHERE rb.scope = 'workspace' AND rb.workspace_id = $1
 )
-  AND ($2::VARCHAR IS NULL OR u.status = $2)
+  AND ($2::VARCHAR IS NULL OR u.status = ANY(string_to_array($2::VARCHAR, ',')))
   AND ($3::VARCHAR IS NULL OR (
        u.username ILIKE '%' || $3 || '%'
        OR u.display_name ILIKE '%' || $3 || '%'

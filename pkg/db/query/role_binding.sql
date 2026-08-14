@@ -271,7 +271,7 @@ WITH members AS (
 SELECT count(*)
 FROM members m
 JOIN users u ON u.id = m.user_id
-WHERE (sqlc.narg('status')::VARCHAR IS NULL OR u.status = sqlc.narg('status'))
+WHERE (sqlc.narg('status')::VARCHAR IS NULL OR u.status = ANY(string_to_array(sqlc.narg('status')::VARCHAR, ',')))
   AND (sqlc.narg('search')::VARCHAR IS NULL OR (
        u.username ILIKE '%' || sqlc.narg('search') || '%'
        OR u.display_name ILIKE '%' || sqlc.narg('search') || '%'
@@ -297,7 +297,7 @@ SELECT u.id, u.username, u.email, u.display_name, u.phone, u.avatar_url, u.statu
        m.role_names, m.joined_at
 FROM members m
 JOIN users u ON u.id = m.user_id
-WHERE (sqlc.narg('status')::VARCHAR IS NULL OR u.status = sqlc.narg('status'))
+WHERE (sqlc.narg('status')::VARCHAR IS NULL OR u.status = ANY(string_to_array(sqlc.narg('status')::VARCHAR, ',')))
   AND (sqlc.narg('search')::VARCHAR IS NULL OR (
        u.username ILIKE '%' || sqlc.narg('search') || '%'
        OR u.display_name ILIKE '%' || sqlc.narg('search') || '%'
@@ -333,7 +333,7 @@ WITH members AS (
 SELECT count(*)
 FROM members m
 JOIN users u ON u.id = m.user_id
-WHERE (sqlc.narg('status')::VARCHAR IS NULL OR u.status = sqlc.narg('status'))
+WHERE (sqlc.narg('status')::VARCHAR IS NULL OR u.status = ANY(string_to_array(sqlc.narg('status')::VARCHAR, ',')))
   AND (sqlc.narg('search')::VARCHAR IS NULL OR (
        u.username ILIKE '%' || sqlc.narg('search') || '%'
        OR u.display_name ILIKE '%' || sqlc.narg('search') || '%'
@@ -358,7 +358,7 @@ SELECT u.id, u.username, u.email, u.display_name, u.phone, u.avatar_url, u.statu
        m.role_names, m.joined_at
 FROM members m
 JOIN users u ON u.id = m.user_id
-WHERE (sqlc.narg('status')::VARCHAR IS NULL OR u.status = sqlc.narg('status'))
+WHERE (sqlc.narg('status')::VARCHAR IS NULL OR u.status = ANY(string_to_array(sqlc.narg('status')::VARCHAR, ',')))
   AND (sqlc.narg('search')::VARCHAR IS NULL OR (
        u.username ILIKE '%' || sqlc.narg('search') || '%'
        OR u.display_name ILIKE '%' || sqlc.narg('search') || '%'
@@ -398,7 +398,7 @@ WITH user_ws AS (
 SELECT count(*)
 FROM user_ws uw
 JOIN workspaces ws ON ws.id = uw.workspace_id
-WHERE (sqlc.narg('status')::VARCHAR IS NULL OR ws.status = sqlc.narg('status'))
+WHERE (sqlc.narg('status')::VARCHAR IS NULL OR ws.status = ANY(string_to_array(sqlc.narg('status')::VARCHAR, ',')))
   AND (sqlc.narg('search')::VARCHAR IS NULL OR (
        ws.name ILIKE '%' || sqlc.narg('search') || '%'
        OR ws.display_name ILIKE '%' || sqlc.narg('search') || '%'
@@ -429,7 +429,7 @@ SELECT ws.id, ws.name, ws.display_name, ws.description, ws.owner_id, ws.status,
 FROM user_ws uw
 JOIN workspaces ws ON ws.id = uw.workspace_id
 JOIN users u ON ws.owner_id = u.id
-WHERE (sqlc.narg('status')::VARCHAR IS NULL OR ws.status = sqlc.narg('status'))
+WHERE (sqlc.narg('status')::VARCHAR IS NULL OR ws.status = ANY(string_to_array(sqlc.narg('status')::VARCHAR, ',')))
   AND (sqlc.narg('search')::VARCHAR IS NULL OR (
        ws.name ILIKE '%' || sqlc.narg('search') || '%'
        OR ws.display_name ILIKE '%' || sqlc.narg('search') || '%'
@@ -471,7 +471,7 @@ WITH user_ns AS (
 SELECT count(*)
 FROM user_ns un
 JOIN namespaces ns ON ns.id = un.namespace_id
-WHERE (sqlc.narg('status')::VARCHAR IS NULL OR ns.status = sqlc.narg('status'))
+WHERE (sqlc.narg('status')::VARCHAR IS NULL OR ns.status = ANY(string_to_array(sqlc.narg('status')::VARCHAR, ',')))
   AND (sqlc.narg('visibility')::VARCHAR IS NULL OR ns.visibility = sqlc.narg('visibility'))
   AND (sqlc.narg('workspace_id')::BIGINT IS NULL OR ns.workspace_id = sqlc.narg('workspace_id'))
   AND (sqlc.narg('search')::VARCHAR IS NULL OR (
@@ -504,7 +504,7 @@ FROM user_ns un
 JOIN namespaces ns ON ns.id = un.namespace_id
 JOIN users u ON ns.owner_id = u.id
 JOIN workspaces w ON ns.workspace_id = w.id
-WHERE (sqlc.narg('status')::VARCHAR IS NULL OR ns.status = sqlc.narg('status'))
+WHERE (sqlc.narg('status')::VARCHAR IS NULL OR ns.status = ANY(string_to_array(sqlc.narg('status')::VARCHAR, ',')))
   AND (sqlc.narg('visibility')::VARCHAR IS NULL OR ns.visibility = sqlc.narg('visibility'))
   AND (sqlc.narg('workspace_id')::BIGINT IS NULL OR ns.workspace_id = sqlc.narg('workspace_id'))
   AND (sqlc.narg('search')::VARCHAR IS NULL OR (
@@ -619,7 +619,7 @@ WHERE u.id NOT IN (
     SELECT rb.user_id FROM role_bindings rb
     WHERE rb.scope = 'workspace' AND rb.workspace_id = @workspace_id
 )
-  AND (sqlc.narg('status')::VARCHAR IS NULL OR u.status = sqlc.narg('status'))
+  AND (sqlc.narg('status')::VARCHAR IS NULL OR u.status = ANY(string_to_array(sqlc.narg('status')::VARCHAR, ',')))
   AND (sqlc.narg('search')::VARCHAR IS NULL OR (
        u.username ILIKE '%' || sqlc.narg('search') || '%'
        OR u.display_name ILIKE '%' || sqlc.narg('search') || '%'
@@ -635,7 +635,7 @@ WHERE u.id NOT IN (
     SELECT rb.user_id FROM role_bindings rb
     WHERE rb.scope = 'workspace' AND rb.workspace_id = @workspace_id
 )
-  AND (sqlc.narg('status')::VARCHAR IS NULL OR u.status = sqlc.narg('status'))
+  AND (sqlc.narg('status')::VARCHAR IS NULL OR u.status = ANY(string_to_array(sqlc.narg('status')::VARCHAR, ',')))
   AND (sqlc.narg('search')::VARCHAR IS NULL OR (
        u.username ILIKE '%' || sqlc.narg('search') || '%'
        OR u.display_name ILIKE '%' || sqlc.narg('search') || '%'
@@ -668,7 +668,7 @@ WHERE u.id NOT IN (
     SELECT rb.user_id FROM role_bindings rb
     WHERE rb.scope = 'namespace' AND rb.namespace_id = @namespace_id
 )
-  AND (sqlc.narg('status')::VARCHAR IS NULL OR u.status = sqlc.narg('status'))
+  AND (sqlc.narg('status')::VARCHAR IS NULL OR u.status = ANY(string_to_array(sqlc.narg('status')::VARCHAR, ',')))
   AND (sqlc.narg('search')::VARCHAR IS NULL OR (
        u.username ILIKE '%' || sqlc.narg('search') || '%'
        OR u.display_name ILIKE '%' || sqlc.narg('search') || '%'
@@ -684,7 +684,7 @@ WHERE u.id NOT IN (
     SELECT rb.user_id FROM role_bindings rb
     WHERE rb.scope = 'namespace' AND rb.namespace_id = @namespace_id
 )
-  AND (sqlc.narg('status')::VARCHAR IS NULL OR u.status = sqlc.narg('status'))
+  AND (sqlc.narg('status')::VARCHAR IS NULL OR u.status = ANY(string_to_array(sqlc.narg('status')::VARCHAR, ',')))
   AND (sqlc.narg('search')::VARCHAR IS NULL OR (
        u.username ILIKE '%' || sqlc.narg('search') || '%'
        OR u.display_name ILIKE '%' || sqlc.narg('search') || '%'

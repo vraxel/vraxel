@@ -139,6 +139,7 @@ export function ResourceListPage<T extends ListRow>({
                 // avoids the double "全部" and preserves the custom wording.
                 const allOpt = col.filter?.find((o) => o.value === "all")
                 const opts = col.filter?.filter((o) => o.value !== "all") ?? []
+                const fk = col.filterKey ?? col.key
                 return col.filter ? (
                   <FilterTableHead
                     key={col.key}
@@ -146,8 +147,8 @@ export function ResourceListPage<T extends ListRow>({
                     sortBy={query.sortBy}
                     sortOrder={query.sortOrder}
                     onSort={query.handleSort}
-                    filterValue={query.filters[col.filterKey ?? col.key] ?? "all"}
-                    onFilterChange={(v) => query.setFilter(col.filterKey ?? col.key, v)}
+                    selected={query.filters[fk] ?? new Set()}
+                    onChange={(v) => query.setFilter(fk, v)}
                     options={opts}
                     allLabel={allOpt?.label}
                     hideSort={!col.sortable}

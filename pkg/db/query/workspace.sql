@@ -46,7 +46,7 @@ SELECT count(ws.id)
 FROM workspaces ws
 WHERE
     (sqlc.narg('accessible_ids')::BIGINT[] IS NULL OR ws.id = ANY(sqlc.narg('accessible_ids')::BIGINT[]))
-    AND (sqlc.narg('status')::VARCHAR IS NULL OR ws.status = sqlc.narg('status'))
+    AND (sqlc.narg('status')::VARCHAR IS NULL OR ws.status = ANY(string_to_array(sqlc.narg('status')::VARCHAR, ',')))
     AND (sqlc.narg('name')::VARCHAR IS NULL OR ws.name ILIKE '%' || sqlc.narg('name') || '%')
     AND (sqlc.narg('owner_id')::BIGINT IS NULL OR ws.owner_id = sqlc.narg('owner_id'))
     AND (sqlc.narg('search')::VARCHAR IS NULL
@@ -68,7 +68,7 @@ WITH ws_data AS (
     LEFT JOIN users cu ON cu.id = ws.created_by
     WHERE
         (sqlc.narg('accessible_ids')::BIGINT[] IS NULL OR ws.id = ANY(sqlc.narg('accessible_ids')::BIGINT[]))
-        AND (sqlc.narg('status')::VARCHAR IS NULL OR ws.status = sqlc.narg('status'))
+        AND (sqlc.narg('status')::VARCHAR IS NULL OR ws.status = ANY(string_to_array(sqlc.narg('status')::VARCHAR, ',')))
         AND (sqlc.narg('name')::VARCHAR IS NULL OR ws.name ILIKE '%' || sqlc.narg('name') || '%')
         AND (sqlc.narg('owner_id')::BIGINT IS NULL OR ws.owner_id = sqlc.narg('owner_id'))
         AND (sqlc.narg('search')::VARCHAR IS NULL

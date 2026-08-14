@@ -14,7 +14,7 @@ const countUsers = `-- name: CountUsers :one
 SELECT count(id)
 FROM users
 WHERE
-    ($1::VARCHAR IS NULL OR status = $1)
+    ($1::VARCHAR IS NULL OR status = ANY(string_to_array($1::VARCHAR, ',')))
     AND ($2::VARCHAR IS NULL OR (
         username ILIKE '%' || $2 || '%'
         OR email ILIKE '%' || $2 || '%'
@@ -347,7 +347,7 @@ FROM users u
 LEFT JOIN role_bindings rb ON u.id = rb.user_id AND rb.scope = 'namespace'
 LEFT JOIN namespaces n ON rb.namespace_id = n.id
 WHERE
-    ($1::VARCHAR IS NULL OR u.status = $1)
+    ($1::VARCHAR IS NULL OR u.status = ANY(string_to_array($1::VARCHAR, ',')))
     AND ($2::VARCHAR IS NULL OR (
         u.username ILIKE '%' || $2 || '%'
         OR u.email ILIKE '%' || $2 || '%'

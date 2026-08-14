@@ -1,4 +1,13 @@
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select"
+import { Filter } from "lucide-react"
+import { Button } from "@/shared/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/shared/ui/dropdown-menu"
 import { useTranslation } from "@/i18n"
 
 export interface StatusFilterOption {
@@ -7,47 +16,60 @@ export interface StatusFilterOption {
 }
 
 interface Props {
-  /** Current value, "all" when unset. */
-  value: string
-  onChange: (value: string) => void
+  selected: Set<string>
+  onChange: (next: Set<string>) => void
   options: StatusFilterOption[]
-  /** Label for the "no filter" entry; defaults to common.all. */
   allLabel?: string
-  placeholder?: string
   className?: string
 }
 
-/**
- * The toolbar dropdown a status filter moves to once its column has been
- * folded into the name cell.
- *
- * It cannot stay on the name column's header: FilterTableHead renders the
- * filter next to that header's text, so a status filter there would read
- * as filtering by name. The toolbar is where a filter with no column of
- * its own belongs.
- */
 export function StatusFilter({
-  value,
+  selected,
   onChange,
   options,
   allLabel,
-  placeholder,
-  className = "h-9 w-40",
+  className,
 }: Props) {
   const { t } = useTranslation()
+  const isFiltered = selected.size > 0 && selected.size < options.length
+
+  const selectAll = () => onChange(new Set(options.map((o) => o.value)))
+  const toggle = (value: string) => {
+    const next = new Set(selected)
+    if (next.has(value)) next.delete(value)
+    else next.add(value)
+    if (next.size === 0) return selectAll()
+    onChange(next)
+  }
+
+  const label = isFiltered
+    ? options.filter((o) => selected.has(o.value)).map((o) => o.label).join(", ")
+    : allLabel ?? t("common.all")
+
   return (
-    <Select value={value || "all"} onValueChange={onChange}>
-      <SelectTrigger className={className}>
-        <SelectValue placeholder={placeholder ?? t("common.status")} />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="all">{allLabel ?? t("common.all")}</SelectItem>
-        {options.map((o) => (
-          <SelectItem key={o.value} value={o.value}>
-            {o.label}
-          </SelectItem>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className={className}>
+          <Filter className={isFiltered ? "fill-primary text-primary h-3 w-3" : "text-muted-foreground h-3 w-3"} />
+          <span className="max-w-32 truncate">{label}</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        <DropdownMenuItem onClick={selectAll}>
+          {allLabel ?? t("common.all")}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        {options.map((opt) => (
+          <DropdownMenuCheckboxItem
+            key={opt.value}
+            checked={selected.has(opt.value)}
+            onSelect={(e) => e.preventDefault()}
+            onCheckedChange={() => toggle(opt.value)}
+          >
+            {opt.label}
+          </DropdownMenuCheckboxItem>
         ))}
-      </SelectContent>
-    </Select>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

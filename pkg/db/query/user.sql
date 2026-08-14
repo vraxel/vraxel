@@ -52,7 +52,7 @@ DELETE FROM users WHERE id = @id AND NOT builtin;
 SELECT count(id)
 FROM users
 WHERE
-    (sqlc.narg('status')::VARCHAR IS NULL OR status = sqlc.narg('status'))
+    (sqlc.narg('status')::VARCHAR IS NULL OR status = ANY(string_to_array(sqlc.narg('status')::VARCHAR, ',')))
     AND (sqlc.narg('search')::VARCHAR IS NULL OR (
         username ILIKE '%' || sqlc.narg('search') || '%'
         OR email ILIKE '%' || sqlc.narg('search') || '%'
@@ -72,7 +72,7 @@ FROM users u
 LEFT JOIN role_bindings rb ON u.id = rb.user_id AND rb.scope = 'namespace'
 LEFT JOIN namespaces n ON rb.namespace_id = n.id
 WHERE
-    (sqlc.narg('status')::VARCHAR IS NULL OR u.status = sqlc.narg('status'))
+    (sqlc.narg('status')::VARCHAR IS NULL OR u.status = ANY(string_to_array(sqlc.narg('status')::VARCHAR, ',')))
     AND (sqlc.narg('search')::VARCHAR IS NULL OR (
         u.username ILIKE '%' || sqlc.narg('search') || '%'
         OR u.email ILIKE '%' || sqlc.narg('search') || '%'
