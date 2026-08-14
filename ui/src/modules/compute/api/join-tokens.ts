@@ -18,8 +18,9 @@ function delay<T>(value: T): Promise<T> {
 export interface CreateJoinTokenInput {
   /** Free-text label, for the pending-token list only. */
   name?: string
-  /** Reserves the host name for whoever redeems this token. */
-  hostName?: string
+  /** Binds the token to a host that already exists: the agent that
+   *  redeems it adopts that row instead of creating a second one. */
+  targetHostId?: string
 }
 
 export const joinTokensApi = {
@@ -45,10 +46,11 @@ export async function createJoinToken(
     },
     spec: {
       scope: "platform",
-      hostName: input.hostName,
-      // A token that reserves a name is pinned to one use: one name, one
-      // machine. Without a name it is still one-use by default; max uses
-      // only becomes a control when batch onboarding lands.
+      targetHostId: input.targetHostId,
+      targetHostName: input.targetHostId ? input.name : undefined,
+      // A token bound to a host is pinned to one use: one host, one
+      // machine. Unbound it is still one-use by default; max uses only
+      // becomes a control when batch onboarding lands.
       maxUses: 1,
       usedCount: 0,
       ttlHours: 24,

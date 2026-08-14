@@ -61,10 +61,12 @@ export function PendingTokensSheet({ open, onOpenChange, scope }: Props) {
                   <p className="truncate text-sm font-medium">
                     {tok.metadata.name || t("compute.token.unnamed")}
                   </p>
-                  {tok.spec.hostName && (
+                  {tok.spec.targetHostName && (
                     <p className="text-muted-foreground mt-0.5 text-xs">
                       {t("compute.token.reserves")}
-                      <span className="text-foreground ml-1 font-medium">{tok.spec.hostName}</span>
+                      <span className="text-foreground ml-1 font-medium">
+                        {tok.spec.targetHostName}
+                      </span>
                     </p>
                   )}
                 </div>

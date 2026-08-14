@@ -119,6 +119,22 @@ export const demoHosts: Host[] = [
       agentConflictAt: minutesAgo(4),
     },
   },
+  {
+    // Imported by hand and still waiting for an agent: a record with no
+    // control channel at all. Present so the list's third status is
+    // reviewable -- "never installed" is not "not answering", and the
+    // import path produces nothing else until someone installs one.
+    metadata: { id: "6", name: "legacy-mail", createdAt: minutesAgo(35) },
+    spec: {
+      displayName: "邮件网关（待接入）",
+      description: "机房 B 遗留机器，先建档",
+      reportedPrimaryIp: "10.3.0.9",
+      sshPort: 22,
+      origin: "manual",
+      scope: "platform",
+      createdByName: "李伟",
+    },
+  },
 ]
 
 export const demoJoinTokens: AgentJoinToken[] = [
@@ -136,7 +152,8 @@ export const demoJoinTokens: AgentJoinToken[] = [
     metadata: { id: "10", name: "", createdAt: minutesAgo(210) },
     spec: {
       scope: "platform",
-      hostName: "cache-02",
+      targetHostId: "6",
+      targetHostName: "legacy-mail",
       maxUses: 1,
       usedCount: 0,
       expiresAt: new Date(now + 20 * 3600_000).toISOString(),

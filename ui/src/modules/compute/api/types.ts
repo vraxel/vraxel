@@ -23,6 +23,13 @@ export interface HostSpec {
   memoryMb?: number
   diskGb?: number
   reportedPrimaryIp?: string
+  // How the record came into existence. Fixed at creation and never
+  // changed afterwards -- distinct from how the control plane reaches
+  // the host today, which does change (an imported host that installs an
+  // agent later has both an SSH address and an agent channel).
+  origin?: "agent" | "manual" | "cloud"
+  // Only meaningful for a record that was not created by an agent.
+  sshPort?: number
   scope?: string
   workspaceId?: string
   namespaceId?: string
@@ -56,10 +63,18 @@ export interface AgentJoinTokenSpec {
   scope?: string
   workspaceId?: string
   namespaceId?: string
-  // Optional host name reserved by this token. When set the registering
-  // agent takes it instead of deriving one from its reported hostname,
-  // and max uses is pinned to 1 -- one name, one machine.
-  hostName?: string
+  // The host this token attaches its agent to, when it has one. Set for
+  // a record that already exists (imported by hand, or provisioned from
+  // a cloud pool): the registering agent adopts that row instead of
+  // creating a second one, and max uses is pinned to 1 -- one host, one
+  // machine. Empty for the agent-onboarding path, where the record does
+  // not exist until the agent brings it into being.
+  //
+  // Binding on id rather than reserving a name: the row is already there
+  // in every case that needs this, so an id says exactly what a
+  // name-shaped placeholder only approximates.
+  targetHostId?: string
+  targetHostName?: string
   maxUses?: number
   usedCount?: number
   ttlHours?: number
