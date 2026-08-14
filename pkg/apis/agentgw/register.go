@@ -10,6 +10,7 @@ import (
 
 	agenttypes "vraxel.io/vraxel/lib/agent/types"
 	apierrors "vraxel.io/vraxel/lib/api/errors"
+	"vraxel.io/vraxel/lib/buildinfo"
 	"vraxel.io/vraxel/lib/logger"
 	gwstore "vraxel.io/vraxel/pkg/apis/agentgw/store"
 )
@@ -208,9 +209,10 @@ func (h *protocolHandler) handleRegister(w http.ResponseWriter, r *http.Request)
 		row.AgentID, hostID, req.Hostname, req.OS, req.Arch, req.DefaultRouteIP, match.Why)
 	h.reportImageGroup(r.Context(), row, now)
 	writeJSON(w, http.StatusOK, agenttypes.RegisterResponse{
-		AgentID:    row.AgentID,
-		HostID:     hostID,
-		AgentToken: agentToken,
+		AgentID:       row.AgentID,
+		HostID:        hostID,
+		AgentToken:    agentToken,
+		ServerVersion: buildinfo.ShortVersion(),
 	})
 }
 

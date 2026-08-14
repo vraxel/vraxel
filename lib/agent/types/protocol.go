@@ -352,4 +352,10 @@ type RegisterResponse struct {
 	AgentID    string `json:"agentId"`
 	HostID     int64  `json:"hostId"`
 	AgentToken string `json:"agentToken"`
+	// ServerVersion is what the operator just onboarded against. Not
+	// persisted and never acted on -- it is here so the install summary
+	// can name both ends of the pairing it just made, which is the one
+	// moment an operator can see them together. An older server omits it
+	// and the summary simply leaves that line out.
+	ServerVersion string `json:"serverVersion,omitempty"`
 }
