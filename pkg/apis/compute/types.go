@@ -44,10 +44,11 @@ type HostSpec struct {
 	IP      string `json:"ip,omitempty"`
 	SSHPort int32  `json:"sshPort,omitempty"`
 
-	Scope       string `json:"scope,omitempty"`
-	WorkspaceID string `json:"workspaceId,omitempty"`
-	NamespaceID string `json:"namespaceId,omitempty"`
-	// CLAUDE.md: any listable resource shows its creator.
+	Scope         string `json:"scope,omitempty"`
+	WorkspaceID   string `json:"workspaceId,omitempty"`
+	NamespaceID   string `json:"namespaceId,omitempty"`
+	WorkspaceName string `json:"workspaceName,omitempty"`
+	NamespaceName string `json:"namespaceName,omitempty"`
 	CreatedByName string `json:"createdByName,omitempty"`
 
 	// --- agent session ---

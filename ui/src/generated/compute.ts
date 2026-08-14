@@ -50,9 +50,8 @@ export interface HostSpec {
   scope?: string;
   workspaceId?: string;
   namespaceId?: string;
-  /**
-   * CLAUDE.md: any listable resource shows its creator.
-   */
+  workspaceName?: string;
+  namespaceName?: string;
   createdByName?: string;
   /**
    * --- agent session ---

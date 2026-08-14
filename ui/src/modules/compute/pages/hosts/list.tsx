@@ -50,7 +50,7 @@ export default function HostListPage() {
     def: hostsDef,
     api: hostsApi,
     scope,
-    filterKeys: ["agent_status"],
+    filterKeys: ["agent_status", "scope"],
   })
   useHostWatch(scope)
 
@@ -88,6 +88,32 @@ export default function HostListPage() {
           }
         />
       ),
+    },
+    {
+      key: "organization",
+      header: t("compute.host.organization"),
+      sortable: true,
+      filterKey: "scope",
+      filter: [
+        { value: "all", label: t("compute.host.scopeAll") },
+        { value: "platform", label: t("compute.host.scopePlatform") },
+        { value: "workspace", label: t("compute.host.scopeWorkspace") },
+        { value: "namespace", label: t("compute.host.scopeNamespace") },
+      ],
+      cell: (h) => {
+        if (h.spec.scope === "namespace") {
+          return (
+            <div className="min-w-0">
+              <div className="truncate text-sm">{h.spec.namespaceName || "-"}</div>
+              <div className="text-muted-foreground truncate text-xs">{h.spec.workspaceName || "-"}</div>
+            </div>
+          )
+        }
+        if (h.spec.scope === "workspace") {
+          return <span className="text-sm">{h.spec.workspaceName || "-"}</span>
+        }
+        return <span className="text-muted-foreground text-sm">{t("compute.host.scopePlatform")}</span>
+      },
     },
     {
       key: "ip",

@@ -36,6 +36,8 @@ RETURNING id;
 -- name: GetHostByID :one
 SELECT h.*,
     COALESCE(NULLIF(u.display_name, ''), u.username, '') AS creator_name,
+    COALESCE(NULLIF(w.display_name, ''), w.name, '') AS workspace_name,
+    COALESCE(NULLIF(ns.display_name, ''), ns.name, '') AS namespace_name,
     a.agent_id       AS agent_id,
     a.status         AS agent_status,
     a.version        AS agent_version,
@@ -44,6 +46,8 @@ SELECT h.*,
     a.conflict_at    AS agent_conflict_at
 FROM hosts h
 LEFT JOIN users u ON u.id = h.created_by
+LEFT JOIN workspaces w ON w.id = h.workspace_id
+LEFT JOIN namespaces ns ON ns.id = h.namespace_id
 LEFT JOIN host_agents a ON a.host_id = h.id
 WHERE h.id = @id
   AND (sqlc.narg('workspace_id_filter')::BIGINT IS NULL OR h.workspace_id IS NOT DISTINCT FROM sqlc.narg('workspace_id_filter')::BIGINT)
@@ -52,6 +56,8 @@ WHERE h.id = @id
 -- name: CountHosts :one
 SELECT count(*)
 FROM hosts h
+LEFT JOIN workspaces w ON w.id = h.workspace_id
+LEFT JOIN namespaces ns ON ns.id = h.namespace_id
 LEFT JOIN host_agents a ON a.host_id = h.id
 WHERE (sqlc.narg('scope')::VARCHAR IS NULL OR h.scope = sqlc.narg('scope'))
   AND (sqlc.narg('workspace_id')::BIGINT IS NULL OR h.workspace_id = sqlc.narg('workspace_id'))
@@ -71,11 +77,17 @@ WHERE (sqlc.narg('scope')::VARCHAR IS NULL OR h.scope = sqlc.narg('scope'))
        OR h.os ILIKE '%' || sqlc.narg('search')::VARCHAR || '%'
        OR h.arch ILIKE '%' || sqlc.narg('search')::VARCHAR || '%'
        OR CAST(h.cpu_cores AS TEXT) = sqlc.narg('search')::VARCHAR
-       OR CAST(h.memory_mb AS TEXT) = sqlc.narg('search')::VARCHAR);
+       OR CAST(h.memory_mb AS TEXT) = sqlc.narg('search')::VARCHAR
+       OR COALESCE(w.name, '') ILIKE '%' || sqlc.narg('search')::VARCHAR || '%'
+       OR COALESCE(w.display_name, '') ILIKE '%' || sqlc.narg('search')::VARCHAR || '%'
+       OR COALESCE(ns.name, '') ILIKE '%' || sqlc.narg('search')::VARCHAR || '%'
+       OR COALESCE(ns.display_name, '') ILIKE '%' || sqlc.narg('search')::VARCHAR || '%');
 
 -- name: ListHosts :many
 SELECT h.*,
     COALESCE(NULLIF(u.display_name, ''), u.username, '') AS creator_name,
+    COALESCE(NULLIF(w.display_name, ''), w.name, '') AS workspace_name,
+    COALESCE(NULLIF(ns.display_name, ''), ns.name, '') AS namespace_name,
     a.agent_id       AS agent_id,
     a.status         AS agent_status,
     a.version        AS agent_version,
@@ -84,6 +96,8 @@ SELECT h.*,
     a.conflict_at    AS agent_conflict_at
 FROM hosts h
 LEFT JOIN users u ON u.id = h.created_by
+LEFT JOIN workspaces w ON w.id = h.workspace_id
+LEFT JOIN namespaces ns ON ns.id = h.namespace_id
 LEFT JOIN host_agents a ON a.host_id = h.id
 WHERE (sqlc.narg('scope')::VARCHAR IS NULL OR h.scope = sqlc.narg('scope'))
   AND (sqlc.narg('workspace_id')::BIGINT IS NULL OR h.workspace_id = sqlc.narg('workspace_id'))
@@ -101,7 +115,11 @@ WHERE (sqlc.narg('scope')::VARCHAR IS NULL OR h.scope = sqlc.narg('scope'))
        OR h.os ILIKE '%' || sqlc.narg('search')::VARCHAR || '%'
        OR h.arch ILIKE '%' || sqlc.narg('search')::VARCHAR || '%'
        OR CAST(h.cpu_cores AS TEXT) = sqlc.narg('search')::VARCHAR
-       OR CAST(h.memory_mb AS TEXT) = sqlc.narg('search')::VARCHAR)
+       OR CAST(h.memory_mb AS TEXT) = sqlc.narg('search')::VARCHAR
+       OR COALESCE(w.name, '') ILIKE '%' || sqlc.narg('search')::VARCHAR || '%'
+       OR COALESCE(w.display_name, '') ILIKE '%' || sqlc.narg('search')::VARCHAR || '%'
+       OR COALESCE(ns.name, '') ILIKE '%' || sqlc.narg('search')::VARCHAR || '%'
+       OR COALESCE(ns.display_name, '') ILIKE '%' || sqlc.narg('search')::VARCHAR || '%')
 ORDER BY
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'name' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN h.name END ASC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'name' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN h.name END DESC,
@@ -111,6 +129,8 @@ ORDER BY
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'os' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN h.os END DESC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'cpu_cores' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN h.cpu_cores END ASC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'cpu_cores' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN h.cpu_cores END DESC,
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'organization' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN COALESCE(NULLIF(w.display_name, ''), w.name, '') END ASC,
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'organization' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN COALESCE(NULLIF(w.display_name, ''), w.name, '') END DESC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'created_at' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN h.created_at END ASC,
     h.created_at DESC
 LIMIT sqlc.arg('page_size')::INT
