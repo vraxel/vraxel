@@ -59,7 +59,7 @@ DELETE FROM roles WHERE id = @id;
 -- name: CountRoles :one
 SELECT count(id)
 FROM roles
-WHERE (sqlc.narg('scope')::VARCHAR IS NULL OR scope = sqlc.narg('scope'))
+WHERE (sqlc.narg('scope')::VARCHAR IS NULL OR scope = ANY(string_to_array(sqlc.narg('scope')::VARCHAR, ',')))
   AND (sqlc.narg('builtin')::BOOLEAN IS NULL OR builtin = sqlc.narg('builtin'))
   AND (sqlc.narg('workspace_id')::BIGINT IS NULL OR workspace_id = sqlc.narg('workspace_id'))
   AND (sqlc.narg('namespace_id')::BIGINT IS NULL OR namespace_id = sqlc.narg('namespace_id'))
@@ -74,7 +74,7 @@ WHERE (sqlc.narg('scope')::VARCHAR IS NULL OR scope = sqlc.narg('scope'))
 SELECT id, name, display_name, description, scope, builtin, workspace_id, namespace_id, created_at, updated_at,
        (SELECT COUNT(*) FROM role_permission_rules WHERE role_id = roles.id)::INT AS rule_count
 FROM roles
-WHERE (sqlc.narg('scope')::VARCHAR IS NULL OR scope = sqlc.narg('scope'))
+WHERE (sqlc.narg('scope')::VARCHAR IS NULL OR scope = ANY(string_to_array(sqlc.narg('scope')::VARCHAR, ',')))
   AND (sqlc.narg('builtin')::BOOLEAN IS NULL OR builtin = sqlc.narg('builtin'))
   AND (sqlc.narg('workspace_id')::BIGINT IS NULL OR workspace_id = sqlc.narg('workspace_id'))
   AND (sqlc.narg('namespace_id')::BIGINT IS NULL OR namespace_id = sqlc.narg('namespace_id'))

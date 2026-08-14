@@ -169,6 +169,7 @@ export default function RoleListPage() {
     {
       key: "scope",
       header: t("role.scope"),
+      sortable: true,
       filter: [
         { value: "all", label: t("common.all") },
         { value: "platform", label: t("role.scope.platform") },
