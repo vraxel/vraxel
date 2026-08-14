@@ -97,7 +97,7 @@ func (h *protocolHandler) handleRegister(w http.ResponseWriter, r *http.Request)
 		existingHostID = prev.HostID
 	}
 
-	hostID, err := h.registrar.RegisterAgentHost(r.Context(), AgentHostSpec{
+	hostID, hostCreated, err := h.registrar.RegisterAgentHost(r.Context(), AgentHostSpec{
 		ExistingHostID: existingHostID,
 		AgentID:        agentID,
 		Hostname:       req.Hostname,
@@ -117,7 +117,7 @@ func (h *protocolHandler) handleRegister(w http.ResponseWriter, r *http.Request)
 	})
 	if err != nil {
 		logger.Warnf("agentgw register: register host for agent %s: %v", agentID, err)
-		h.undoRegistration(r.Context(), agentID, existingHostID, 0, token.ID)
+		h.undoRegistration(r.Context(), agentID, 0, false, token.ID)
 		// A rejected rebind is the caller's problem to fix (wrong token for
 		// that host), everything else is ours. Neither answer carries the
 		// underlying error: the peer holds nothing but a join token, and
@@ -141,7 +141,7 @@ func (h *protocolHandler) handleRegister(w http.ResponseWriter, r *http.Request)
 		// exists but is bound to nothing, and every retry with a fresh
 		// token creates yet another host, until all three candidate names
 		// are taken by its own orphans and registration fails outright.
-		h.undoRegistration(r.Context(), agentID, existingHostID, hostID, token.ID)
+		h.undoRegistration(r.Context(), agentID, hostID, hostCreated, token.ID)
 		http.Error(w, "persist agent", http.StatusInternalServerError)
 		return
 	}
@@ -171,15 +171,22 @@ func (h *protocolHandler) handleRegister(w http.ResponseWriter, r *http.Request)
 // token was claimed: it gives the use back and, when this request was the
 // one that created the host row, deletes it again.
 //
+// hostCreated comes from the registrar rather than being inferred here.
+// This used to test existingHostID == 0, which is a proxy that holds only
+// while every registration either updates a host found via host_agents or
+// creates a brand new one. A join token that names an existing host to
+// attach to breaks it: no host_agents row yet, so existingHostID is 0,
+// and the compensation would delete a host the operator imported by hand.
+//
 // Both steps are best-effort. If they fail the caller is no worse off
 // than before they existed, which is why nothing here changes the
 // response. A process killed mid-registration still leaves the residue
 // they clean up -- compensation is not atomicity -- but that window is
 // now a crash rather than any ordinary database error.
-func (h *protocolHandler) undoRegistration(ctx context.Context, agentID string, existingHostID, createdHostID, tokenID int64) {
-	if createdHostID > 0 && existingHostID == 0 {
-		if err := h.registrar.UnregisterAgentHost(ctx, createdHostID); err != nil {
-			logger.Warnf("agentgw register: roll back host %d for agent %s: %v", createdHostID, agentID, err)
+func (h *protocolHandler) undoRegistration(ctx context.Context, agentID string, hostID int64, hostCreated bool, tokenID int64) {
+	if hostCreated && hostID > 0 {
+		if err := h.registrar.UnregisterAgentHost(ctx, hostID); err != nil {
+			logger.Warnf("agentgw register: roll back host %d for agent %s: %v", hostID, agentID, err)
 		}
 	}
 	if err := h.joinTokens.Refund(ctx, tokenID); err != nil {

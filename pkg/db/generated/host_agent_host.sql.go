@@ -21,7 +21,7 @@ VALUES (
     $1, $2, $3, $4, $5,
     $6, $7, $8, $9,
     $10, $11, 'running', 22, 9100,
-    'manual', 'agent', $12, $13
+    'agent', 'agent', $12, $13
 )
 RETURNING id
 `
@@ -49,6 +49,12 @@ type CreateAgentHostParams struct {
 // columns. created_by is inherited from the join token's creator -- the
 // operator who authorised the onboarding is the traceable human, since
 // /register carries no user session.
+//
+// origin='agent' records how the row came into existence and never
+// changes afterwards; connectivity_mode records how the control plane
+// reaches the host today and does change (an imported host that later
+// installs an agent flips to 'agent'). Conflating the two is what made
+// the old rollback guard below unsound.
 func (q *Queries) CreateAgentHost(ctx context.Context, arg CreateAgentHostParams) (int64, error) {
 	row := q.db.QueryRow(ctx, createAgentHost,
 		arg.Name,
@@ -71,12 +77,26 @@ func (q *Queries) CreateAgentHost(ctx context.Context, arg CreateAgentHostParams
 }
 
 const deleteAgentHost = `-- name: DeleteAgentHost :execrows
-DELETE FROM hosts WHERE id = $1 AND connectivity_mode = 'agent'
+DELETE FROM hosts h
+WHERE h.id = $1
+  AND NOT EXISTS (SELECT 1 FROM host_agents ha WHERE ha.host_id = h.id)
 `
 
-// Roll back a host row created by a registration that then failed. Bound
-// to connectivity_mode='agent' so this can never remove a host that was
-// onboarded any other way.
+// Roll back a host row created by a registration that then failed.
+//
+// The guard is "no agent is bound to this host", not the old
+// connectivity_mode='agent'. connectivity_mode is mutable: an operator
+// imports a host, installs the agent on it later, UpdateAgentHostFacts
+// flips the column, and from then on the old guard would have let a
+// failed registration delete a hand-created row along with everything
+// hanging off it. Whether an agent is bound is the fact that actually
+// separates "this request just made this row" from "this row was here
+// first" -- the rollback only ever runs before host_agents is written,
+// or after that write failed.
+//
+// The caller applies the same rule in-process (register.go passes the
+// create/attach outcome). This is the second lock on the same door,
+// because the thing behind it is an unrecoverable delete.
 func (q *Queries) DeleteAgentHost(ctx context.Context, id int64) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteAgentHost, id)
 	if err != nil {

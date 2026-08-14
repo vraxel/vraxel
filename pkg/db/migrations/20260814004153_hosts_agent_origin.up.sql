@@ -1,0 +1,16 @@
+-- Backfill hosts.origin for machines that onboarded through the agent.
+--
+-- CreateAgentHost wrote origin='manual' for them, so every host in the
+-- table currently claims to have been hand-entered. origin records how a
+-- row came into existence and is meant to stay put for the row's life;
+-- connectivity_mode records how the control plane reaches the host today
+-- and is expected to change.
+--
+-- The two are separable here only because vraxel has no manual host
+-- create path yet: pkg/apis/compute exposes no REST resources, so every
+-- row in hosts was written by CreateAgentHost. Once hosts can be
+-- imported by hand, connectivity_mode='agent' stops implying agent
+-- origin (an imported host that later installs an agent has both) and
+-- this backfill stops being derivable. It is correct now and only now,
+-- which is why it runs now.
+UPDATE hosts SET origin = 'agent' WHERE origin = 'manual';
