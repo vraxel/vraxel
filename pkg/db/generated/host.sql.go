@@ -344,10 +344,10 @@ ORDER BY
     CASE WHEN $7::VARCHAR = 'os' AND $8::VARCHAR = 'desc' THEN h.os END DESC,
     CASE WHEN $7::VARCHAR = 'cpu_cores' AND $8::VARCHAR = 'asc' THEN h.cpu_cores END ASC,
     CASE WHEN $7::VARCHAR = 'cpu_cores' AND $8::VARCHAR = 'desc' THEN h.cpu_cores END DESC,
-    CASE WHEN $7::VARCHAR = 'organization' AND $8::VARCHAR = 'asc'
-         THEN COALESCE(NULLIF(w.display_name, ''), w.name, '') || chr(0) || COALESCE(NULLIF(ns.display_name, ''), ns.name, '') END ASC,
-    CASE WHEN $7::VARCHAR = 'organization' AND $8::VARCHAR = 'desc'
-         THEN COALESCE(NULLIF(w.display_name, ''), w.name, '') || chr(0) || COALESCE(NULLIF(ns.display_name, ''), ns.name, '') END DESC,
+    CASE WHEN $7::VARCHAR = 'organization' AND $8::VARCHAR = 'asc' THEN COALESCE(NULLIF(w.display_name, ''), w.name, '') END ASC,
+    CASE WHEN $7::VARCHAR = 'organization' AND $8::VARCHAR = 'asc' THEN COALESCE(NULLIF(ns.display_name, ''), ns.name, '') END ASC,
+    CASE WHEN $7::VARCHAR = 'organization' AND $8::VARCHAR = 'desc' THEN COALESCE(NULLIF(w.display_name, ''), w.name, '') END DESC,
+    CASE WHEN $7::VARCHAR = 'organization' AND $8::VARCHAR = 'desc' THEN COALESCE(NULLIF(ns.display_name, ''), ns.name, '') END DESC,
     CASE WHEN $7::VARCHAR = 'created_at' AND $8::VARCHAR = 'asc' THEN h.created_at END ASC,
     h.created_at DESC
 LIMIT $10::INT
