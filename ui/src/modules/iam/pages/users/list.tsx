@@ -24,7 +24,6 @@ import { usersDef } from "@/modules/iam/defs"
 import { useQueryClient } from "@tanstack/react-query"
 import { useListQuery } from "@/frameworks/list/use-list-query"
 import { NameCell } from "@/frameworks/list/name-cell"
-import { StatusFilter } from "@/frameworks/list/status-filter"
 import { ActiveStatusBadge } from "@/shared/components/active-status-badge"
 import { ResourceListPage, type ColumnDef } from "@/frameworks/list/resource-list-page"
 import { useApiMutation } from "@/core/query/hooks"
@@ -128,6 +127,12 @@ export default function UserListPage() {
       key: "username",
       header: t("user.username"),
       sortable: true,
+      filterKey: "status",
+      filter: [
+        { value: "all", label: t("common.all") },
+        { value: "active", label: t("common.active") },
+        { value: "inactive", label: t("common.inactive") },
+      ],
       cell: (user) => (
         <NameCell
           to={`/iam/users/${user.metadata.id}`}
@@ -178,18 +183,6 @@ export default function UserListPage() {
       titleKey="user.title"
       subtitle={t("user.manage", { count: query.totalCount })}
       searchPlaceholderKey="user.searchPlaceholder"
-      // The status filter follows its column into the toolbar: left on
-      // the name header it would read as filtering by name.
-      toolbarExtra={
-        <StatusFilter
-          selected={query.filters.status ?? new Set()}
-          onChange={(v) => query.setFilter("status", v)}
-          options={[
-            { value: "active", label: t("common.active") },
-            { value: "inactive", label: t("common.inactive") },
-          ]}
-        />
-      }
       selectable={false}
       emptyKey="user.noData"
       createButton={

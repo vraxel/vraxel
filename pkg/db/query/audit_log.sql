@@ -90,6 +90,8 @@ ORDER BY
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'status_code' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN status_code END DESC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'duration_ms' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN duration_ms END ASC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'duration_ms' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN duration_ms END DESC,
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'success' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN success END ASC,
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'success' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN success END DESC,
     created_at DESC
 LIMIT sqlc.arg('page_size')::INT
 OFFSET sqlc.arg('page_offset')::INT;
