@@ -148,7 +148,7 @@ func (h *protocolHandler) handleBinary(w http.ResponseWriter, r *http.Request, r
 	path := filepath.Join(h.binaryDir, name)
 	f, err := os.Open(path)
 	if err != nil {
-		logger.Warnf("agentgw: agent binary %s unavailable: %v (build it with `make vr-agent-binaries`, or point %s at its directory)", path, err, agentBinaryDirEnv)
+		logger.Warnf("agentgw: agent binary %s unavailable: %v (build it with `make agent-binaries`, or point %s at its directory)", path, err, agentBinaryDirEnv)
 		http.Error(w, "agent binary for "+goos+"/"+goarch+" is not available on this server", http.StatusNotFound)
 		return
 	}
