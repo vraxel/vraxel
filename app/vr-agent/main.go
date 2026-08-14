@@ -75,7 +75,9 @@ func main() {
 	}
 
 	if *registerOnly {
-		logger.Infof("vr-agent: registration complete (host %d); exiting as requested", st.HostID)
+		// No host id here: printInstallSummary has just written it, and
+		// this line lands one line above it.
+		logger.Infof("vr-agent: registration complete; exiting as requested")
 		return
 	}
 
@@ -180,8 +182,34 @@ func ensureRegistered(ctx context.Context, httpClient *http.Client, statePath, s
 	if err := saveState(statePath, st, logger); err != nil {
 		return nil, err
 	}
-	logger.Infof("vr-agent: registered as host %d (agent %s)", resp.HostID, resp.AgentID)
+	printInstallSummary(st, version, resp.ServerVersion)
 	return st, nil
+}
+
+// printInstallSummary writes what this machine just became: which host it
+// is, which credential it holds, and the two versions now paired.
+//
+// On stdout, alone. Every log line this agent writes goes to stderr, so
+// install-agent.sh can capture this block whole and print it as its
+// closing summary while still letting progress and errors reach the
+// operator as they happen.
+//
+// Composed here rather than in the script because this is where the
+// values are: the script stays a pipe with nothing to parse and nothing
+// to keep in step when a line is added.
+func printInstallSummary(st *state, agentVersion, serverVersion string) {
+	fmt.Printf("    host          %d\n", st.HostID)
+	fmt.Printf("    agent         %s\n", st.AgentID)
+	fmt.Printf("    agent version %s\n", agentVersion)
+	// A server older than this field says nothing rather than "unknown":
+	// the line is here to answer "which build did I just join", and an
+	// empty answer is better told by its absence than by a word that
+	// reads like the server failed to identify itself.
+	if serverVersion != "" {
+		fmt.Printf("    server        %s (%s)\n", st.ServerURL, serverVersion)
+	} else {
+		fmt.Printf("    server        %s\n", st.ServerURL)
+	}
 }
 
 // checkStateMachine refuses to reuse a credential that was issued to a

@@ -4,6 +4,11 @@ APP_NAME   := vraxel-server
 # Stamped into lib/buildinfo.Version; "dev" outside a git tree.
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -X '$(PKG_PREFIX)/lib/buildinfo.Version=$(APP_NAME)-$(VERSION)'
+# The agent names itself. Both binaries share lib/buildinfo, so building
+# the agent with LDFLAGS stamped it "vraxel-server-<ver>" -- which is what
+# host_agents.version, the host detail page and the install summary all
+# then reported as the agent's version.
+AGENT_LDFLAGS := -X '$(PKG_PREFIX)/lib/buildinfo.Version=vr-agent-$(VERSION)'
 
 # The gitignored per-developer overlay wins when present; otherwise the
 # committed config, whose defaults boot against localhost PG with
@@ -55,7 +60,7 @@ agent-binaries: $(AGENT_BINS) ## Cross-compile vr-agent into bin/ for the target
 
 $(AGENT_BINS): bin/vr-agent-linux-%: $(AGENT_SRC)
 	CGO_ENABLED=0 GOOS=linux GOARCH=$* \
-	  go build -ldflags "$(LDFLAGS)" -o $@ $(PKG_PREFIX)/app/vr-agent
+	  go build -ldflags "$(AGENT_LDFLAGS)" -o $@ $(PKG_PREFIX)/app/vr-agent
 
 # Refreshes the three committed artifact sets, in dependency order:
 #   pkg/db/query/*.sql          -> pkg/db/generated/            (sqlc)

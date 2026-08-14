@@ -37,6 +37,10 @@ main() {
     # Both are read by cleanup(), which can fire from anywhere below.
     NEW_BINARY=""
     AGENT_WAS_RUNNING=0
+    # The closing summary, produced by the agent's registration. Empty
+    # under set -u until then, and stays empty against an agent too old to
+    # print one.
+    SUMMARY=""
     INSTALL_DIR="/opt/vraxel/bin"
     STATE_DIR="/etc/vr-agent"
     STATE_FILE="${STATE_DIR}/agent.json"
@@ -159,6 +163,9 @@ EOF
         exit $status
     }
 
+    # Stdout carries the summary block and nothing else; the agent logs to
+    # stderr, which is left streaming so progress and failures reach the
+    # operator as they happen rather than at the end.
     register_agent() {
         # --re-register unconditionally: the agent short-circuits on an
         # existing state file otherwise, which is the same inference this
@@ -245,14 +252,14 @@ EOF
     chmod 0700 "$STATE_DIR"
 
     echo "==> registering with ${SERVER_TRIMMED}"
-    if ! register_agent; then
+    if ! SUMMARY="$(register_agent)"; then
         # The stop above only reaches the server as a socket close
         # travelling over the network, and until it lands the server still
         # sees a live channel. One retry covers that window; a second
         # would be waiting on something that is not going to change.
         echo "==> registration failed; retrying once in 3s" >&2
         sleep 3
-        register_agent
+        SUMMARY="$(register_agent)"
     fi
     [ -f "$STATE_FILE" ] || { echo "registration produced no state file" >&2; exit 1; }
     echo "==> registered"
@@ -304,6 +311,18 @@ EOF
 
     echo "==> vr-agent installed and started"
     systemctl --no-pager status vr-agent | head -n 5 || true
+
+    # Last, because it is the one part an operator keeps: the host it can
+    # now find this machine under, and the two versions that were paired.
+    # An `if` rather than `[ -n "$SUMMARY" ] && printf ...`, which would
+    # make an empty summary the script's exit status and send a successful
+    # install through cleanup()'s failure path.
+    if [ -n "$SUMMARY" ]; then
+        # Blank line first: systemctl's status block ends on an indented
+        # "Main PID:" line, and without a separator the summary reads as
+        # more of systemd's output rather than as ours.
+        printf '\n%s\n' "$SUMMARY"
+    fi
 }
 
 # Call main only after the whole script has been parsed. `curl | sh` feeds
