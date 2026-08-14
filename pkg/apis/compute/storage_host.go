@@ -26,9 +26,9 @@ type hostOps struct {
 // fields, so a partial update of it is the same request as a full one,
 // and a host is deleted one at a time because deleting it detaches a
 // machine that is probably still running.
-func HostsDef(store modstore.HostStore, agents agentgw.AgentStore, hub *statushub.Hub) apiserver.ResourceDef[Host] {
+func HostsDef(store modstore.HostStore, agentHosts modstore.AgentHostStore, agents agentgw.AgentStore, hub *statushub.Hub) apiserver.ResourceDef[Host] {
 	o := hostOps{store: store}
-	m := hostMergeOps{hosts: store, agents: agents}
+	m := hostMergeOps{hosts: store, agentHosts: agentHosts, agents: agents}
 	return apiserver.ResourceDef[Host]{
 		Group: "compute", Name: "hosts",
 		Scopes: apiserver.ScopeAll,

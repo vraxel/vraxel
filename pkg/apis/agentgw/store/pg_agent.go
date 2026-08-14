@@ -192,14 +192,27 @@ func (s *pgAgentStore) RefreshFingerprint(ctx context.Context, hostID int64, fp 
 }
 
 func (s *pgAgentStore) MoveBinding(ctx context.Context, fromHostID, toHostID int64) error {
-	if _, err := s.Q().MoveHostAgentBinding(ctx, generated.MoveHostAgentBindingParams{
-		ToHostID:   toHostID,
-		FromHostID: fromHostID,
-	}); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return fmt.Errorf("host agent for host %d: %w", fromHostID, pgerrors.ErrNotFound)
+	if err := s.DB.WithTx(ctx, func(ctx context.Context, q *generated.Queries) error {
+		// host_agents is keyed BY host_id, so the destination cannot hold a
+		// binding when this lands -- the update would collide with it
+		// rather than replace it. Dropping it first is also the semantics:
+		// the destination's old binding is the stale record of a machine
+		// that turned out to be the one now arriving.
+		if _, err := q.DeleteHostAgentByHostID(ctx, toHostID); err != nil {
+			return fmt.Errorf("detach destination host agent: %w", err)
 		}
-		return fmt.Errorf("move host agent binding: %w", pgerrors.CheckPG(err))
+		if _, err := q.MoveHostAgentBinding(ctx, generated.MoveHostAgentBindingParams{
+			ToHostID:   toHostID,
+			FromHostID: fromHostID,
+		}); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return fmt.Errorf("host agent for host %d: %w", fromHostID, pgerrors.ErrNotFound)
+			}
+			return fmt.Errorf("move host agent binding: %w", pgerrors.CheckPG(err))
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
 	// Both rows change what the list draws: one gains an agent, the other
 	// is about to disappear.
@@ -274,6 +287,14 @@ func (s *pgAgentStore) MarkOnline(ctx context.Context, hostID int64, instanceID,
 		HostID:      hostID,
 	})
 	if err != nil {
+		// No row means the host is gone -- deleted, or merged into another
+		// host and the binding taken with it. Mapped rather than wrapped
+		// raw so the caller can tell that apart from a database fault: one
+		// means this channel is addressed to nothing and must be dropped,
+		// the other means try again.
+		if errors.Is(err, pgx.ErrNoRows) {
+			return time.Time{}, fmt.Errorf("host agent for host %d: %w", hostID, pgerrors.ErrNotFound)
+		}
 		return time.Time{}, fmt.Errorf("mark host agent online: %w", err)
 	}
 	// connected_at was just SET to now() in the same statement, so the

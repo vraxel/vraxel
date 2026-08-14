@@ -5,6 +5,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	apierrors "vraxel.io/vraxel/lib/api/errors"
 
 	"vraxel.io/vraxel/lib/logger"
 	ws "vraxel.io/vraxel/lib/websocket"
@@ -256,6 +257,22 @@ func (r *Registry) Touch(ctx context.Context, sess *Session, clockSkewMs int64) 
 	// caller has to issue a fresh one.
 	connectedAt, err := r.agents.MarkOnline(ctx, sess.HostID, r.instanceID, sess.Version, clockSkewMs)
 	if err != nil {
+		// The row this session was opened against is gone. Two ways in:
+		// the host was deleted, or it was merged into another host and the
+		// binding moved with it. Either way this channel is addressed to a
+		// host that no longer exists, and no future beat can fix that --
+		// only a reconnect can, which re-reads the agent's row and picks up
+		// wherever it now belongs.
+		//
+		// Without this the session survives as a channel nobody can reach:
+		// every beat logs, the row it points at stays stale, and the host
+		// reads offline while its agent sits there connected.
+		if se := apierrors.FromDomain(err, "agent"); se != nil && apierrors.IsNotFound(se) {
+			logger.Infof("agentgw: agent %s no longer belongs to host %d; dropping the channel so it reconnects",
+				sess.AgentID, sess.HostID)
+			sess.stop()
+			return time.Time{}
+		}
 		logger.Warnf("agentgw: reclaim host %d: %v", sess.HostID, err)
 		return time.Time{}
 	}

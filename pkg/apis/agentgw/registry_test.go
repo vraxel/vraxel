@@ -2,6 +2,8 @@ package agentgw
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -12,6 +14,7 @@ import (
 
 	ws "vraxel.io/vraxel/lib/websocket"
 	gwstore "vraxel.io/vraxel/pkg/apis/agentgw/store"
+	"vraxel.io/vraxel/pkg/db/pgerrors"
 )
 
 // fakeAgentStore records the host_agents writes the registry performs so
@@ -29,6 +32,12 @@ type fakeAgentStore struct {
 	touchLost bool
 	// markOnlineAt is what MarkOnline stamps the row with.
 	markOnlineAt time.Time
+	// markOnlineGone makes MarkOnline report that the row is not there,
+	// which is what a deleted or merged-away host looks like.
+	markOnlineGone bool
+	// markOnlineErr is a transport-level failure, as opposed to a missing
+	// row.
+	markOnlineErr error
 }
 
 type onlineCall struct {
@@ -74,6 +83,12 @@ func (f *fakeAgentStore) MarkOnline(_ context.Context, hostID int64, instanceID,
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.online = append(f.online, onlineCall{hostID, instanceID, version, skew})
+	if f.markOnlineErr != nil {
+		return time.Time{}, f.markOnlineErr
+	}
+	if f.markOnlineGone {
+		return time.Time{}, fmt.Errorf("host agent for host %d: %w", hostID, pgerrors.ErrNotFound)
+	}
 	return f.markOnlineAt, nil
 }
 
@@ -302,5 +317,47 @@ func TestRegistryEvictDropsTheIncumbentChannel(t *testing.T) {
 	r.Remove(context.Background(), sess)
 	if r.Evict(100, "contended") {
 		t.Fatal("Evict reported a session after the host's channel was already gone")
+	}
+}
+
+// A merge moves an agent's binding to the surviving host and deletes the
+// record this channel was opened against. The session is then addressed
+// to a host that does not exist: no later beat can repair it, because
+// every one of them targets the same dead id. Dropping it is what makes
+// the agent reconnect and pick up the host it now belongs to -- without
+// this the merged host reads offline while its agent sits connected.
+func TestTouchDropsSessionWhenItsHostIsGone(t *testing.T) {
+	store := &fakeAgentStore{touchLost: true, markOnlineGone: true}
+	r := NewRegistry(store, "inst-a")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sess := &Session{AgentID: "agent-a", HostID: 7, ctx: ctx, stop: cancel}
+
+	if reclaimed := r.Touch(context.Background(), sess, 0); !reclaimed.IsZero() {
+		t.Fatalf("Touch reported a re-claim at %v for a host that is gone", reclaimed)
+	}
+	select {
+	case <-sess.Context().Done():
+	default:
+		t.Fatal("session survived a heartbeat against a host that no longer exists; it would never reconnect")
+	}
+}
+
+// A database fault must NOT drop the channel: the row is probably fine
+// and the agent has nowhere better to be. Dropping on any error would
+// turn one bad minute into a fleet-wide reconnect storm.
+func TestTouchKeepsSessionWhenTheReclaimFails(t *testing.T) {
+	store := &fakeAgentStore{touchLost: true, markOnlineErr: errors.New("connection refused")}
+	r := NewRegistry(store, "inst-a")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sess := &Session{AgentID: "agent-a", HostID: 7, ctx: ctx, stop: cancel}
+
+	r.Touch(context.Background(), sess, 0)
+
+	select {
+	case <-sess.Context().Done():
+		t.Fatal("a database error dropped a healthy channel")
+	default:
 	}
 }

@@ -24,8 +24,11 @@ import (
 // towards "different machine" leaves a spare row. So the system always
 // leaves the spare row, and this is how an operator collects it.
 type hostMergeOps struct {
-	hosts  modstore.HostStore
-	agents agentgw.AgentStore
+	hosts modstore.HostStore
+	// agentHosts writes the reported half of a host row. The merge needs
+	// it because the surviving record describes the machine that is gone.
+	agentHosts modstore.AgentHostStore
+	agents     agentgw.AgentStore
 }
 
 // +openapi:summary=获取与该主机同源（同一磁盘镜像）的主机
@@ -142,6 +145,25 @@ func (o hostMergeOps) merge(ctx apiserver.Ctx, in *HostMergeRequest) (*HostMerge
 			return nil, domainErr(err)
 		}
 		agentMoved = true
+		// The surviving record was written by the machine that has gone
+		// away, so every agent-reported field on it -- address, OS, CPU,
+		// memory -- describes the wrong machine. Carrying the source's
+		// across is the whole claim the operator just made: this record IS
+		// that machine. Without it the merge leaves a host that answers on
+		// one address and advertises another, and nothing corrects it,
+		// because facts are only rewritten at registration and a merged
+		// agent never registers again.
+		if err := o.agentHosts.UpdateFacts(ctx, targetID, modstore.AgentHostFactsInput{
+			Hostname:  source.Hostname,
+			OS:        source.OS,
+			Arch:      source.Arch,
+			CPUCores:  source.CPUCores,
+			MemoryMB:  source.MemoryMB,
+			DiskGB:    source.DiskGB,
+			PrimaryIP: source.ReportedPrimaryIP,
+		}); err != nil {
+			return nil, domainErr(err)
+		}
 	} else if !apierrors.IsNotFound(apierrors.FromDomain(err, "agent")) {
 		return nil, domainErr(err)
 	}

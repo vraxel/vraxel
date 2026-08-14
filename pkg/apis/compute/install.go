@@ -59,13 +59,14 @@ func Registrar(database *db.DB, serverURL string, hub *statushub.Hub) func(*apis
 	// the same top-level factory the join-token store uses, so no
 	// cross-module store import is needed.
 	agents := agentgw.NewAgentStore(database)
+	agentHosts := modstore.NewPGAgentHostStore(database)
 	// The join-token table belongs to the gateway, which owns the
 	// /register path that consumes them. compute reaches it through the
 	// store interface rather than pkg/db, the same way every other
 	// cross-module data path in the tree works.
 	tokens := agentgw.NewJoinTokenStore(database)
 	return func(s *apiserver.Server) {
-		apiserver.Register(s, HostsDef(hosts, agents, hub))
+		apiserver.Register(s, HostsDef(hosts, agentHosts, agents, hub))
 		apiserver.Register(s, AgentJoinTokensDef(tokens, hosts, serverURL))
 	}
 }

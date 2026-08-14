@@ -87,15 +87,18 @@ func (h *protocolHandler) handleChannel(w http.ResponseWriter, r *http.Request) 
 	// agent id means two live processes are claiming it, and admitting
 	// either would mark the host online under a channel we cannot trust
 	// and let the reconciler fail the other one's running jobs.
-	if h.identityContended(sessCtx, claims, hello.BootNonce) {
+	if h.identityContended(sessCtx, row, hello.BootNonce) {
 		_ = conn.Close(ws.StatusPolicyViolation,
 			"another agent is already using this identity; this host looks cloned from an onboarded one")
 		return
 	}
 
 	sess := &Session{
-		AgentID:     claims.AgentID,
-		HostID:      claims.HostID,
+		AgentID: row.AgentID,
+		// From the row, never from the token: a merge moves an agent to
+		// another host without reissuing credentials, so the token's copy
+		// can be one host out of date.
+		HostID:      row.HostID,
 		Version:     hello.AgentVersion,
 		Conn:        conn,
 		ConnectedAt: time.Now(),
@@ -109,11 +112,11 @@ func (h *protocolHandler) handleChannel(w http.ResponseWriter, r *http.Request) 
 	// window in which a driver dispatches onto the fresh channel and the
 	// reconcile, working from the older hello snapshot, immediately kills
 	// that brand-new job while the agent is already running it.
-	h.runManager.OnAgentReconnect(sessCtx, claims.HostID, hello.RunningJobs, sess)
+	h.runManager.OnAgentReconnect(sessCtx, row.HostID, hello.RunningJobs, sess)
 
 	connectedAt := h.registry.Add(sessCtx, sess, clockSkew(hello.ClockUnixMs))
 	logger.Infof("agentgw: agent %s (host %d) channel open, version=%q token_version=%d",
-		claims.AgentID, claims.HostID, hello.AgentVersion, row.TokenVersion)
+		row.AgentID, row.HostID, hello.AgentVersion, row.TokenVersion)
 	defer h.registry.Remove(context.WithoutCancel(h.ctx), sess)
 
 	// Hand the agent its session token for the REST surface, then keep
@@ -140,24 +143,24 @@ func (h *protocolHandler) handleChannel(w http.ResponseWriter, r *http.Request) 
 // a misconfigured fleet, not an authentication decision -- the bearer token
 // already settled that -- so a database blip must not disconnect every
 // agent in the deployment.
-func (h *protocolHandler) identityContended(ctx context.Context, claims *AgentClaims, bootNonce string) bool {
-	contended, err := h.agents.CheckIdentity(ctx, claims.HostID, bootNonce, identityConflictCooldown)
+func (h *protocolHandler) identityContended(ctx context.Context, row *gwstore.AgentRow, bootNonce string) bool {
+	contended, err := h.agents.CheckIdentity(ctx, row.HostID, bootNonce, identityConflictCooldown)
 	if err != nil {
-		logger.Warnf("agentgw channel: identity check for agent %s: %v", claims.AgentID, err)
+		logger.Warnf("agentgw channel: identity check for agent %s: %v", row.AgentID, err)
 		return false
 	}
 	if contended {
 		logger.Warnf("agentgw channel: refusing agent %s (host %d): its identity is claimed by more than one "+
 			"live agent process. This host was most likely cloned from an onboarded one -- reset "+
 			"/etc/machine-id on the copies and re-onboard them. Retries are refused for %s.",
-			claims.AgentID, claims.HostID, identityConflictCooldown)
+			row.AgentID, row.HostID, identityConflictCooldown)
 		// The duplicate holding the channel has to go too, or it would
 		// simply keep it: it never reconnects, so it is never re-checked.
 		// Since a clone boots after the machine it was copied from, the
 		// incumbent is usually the copy -- leaving it in place would hand
 		// the host to the clone and lock the real one out.
-		if h.registry.Evict(claims.HostID, "this host's agent identity is contended") {
-			logger.Warnf("agentgw channel: also dropped the channel host %d was already holding", claims.HostID)
+		if h.registry.Evict(row.HostID, "this host's agent identity is contended") {
+			logger.Warnf("agentgw channel: also dropped the channel host %d was already holding", row.HostID)
 		}
 	}
 	return contended
@@ -243,10 +246,13 @@ func (h *protocolHandler) authAgent(w http.ResponseWriter, r *http.Request) (*Ag
 		}
 		return nil, nil, false
 	}
-	if row.HostID != claims.HostID {
-		http.Error(w, "agent-token host mismatch", http.StatusUnauthorized)
-		return nil, nil, false
-	}
+	// claims.HostID is deliberately NOT compared. It is a snapshot of
+	// where this agent belonged when its token was issued, and the row is
+	// the authority on where it belongs now -- which is what lets an
+	// operator merge two host records without the machine having to
+	// re-onboard. Nothing is lost by dropping the check: agent_id is the
+	// signed identity, and the row it names carries the host id every
+	// caller below uses.
 	// token_version is the revocation lever: bumping the column (a
 	// re-registration, or an explicit revoke later) invalidates every
 	// token minted before it without needing a token blacklist.
