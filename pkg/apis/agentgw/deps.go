@@ -15,6 +15,7 @@ type (
 	JoinTokenRow         = gwstore.JoinTokenRow
 	JoinTokenCreateInput = gwstore.JoinTokenCreateInput
 	AgentRow             = gwstore.AgentRow
+	AgentStore           = gwstore.AgentStore
 )
 
 // AgentHostSpec is what an agent reports about the machine it runs on,
@@ -24,9 +25,14 @@ type AgentHostSpec struct {
 	// row, i.e. the machine is re-registering. The registrar then
 	// refreshes facts in place instead of inserting.
 	ExistingHostID int64
-	// AgentID is the machine's stable agent identity. Used only to derive
-	// a deterministic suffix when the preferred host name is taken.
-	AgentID string
+	// NameSeed disambiguates the host name when the machine's preferred
+	// one is taken. Any per-machine constant does; it is the machine's
+	// strongest identity signal rather than its agent id, because an
+	// agent id is now allocated fresh on every first registration. A
+	// machine that lost its host binding and re-registers would otherwise
+	// pick a different name each time, accumulating rows -- the exact
+	// behaviour the deterministic suffix exists to prevent.
+	NameSeed string
 
 	Hostname string
 	OS       string

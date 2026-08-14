@@ -45,8 +45,10 @@ const (
 	// FrameTypeProbeConfig replaces the host's whole probe set
 	// (design §5.6).
 	FrameTypeProbeConfig = "probe.config"
-	// FrameTypeAgentUpgrade tells the agent to replace its own binary.
-	FrameTypeAgentUpgrade = "agent.upgrade"
+	// Upgrading the agent is install-agent.sh's job, not a frame's: the
+	// script already stops, replaces and re-registers atomically, and a
+	// second mechanism for the same thing is a second thing to keep
+	// correct.
 
 	// agent -> server
 	FrameTypeHello     = "hello"
@@ -106,6 +108,14 @@ type Frame struct {
 	// a restart changes it once; only two live processes can make an old
 	// value reappear.
 	BootNonce string `json:"bootNonce,omitempty"`
+	// Fingerprint is re-presented on every connect, because a credential
+	// alone cannot say which machine is holding it. A copied agent.json
+	// carries a perfectly valid token; what it cannot carry is the
+	// hypervisor-assigned identity of the machine it was issued to. The
+	// server compares the two and refuses the mismatch, which makes the
+	// original the deterministic winner instead of whichever clone
+	// reconnected last.
+	Fingerprint MachineFingerprint `json:"fingerprint,omitzero"`
 
 	// --- hello + heartbeat ---
 	// ClockUnixMs is the agent's wall clock at send time. The server
@@ -138,9 +148,6 @@ type Frame struct {
 	Probes      []ProbeSpec  `json:"probes,omitempty"`
 	ProbeStates []ProbeState `json:"probeStates,omitempty"`
 
-	// --- agent.upgrade ---
-	Upgrade *AgentUpgrade `json:"upgrade,omitempty"`
-
 	// --- agent.status ---
 	Status string `json:"status,omitempty"`
 
@@ -153,16 +160,6 @@ type Frame struct {
 	// --- error ---
 	Code    string `json:"code,omitempty"`
 	Message string `json:"message,omitempty"`
-}
-
-// AgentUpgrade is the agent.upgrade payload.
-//
-// It names a version and its digest, not a URL: the agent builds the
-// download URL from its own server address and BinaryPath, so a frame
-// cannot point the agent's self-replacement at an attacker's host.
-type AgentUpgrade struct {
-	Version string `json:"version"`
-	SHA256  string `json:"sha256"`
 }
 
 // JobDispatch is the job.dispatch payload: one (play, host) execution
@@ -234,10 +231,9 @@ type TokenRenewResponse struct {
 	AgentToken string `json:"agentToken"`
 }
 
-// BinaryPath returns the download path for an agent binary. The agent
-// builds its upgrade URL from this rather than from a URL in the
-// upgrade frame: the binary it replaces itself with must come from the
-// server it is enrolled with, never from an address a frame names.
+// BinaryPath returns the download path for an agent binary, which is
+// where install-agent.sh fetches it from -- always the server the host
+// is being enrolled with, never an address supplied to it.
 func BinaryPath(goos, goarch string) string {
 	return ProtocolPathPrefix + "binary/" + goos + "/" + goarch
 }
@@ -312,6 +308,39 @@ type RegisterRequest struct {
 	// (design §5.13).
 	DefaultRouteIP string `json:"defaultRouteIp"`
 	AgentVersion   string `json:"agentVersion,omitempty"`
+
+	// --- machine fingerprint ---
+	//
+	// Reported, not decided: the agent sends what it can read and the
+	// server decides which host row that is. Deriving the identity on the
+	// machine (as UUIDv5 of the machine id once did) freezes the rule into
+	// every deployed binary, so correcting it means re-onboarding a fleet.
+	//
+	// MachineID above is part of this set -- it stays where it is because
+	// it predates the rest.
+	Fingerprint MachineFingerprint `json:"fingerprint,omitzero"`
+}
+
+// MachineFingerprint is the evidence a machine offers about which machine
+// it is. See the 20260814075808 migration for why the fields are split
+// into those a disk image carries and those it cannot.
+type MachineFingerprint struct {
+	// MachineID is /etc/machine-id. Carried here as well as at the top
+	// level of RegisterRequest (where it predates this struct) because
+	// the control channel needs it too: it is what distinguishes a
+	// machine that reset its image identity from one that is simply not
+	// the machine the credential names.
+	MachineID string `json:"machineId,omitempty"`
+	// ProductUUID is the SMBIOS system UUID. The only field that may
+	// claim an existing host row, because it is the only one a hypervisor
+	// re-issues when it copies a VM.
+	ProductUUID string `json:"productUuid,omitempty"`
+	// MACs corroborate and give an operator something to read; they never
+	// claim a row on their own.
+	MACs []string `json:"macs,omitempty"`
+	// UptimeSeconds at send time. The server converts it against its own
+	// clock; see hostinfo.uptimeSeconds.
+	UptimeSeconds int64 `json:"uptimeSeconds,omitempty"`
 }
 
 // RegisterResponse is what the agent persists to disk after a successful

@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Link, useNavigate, useParams } from "react-router"
-import { ArrowLeft, Pencil, Trash2 } from "lucide-react"
+import { ArrowLeft, Pencil, PlugZap, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { formatDateTime } from "@/shared/lib/format"
 import { Button } from "@/shared/ui/button"
@@ -18,6 +18,8 @@ import { hostsApi } from "@/modules/compute/api/hosts"
 import { hostsDef } from "@/modules/compute/defs"
 import { AgentStatusBadge } from "@/modules/compute/components/agent-status-badge"
 import { HostEditDialog } from "@/modules/compute/components/host-edit-dialog"
+import { AgentInstallDialog } from "@/modules/compute/components/agent-install-dialog"
+import { HostMergeDialog } from "@/modules/compute/components/host-merge-dialog"
 import { useHostWatch } from "@/modules/compute/use-host-watch"
 import { ConfirmDialog } from "@/shared/components/confirm-dialog"
 
@@ -33,9 +35,15 @@ export default function HostDetailPage() {
 
   const canUpdate = hasPermission("compute:hosts:update", permScope)
   const canDelete = hasPermission("compute:hosts:delete", permScope)
+  // Installing an agent means minting a join token, which the API gates
+  // on compute:hosts:create -- a token is the power to bring a machine
+  // into this scope.
+  const canInstallAgent = hasPermission("compute:hosts:create", permScope)
 
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [installOpen, setInstallOpen] = useState(false)
+  const [mergeOpen, setMergeOpen] = useState(false)
 
   const query = useApiQuery({
     queryKey: qk.detail(hostsDef, scope, hostId ?? ""),
@@ -90,6 +98,12 @@ export default function HostDetailPage() {
           <p className="text-muted-foreground mt-0.5 text-sm">{host.metadata.name}</p>
         </div>
         <div className="flex items-center gap-2">
+          {canInstallAgent && (
+            <Button variant="outline" size="sm" onClick={() => setInstallOpen(true)}>
+              <PlugZap className="size-4" />
+              {t(host.spec.agentId ? "compute.host.reinstallAgent" : "compute.host.installAgent")}
+            </Button>
+          )}
           {canUpdate && (
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
               <Pencil className="size-4" />
@@ -104,6 +118,27 @@ export default function HostDetailPage() {
           )}
         </div>
       </div>
+
+      {(host.spec.imageGroupSize ?? 0) > 1 && (
+        <div className="border-warning/25 bg-warning/10 mb-6 flex items-start justify-between gap-3 rounded-lg border p-3 text-sm">
+          <div>
+            <p className="font-medium">{t("compute.host.imageGroup")}</p>
+            <p className="text-muted-foreground mt-1 text-xs">
+              {t("compute.host.imageGroupHint", { count: host.spec.imageGroupSize ?? 0 })}
+            </p>
+          </div>
+          {canDelete && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              onClick={() => setMergeOpen(true)}
+            >
+              {t("compute.host.merge")}
+            </Button>
+          )}
+        </div>
+      )}
 
       {host.spec.agentConflictAt && (
         <div className="border-destructive/25 bg-destructive/10 mb-6 rounded-lg border p-3 text-sm">
@@ -170,11 +205,32 @@ export default function HostDetailPage() {
         }
       />
 
+      <AgentInstallDialog
+        host={installOpen ? host : null}
+        scope={scope}
+        onClose={() => setInstallOpen(false)}
+      />
+
+      <HostMergeDialog
+        host={mergeOpen ? host : null}
+        scope={scope}
+        onClose={() => setMergeOpen(false)}
+        onMerged={() => navigate(listPath)}
+      />
+
       <ConfirmDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title={t("common.delete")}
-        description={t("compute.host.deleteConfirm", { name: host.metadata.name })}
+        // Deleting the row does not stop the machine: its agent keeps
+        // dialling in with a credential nothing will honour again. Said
+        // here because this is the last moment anyone is in a position to
+        // do something about it -- afterwards there is no host page left
+        // to say it on, and the only trace is a 401 in the server log.
+        description={
+          t("compute.host.deleteConfirm", { name: host.metadata.name }) +
+          (host.spec.agentId ? `\n\n${t("compute.host.deleteAgentWarning")}` : "")
+        }
         onConfirm={handleDelete}
         confirmText={t("common.delete")}
       />

@@ -31,6 +31,25 @@ const compute = {
 
   "compute.host.edit": "编辑主机",
   "compute.host.deleteConfirm": "确定要删除主机「{name}」吗？此操作不可撤销。",
+  "compute.host.deleteAgentWarning":
+    "这台主机已接入 Agent。删除档案不会停止机器上的 Agent，它会一直用已失效的凭证重连。请先在机器上卸载（systemctl disable --now vr-agent），或删除后重新接入。",
+
+  "compute.host.imageGroup": "同源镜像",
+  "compute.host.imageGroupHint":
+    "有 {count} 台主机由同一份磁盘镜像克隆而来（/etc/machine-id 相同）。它们是各自独立的主机，但在依赖该 id 的地方无法区分；请在模板里执行 systemd-machine-id-setup，再在已克隆的机器上重置。",
+  "compute.host.merge": "合并主机记录",
+  "compute.host.mergeHint": "把这条记录并入它重复的那条：agent 迁过去，本条删除。",
+  "compute.host.mergeEvidence":
+    "这两条记录来自同一份磁盘镜像，但硬件标识不同。可能是同一台机器换了主板/整机迁移，也可能是一台克隆机——只有你知道是哪种。确认是同一台再合并。",
+  "compute.host.mergeInto": "并入哪条记录",
+  "compute.host.mergeConfirm": "并入这条",
+  "compute.host.mergeNoCandidates": "没有找到同源的其他主机记录。",
+  "compute.host.mergeSuccess": "已合并",
+
+  "compute.host.installAgent": "安装 Agent",
+  "compute.host.reinstallAgent": "重装 Agent",
+  "compute.host.installAgentHint":
+    "在这台主机上执行下面的命令。首次安装、重装升级、以及凭证失效后的重新接入，都是同一条命令。",
 
   // host detail
   "compute.host.basicInfo": "基本信息",

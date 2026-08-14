@@ -3,11 +3,28 @@
 #
 #   ./install-agent.sh --server https://vraxel.example.com --token <join-token>
 #
-# Idempotent: re-running on an already-onboarded host reinstalls the
-# binary and restarts the service without registering again, so it never
-# produces a duplicate host in vraxel. Pass --force-register to re-register
-# anyway (recovery after a revoked token); the server keys registration
-# on /etc/machine-id, so that still rebinds the same host row.
+# One command, one behaviour: this always registers, so a join token is
+# always required. The state file is an output of that decision, never an
+# input to it.
+#
+# The alternative -- skip registration when the state file is already
+# there -- infers the operator's intent from the filesystem, and gets it
+# wrong in exactly the case that needs it most: a host deleted on the
+# server leaves a state file holding a credential the server no longer
+# honours, so the recovery command silently did nothing while the agent
+# retried a rejected token forever.
+#
+# Registering unconditionally is safe because the server keys identity on
+# /etc/machine-id: a machine that has onboarded before rebinds its
+# existing host row instead of creating a second one, and a rebind never
+# moves a host between scopes (rebindAuthorised refuses a token from
+# another tenant outright).
+#
+# There is no upgrade-only mode either: upgrading is this same command,
+# run again. It costs one join token and rotates the credential, which is
+# a smaller price than a second mechanism doing half of what this one
+# already does -- and the half it would skip (re-registering) is the half
+# that heals a host whose credential has gone stale.
 #
 # POSIX sh, no bashisms: this runs on whatever minimal image the customer
 # happens to have.
@@ -17,7 +34,9 @@ set -eu
 main() {
     SERVER=""
     TOKEN=""
-    FORCE_REGISTER=0
+    # Both are read by cleanup(), which can fire from anywhere below.
+    NEW_BINARY=""
+    AGENT_WAS_RUNNING=0
     INSTALL_DIR="/opt/vraxel/bin"
     STATE_DIR="/etc/vr-agent"
     STATE_FILE="${STATE_DIR}/agent.json"
@@ -27,12 +46,12 @@ main() {
 
     usage() {
         cat >&2 <<EOF
-usage: $0 --server <url> --token <join-token> [--force-register] [--install-dir <dir>] [--ca-file <path>]
+usage: $0 --server <url> --token <join-token> [--install-dir <dir>] [--ca-file <path>]
 
   --server          vraxel-server base URL, e.g. https://vraxel.example.com
-  --token           one-time join token minted in vraxel
-                    (compute > agent-join-tokens)
-  --force-register  re-register even if this host is already onboarded
+  --token           one-time join token minted in vraxel (compute >
+                    agent-join-tokens, or the button on a host's page).
+                    Required every time: this script always registers.
   --install-dir     where to place the binary (default ${INSTALL_DIR})
   --ca-file         PEM bundle of the CA that signed the vraxel-server
                     certificate. Required when that certificate is not
@@ -49,7 +68,12 @@ EOF
             # script then exited silently with no clue what was wrong.
             --server) SERVER="${2:?--server needs a URL}"; shift 2 ;;
             --token) TOKEN="${2:?--token needs a value}"; shift 2 ;;
-            --force-register) FORCE_REGISTER=1; shift ;;
+            # Accepted and ignored. Registration is now unconditional, so
+            # this asks for what already happens -- but agents built
+            # before that change print it as the recovery instruction, and
+            # failing on it would send whoever followed that advice
+            # looking for a second problem.
+            --force-register) echo "note: --force-register is no longer needed; this script always registers" >&2; shift ;;
             --install-dir) INSTALL_DIR="${2:?--install-dir needs a path}"; BINARY="${INSTALL_DIR}/vr-agent"; shift 2 ;;
             --ca-file) CA_FILE="${2:?--ca-file needs a path}"; shift 2 ;;
             -h|--help) usage ;;
@@ -66,10 +90,7 @@ EOF
     fi
     [ "$(id -u)" = "0" ] || { echo "must run as root" >&2; exit 1; }
 
-    # Registration needs a token only on the first run.
-    if [ ! -f "$STATE_FILE" ] || [ "$FORCE_REGISTER" = "1" ]; then
-        [ -n "$TOKEN" ] || { echo "--token is required (host is not registered yet)" >&2; usage; }
-    fi
+    [ -n "$TOKEN" ] || { echo "--token is required" >&2; usage; }
 
     case "$(uname -m)" in
         x86_64|amd64) ARCH="amd64" ;;
@@ -114,9 +135,42 @@ EOF
             ;;
     esac
 
+    # cleanup owns every exit path from here on.
+    #
+    # The one thing this script must never do is leave a host without a
+    # running agent. Registration requires stopping the one that is there
+    # (the server refuses a re-registration while the channel is live), so
+    # between that stop and the final restart there is a window where a
+    # failure -- a spent token, an unreachable server, a full disk --
+    # would otherwise walk away from a silently unmanaged machine.
+    #
+    # Restarting is always safe: the old credential is either untouched
+    # (registration failed, and the server refunded the token) or already
+    # replaced on disk (it succeeded, and a later step failed). Both are
+    # states the old binary can run in.
+    cleanup() {
+        status=$?
+        rm -f "$TMP_BIN"
+        if [ -n "$NEW_BINARY" ]; then rm -f "$NEW_BINARY"; fi
+        if [ "$status" -ne 0 ] && [ "$AGENT_WAS_RUNNING" = "1" ]; then
+            echo "==> install failed; restarting the previous agent" >&2
+            systemctl start vr-agent >/dev/null 2>&1 || true
+        fi
+        exit $status
+    }
+
+    register_agent() {
+        # --re-register unconditionally: the agent short-circuits on an
+        # existing state file otherwise, which is the same inference this
+        # script just stopped making.
+        # shellcheck disable=SC2086
+        "$NEW_BINARY" --server "$SERVER_TRIMMED" --token "$TOKEN" \
+            --register-only --re-register $CA_ARG
+    }
+
     echo "==> downloading vr-agent (linux/${ARCH}) from ${DOWNLOAD_URL}"
     TMP_BIN="$(mktemp)"
-    trap 'rm -f "$TMP_BIN"' EXIT
+    trap cleanup EXIT
     if command -v curl >/dev/null 2>&1; then
         # Deliberately not -f: it turns an HTTP error into a bare exit
         # status and throws away the body, which is where the server says
@@ -161,33 +215,55 @@ EOF
     # unit fails with status=203/EXEC while the very same binary runs fine
     # in the foreground. Measured in spike 0.2. So: install to a real
     # location first, relabel, and only then write the unit.
-    echo "==> installing to ${BINARY}"
+    # Staged under .new rather than written straight to $BINARY: a run
+    # that fails during registration then leaves the previous install
+    # exactly as it was, old binary and all. It also sidesteps the ETXTBSY
+    # that replacing a running executable in place would give.
+    echo "==> staging ${BINARY}"
     mkdir -p "$INSTALL_DIR"
-    # Stop first: replacing a running executable in place gives ETXTBSY.
-    systemctl stop vr-agent 2>/dev/null || true
-    install -m 0755 "$TMP_BIN" "$BINARY"
+    NEW_BINARY="${BINARY}.new"
+    install -m 0755 "$TMP_BIN" "$NEW_BINARY"
 
     # restorecon applies the context the policy assigns to this path
     # (bin_t under /opt/vraxel/bin), which is what makes the exec allowed.
     # Absent on non-SELinux distros, hence the guard.
     if command -v restorecon >/dev/null 2>&1; then
-        echo "==> restoring SELinux context on ${BINARY}"
-        restorecon -F "$BINARY" || true
+        restorecon -F "$NEW_BINARY" || true
+    fi
+
+    # Down before registering, not after: a live control channel makes the
+    # server refuse the registration outright, because a machine id
+    # presented while its own agent is still connected is more likely to
+    # be someone else holding it than a reinstall.
+    if systemctl is-active --quiet vr-agent 2>/dev/null; then
+        AGENT_WAS_RUNNING=1
+        echo "==> stopping the running agent"
+        systemctl stop vr-agent || true
     fi
 
     mkdir -p "$STATE_DIR"
     chmod 0700 "$STATE_DIR"
 
-    if [ ! -f "$STATE_FILE" ] || [ "$FORCE_REGISTER" = "1" ]; then
-        echo "==> registering with ${SERVER_TRIMMED}"
-        REGISTER_ARGS="--server ${SERVER_TRIMMED} --token ${TOKEN} --register-only${CA_ARG}"
-        [ "$FORCE_REGISTER" = "1" ] && REGISTER_ARGS="${REGISTER_ARGS} --re-register"
-        # shellcheck disable=SC2086
-        "$BINARY" $REGISTER_ARGS
-        [ -f "$STATE_FILE" ] || { echo "registration produced no state file" >&2; exit 1; }
-        echo "==> registered"
-    else
-        echo "==> already registered (${STATE_FILE}); skipping registration"
+    echo "==> registering with ${SERVER_TRIMMED}"
+    if ! register_agent; then
+        # The stop above only reaches the server as a socket close
+        # travelling over the network, and until it lands the server still
+        # sees a live channel. One retry covers that window; a second
+        # would be waiting on something that is not going to change.
+        echo "==> registration failed; retrying once in 3s" >&2
+        sleep 3
+        register_agent
+    fi
+    [ -f "$STATE_FILE" ] || { echo "registration produced no state file" >&2; exit 1; }
+    echo "==> registered"
+
+    # Promote the staged binary only now: everything that could have sent
+    # us to cleanup() has already run.
+    mv -f "$NEW_BINARY" "$BINARY"
+    NEW_BINARY=""
+    if command -v restorecon >/dev/null 2>&1; then
+        echo "==> restoring SELinux context on ${BINARY}"
+        restorecon -F "$BINARY" || true
     fi
 
     echo "==> writing ${UNIT_FILE}"

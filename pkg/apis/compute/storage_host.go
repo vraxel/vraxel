@@ -1,6 +1,7 @@
 package compute
 
 import (
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -8,6 +9,7 @@ import (
 	"vraxel.io/vraxel/lib/list"
 	"vraxel.io/vraxel/lib/oidc"
 	"vraxel.io/vraxel/lib/statushub"
+	"vraxel.io/vraxel/pkg/apis/agentgw"
 	modstore "vraxel.io/vraxel/pkg/apis/compute/store"
 	"vraxel.io/vraxel/pkg/apis/shared/scope"
 )
@@ -24,8 +26,9 @@ type hostOps struct {
 // fields, so a partial update of it is the same request as a full one,
 // and a host is deleted one at a time because deleting it detaches a
 // machine that is probably still running.
-func HostsDef(store modstore.HostStore, hub *statushub.Hub) apiserver.ResourceDef[Host] {
+func HostsDef(store modstore.HostStore, agentHosts modstore.AgentHostStore, agents agentgw.AgentStore, hub *statushub.Hub) apiserver.ResourceDef[Host] {
 	o := hostOps{store: store}
+	m := hostMergeOps{hosts: store, agentHosts: agentHosts, agents: agents}
 	return apiserver.ResourceDef[Host]{
 		Group: "compute", Name: "hosts",
 		Scopes: apiserver.ScopeAll,
@@ -36,6 +39,11 @@ func HostsDef(store modstore.HostStore, hub *statushub.Hub) apiserver.ResourceDe
 			Update: o.update,
 			Delete: o.delete,
 		},
+		Verbs: []apiserver.VerbDef{
+			// Read-only, so it inherits compute:hosts:get and declares no
+			// permission of its own.
+			apiserver.Verb("image-siblings", m.imageSiblings),
+		},
 		Actions: []apiserver.ActionDef{
 			// On the collection, and borrowing the collection's own
 			// permission: watching this URL shows exactly what listing it
@@ -43,6 +51,11 @@ func HostsDef(store modstore.HostStore, hub *statushub.Hub) apiserver.ResourceDe
 			// compute:hosts:list and still watch a page that never updates.
 			apiserver.WSAction("watch", []string{"compute:hosts:list"},
 				NewHostWatchHandler(hub), apiserver.OnCollection()),
+			// Deleting a record is what a merge does to the record it
+			// absorbs, so it borrows that permission rather than inventing
+			// one. It is also the heaviest thing the action does: whoever
+			// may merge may already delete either side by hand.
+			apiserver.Action("merge", http.MethodPost, []string{"compute:hosts:delete"}, m.merge),
 		},
 	}
 }
@@ -184,6 +197,7 @@ func hostToAPI(r *modstore.HostRow) Host {
 			AgentConnectedAt:  r.AgentConnectedAt,
 			AgentLastSeenAt:   r.AgentLastSeenAt,
 			AgentConflictAt:   r.AgentConflictAt,
+			ImageGroupSize:    r.ImageGroupSize,
 		},
 	}
 	if r.WorkspaceID != nil {

@@ -80,7 +80,7 @@ func (r *agentHostRegistrar) RegisterAgentHost(ctx context.Context, spec agentgw
 	}
 
 	base := agentHostName(spec.Hostname)
-	for _, name := range agentHostNameCandidates(base, spec.AgentID) {
+	for _, name := range agentHostNameCandidates(base, spec.NameSeed) {
 		id, err := r.store.Create(ctx, modstore.AgentHostCreateInput{
 			Name:        name,
 			DisplayName: spec.Hostname,
@@ -137,14 +137,15 @@ func int64PtrEqual(a, b *int64) bool {
 }
 
 // agentHostNameCandidates lists the names to try, in order: the plain
-// normalised hostname, then progressively longer agent-derived suffixes.
-// Six hex digits already makes a collision between two machines sharing a
-// hostname a 1-in-16-million event; twelve is the belt-and-braces step.
-func agentHostNameCandidates(base, agentID string) []string {
+// normalised hostname, then progressively longer machine-derived
+// suffixes. Six hex digits already makes a collision between two machines
+// sharing a hostname a 1-in-16-million event; twelve is the
+// belt-and-braces step.
+func agentHostNameCandidates(base, nameSeed string) []string {
 	return []string{
 		base,
-		base + "-" + agentgw.NameSuffixForAgent(agentID, 6),
-		base + "-" + agentgw.NameSuffixForAgent(agentID, 12),
+		base + "-" + agentgw.NameSuffixForAgent(nameSeed, 6),
+		base + "-" + agentgw.NameSuffixForAgent(nameSeed, 12),
 	}
 }
 

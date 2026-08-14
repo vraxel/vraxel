@@ -31,6 +31,26 @@ const compute = {
   "compute.host.edit": "Edit host",
   "compute.host.deleteConfirm":
     'Are you sure you want to delete host "{name}"? This action cannot be undone.',
+  "compute.host.deleteAgentWarning":
+    "This host has an agent. Deleting the record does not stop it: the machine keeps dialling in with a credential nothing will honour again. Uninstall it there first (systemctl disable --now vr-agent), or onboard the machine again afterwards.",
+
+  "compute.host.imageGroup": "Cloned image",
+  "compute.host.imageGroupHint":
+    "{count} hosts were built from this disk image (they share /etc/machine-id). They are distinct hosts, but nothing that relies on that id can tell them apart; run systemd-machine-id-setup in the template, then on the machines already cloned from it.",
+  "compute.host.merge": "Merge host records",
+  "compute.host.mergeHint":
+    "Fold this record into the one it duplicates: the agent moves across and this record is deleted.",
+  "compute.host.mergeEvidence":
+    "These records came from one disk image but report different hardware. That is either one machine whose hardware was replaced, or a clone -- only you know which. Merge only if it is the same machine.",
+  "compute.host.mergeInto": "Merge into",
+  "compute.host.mergeConfirm": "Merge into this",
+  "compute.host.mergeNoCandidates": "No other host shares this disk image.",
+  "compute.host.mergeSuccess": "Merged",
+
+  "compute.host.installAgent": "Install agent",
+  "compute.host.reinstallAgent": "Reinstall agent",
+  "compute.host.installAgentHint":
+    "Run the command below on this host. First install, reinstall to upgrade, and recovery after a credential stops working are all the same command.",
 
   // host detail
   "compute.host.basicInfo": "Basic information",

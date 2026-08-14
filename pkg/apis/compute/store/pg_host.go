@@ -62,6 +62,9 @@ type HostRow struct {
 	AgentConnectedAt *time.Time
 	AgentLastSeenAt  *time.Time
 	AgentConflictAt  *time.Time
+	// ImageGroupSize counts the hosts built from this host's disk image,
+	// this one included.
+	ImageGroupSize int64
 }
 
 // HostCreateInput is a host recorded by hand.
@@ -288,6 +291,7 @@ func listRowToDomain(r *generated.ListHostsRow) HostRow {
 		AgentConnectedAt: r.AgentConnectedAt,
 		AgentLastSeenAt:  r.AgentLastSeenAt,
 		AgentConflictAt:  r.AgentConflictAt,
+		ImageGroupSize:   r.ImageGroupSize,
 	}
 }
 
@@ -308,5 +312,6 @@ func getRowToDomain(r *generated.GetHostByIDRow) HostRow {
 		AgentConnectedAt: r.AgentConnectedAt,
 		AgentLastSeenAt:  r.AgentLastSeenAt,
 		AgentConflictAt:  r.AgentConflictAt,
+		ImageGroupSize:   r.ImageGroupSize,
 	}
 }

@@ -27,6 +27,65 @@ type AgentRow struct {
 	ClockSkewMs  int64
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+	// ConflictAt is when two live processes were last caught claiming
+	// this identity. Nil once a clean session gets through.
+	ConflictAt *time.Time
+
+	// --- machine fingerprint ---
+	// What the machine holding this row last reported about itself. See
+	// the 20260814075808 migration for the A/B split these divide into.
+	ProductUUID string
+	MachineID   string
+	MACs        []string
+	// IdentitySource names the class that claimed this row:
+	// IdentitySourceProductUUID, or IdentitySourceNone when nothing
+	// identified the machine and only an operator can bind it.
+	IdentitySource string
+	BootAt         *time.Time
+}
+
+// Identity sources, stored in host_agents.identity_source.
+const (
+	// IdentitySourceProductUUID: the row is claimable by a machine
+	// presenting the same SMBIOS UUID.
+	IdentitySourceProductUUID = "product_uuid"
+	// IdentitySourceNone: the machine offered nothing that can identify
+	// it (no DMI, or firmware junk). Re-registering after losing its
+	// state file produces a second host, which an operator merges.
+	IdentitySourceNone = "none"
+)
+
+// FingerprintInput is what a machine reported about itself, normalised
+// by the business layer. Written on register and refreshed on reconnect.
+type FingerprintInput struct {
+	ProductUUID string
+	MachineID   string
+	MACs        []string
+	Source      string
+	BootAt      *time.Time
+}
+
+// BindInput is one machine claiming one host row.
+type BindInput struct {
+	HostID  int64
+	Version string
+	// AgentID names the row to rebind, or "" to allocate a new identity.
+	// Allocated, never derived: a derived id changes whenever the signal
+	// it came from changes, which is how a cloned disk used to arrive as
+	// an existing agent.
+	AgentID     string
+	Fingerprint FingerprintInput
+	// ClaimUUIDs is the double-check the write side performs under its
+	// lock: if a row already claims one of these, bind to that row
+	// instead of creating a second one. Set only when claiming such a
+	// row would be correct -- a caller that deliberately refused a
+	// candidate (an untrustworthy UUID, say) passes nil, so this cannot
+	// re-admit a decision the caller already made.
+	//
+	// It closes the window between the caller's lookup and this write,
+	// which two concurrent installs of the same machine would otherwise
+	// both pass through.
+	ClaimUUIDs []string
 }
 
 // JoinTokenRow is a registration token. TokenHash is the SHA-256 of the

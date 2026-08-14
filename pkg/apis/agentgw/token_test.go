@@ -87,23 +87,6 @@ func TestTokenRejectsEmptyIdentity(t *testing.T) {
 	}
 }
 
-func TestAgentIDForMachineIsStableAndDistinct(t *testing.T) {
-	// Stability is what makes re-running install-agent.sh idempotent: the
-	// second registration must resolve to the same agent id, hit the
-	// ON CONFLICT (agent_id) branch, and rebind the existing host row.
-	const machine = "3f1a2b4c5d6e7f8091a2b3c4d5e6f708"
-	first := AgentIDForMachine(machine)
-	if first != AgentIDForMachine(machine) {
-		t.Fatal("AgentIDForMachine is not deterministic")
-	}
-	if first == AgentIDForMachine(machine+"0") {
-		t.Fatal("two different machine ids produced the same agent id")
-	}
-	if len(first) != len("6f1d4b2e-9c3a-5f77-8d21-0a5e6b74c910") {
-		t.Fatalf("agent id %q is not uuid-shaped; the DB column is uuid", first)
-	}
-}
-
 func TestNameSuffixForAgentIsStable(t *testing.T) {
 	const agentID = "6f1d4b2e-9c3a-5f77-8d21-0a5e6b74c910"
 	six := NameSuffixForAgent(agentID, 6)

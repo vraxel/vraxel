@@ -72,19 +72,33 @@ func (h *protocolHandler) handleChannel(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Is the machine holding this credential the one it was issued to?
+	// Asked before anything else observable happens, because admitting a
+	// copy marks the host online under a channel belonging to a different
+	// machine -- and then dispatches that host's jobs, carrying that
+	// host's secrets, onto it.
+	if !h.verifyMachine(sessCtx, row, hello) {
+		_ = conn.Close(ws.StatusPolicyViolation,
+			"this credential was issued to a different machine; re-onboard this host to get its own")
+		return
+	}
+
 	// Identity check before anything else observable happens. A contended
 	// agent id means two live processes are claiming it, and admitting
 	// either would mark the host online under a channel we cannot trust
 	// and let the reconciler fail the other one's running jobs.
-	if h.identityContended(sessCtx, claims, hello.BootNonce) {
+	if h.identityContended(sessCtx, row, hello.BootNonce) {
 		_ = conn.Close(ws.StatusPolicyViolation,
 			"another agent is already using this identity; this host looks cloned from an onboarded one")
 		return
 	}
 
 	sess := &Session{
-		AgentID:     claims.AgentID,
-		HostID:      claims.HostID,
+		AgentID: row.AgentID,
+		// From the row, never from the token: a merge moves an agent to
+		// another host without reissuing credentials, so the token's copy
+		// can be one host out of date.
+		HostID:      row.HostID,
 		Version:     hello.AgentVersion,
 		Conn:        conn,
 		ConnectedAt: time.Now(),
@@ -98,11 +112,11 @@ func (h *protocolHandler) handleChannel(w http.ResponseWriter, r *http.Request) 
 	// window in which a driver dispatches onto the fresh channel and the
 	// reconcile, working from the older hello snapshot, immediately kills
 	// that brand-new job while the agent is already running it.
-	h.runManager.OnAgentReconnect(sessCtx, claims.HostID, hello.RunningJobs, sess)
+	h.runManager.OnAgentReconnect(sessCtx, row.HostID, hello.RunningJobs, sess)
 
 	connectedAt := h.registry.Add(sessCtx, sess, clockSkew(hello.ClockUnixMs))
 	logger.Infof("agentgw: agent %s (host %d) channel open, version=%q token_version=%d",
-		claims.AgentID, claims.HostID, hello.AgentVersion, row.TokenVersion)
+		row.AgentID, row.HostID, hello.AgentVersion, row.TokenVersion)
 	defer h.registry.Remove(context.WithoutCancel(h.ctx), sess)
 
 	// Hand the agent its session token for the REST surface, then keep
@@ -129,24 +143,24 @@ func (h *protocolHandler) handleChannel(w http.ResponseWriter, r *http.Request) 
 // a misconfigured fleet, not an authentication decision -- the bearer token
 // already settled that -- so a database blip must not disconnect every
 // agent in the deployment.
-func (h *protocolHandler) identityContended(ctx context.Context, claims *AgentClaims, bootNonce string) bool {
-	contended, err := h.agents.CheckIdentity(ctx, claims.HostID, bootNonce, identityConflictCooldown)
+func (h *protocolHandler) identityContended(ctx context.Context, row *gwstore.AgentRow, bootNonce string) bool {
+	contended, err := h.agents.CheckIdentity(ctx, row.HostID, bootNonce, identityConflictCooldown)
 	if err != nil {
-		logger.Warnf("agentgw channel: identity check for agent %s: %v", claims.AgentID, err)
+		logger.Warnf("agentgw channel: identity check for agent %s: %v", row.AgentID, err)
 		return false
 	}
 	if contended {
 		logger.Warnf("agentgw channel: refusing agent %s (host %d): its identity is claimed by more than one "+
 			"live agent process. This host was most likely cloned from an onboarded one -- reset "+
 			"/etc/machine-id on the copies and re-onboard them. Retries are refused for %s.",
-			claims.AgentID, claims.HostID, identityConflictCooldown)
+			row.AgentID, row.HostID, identityConflictCooldown)
 		// The duplicate holding the channel has to go too, or it would
 		// simply keep it: it never reconnects, so it is never re-checked.
 		// Since a clone boots after the machine it was copied from, the
 		// incumbent is usually the copy -- leaving it in place would hand
 		// the host to the clone and lock the real one out.
-		if h.registry.Evict(claims.HostID, "this host's agent identity is contended") {
-			logger.Warnf("agentgw channel: also dropped the channel host %d was already holding", claims.HostID)
+		if h.registry.Evict(row.HostID, "this host's agent identity is contended") {
+			logger.Warnf("agentgw channel: also dropped the channel host %d was already holding", row.HostID)
 		}
 	}
 	return contended
@@ -232,10 +246,13 @@ func (h *protocolHandler) authAgent(w http.ResponseWriter, r *http.Request) (*Ag
 		}
 		return nil, nil, false
 	}
-	if row.HostID != claims.HostID {
-		http.Error(w, "agent-token host mismatch", http.StatusUnauthorized)
-		return nil, nil, false
-	}
+	// claims.HostID is deliberately NOT compared. It is a snapshot of
+	// where this agent belonged when its token was issued, and the row is
+	// the authority on where it belongs now -- which is what lets an
+	// operator merge two host records without the machine having to
+	// re-onboard. Nothing is lost by dropping the check: agent_id is the
+	// signed identity, and the row it names carries the host id every
+	// caller below uses.
 	// token_version is the revocation lever: bumping the column (a
 	// re-registration, or an explicit revoke later) invalidates every
 	// token minted before it without needing a token blacklist.
@@ -374,4 +391,42 @@ func clockSkew(agentClockUnixMs int64) int64 {
 		return 0
 	}
 	return agentClockUnixMs - time.Now().UnixMilli()
+}
+
+// verifyMachine reports whether this connection may proceed, and records
+// a machine-id reset when it sees one.
+//
+// The refusal it can produce is the deterministic half of clone handling.
+// The boot-nonce check below it catches two live processes alternating on
+// one identity -- which requires them to overlap, and only ever says
+// "somebody is duplicated", never which one is the impostor. This says
+// exactly which, on the first connection, from evidence a copy cannot
+// forge by accident: the original keeps its host, the copy is told to
+// onboard as itself.
+func (h *protocolHandler) verifyMachine(ctx context.Context, row *gwstore.AgentRow, hello *agenttypes.Frame) bool {
+	fp := NewFingerprint("", hello.Fingerprint, time.Now())
+
+	switch VerifyMachine(row, fp) {
+	case VerdictForeignMachine:
+		// Logged, not silent: from the operator's side this looks like a
+		// host that will not come online, and the reason is on a machine
+		// they may not have thought to look at.
+		logger.Warnf("agentgw channel: refused agent %s (host %d): credential was issued to machine %s, caller is %s",
+			row.AgentID, row.HostID, row.ProductUUID, fp.ProductUUID)
+		return false
+	case VerdictMachineIDReset:
+		// The machine kept its hardware identity and changed its image
+		// identity: someone ran systemd-machine-id-setup, which is what we
+		// ask the operator of a cloned host to do. Record it so the host
+		// stops being grouped with the image it was cloned from, and so
+		// the conflict flag clears.
+		if err := h.agents.RefreshFingerprint(ctx, row.HostID, fp.ToStore(row.IdentitySource)); err != nil {
+			// Non-fatal: the machine is who it claims to be either way,
+			// and refusing it over a bookkeeping write would take a host
+			// offline for no safety gain.
+			logger.Warnf("agentgw channel: record machine-id reset for host %d: %v", row.HostID, err)
+		}
+		logger.Infof("agentgw channel: host %d reset its machine id (%s -> %s)", row.HostID, row.MachineID, fp.MachineID)
+	}
+	return true
 }

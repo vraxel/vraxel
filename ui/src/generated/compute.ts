@@ -71,6 +71,15 @@ export interface HostSpec {
    * refuses every channel for the host until it clears.
    */
   agentConflictAt?: string;
+  /**
+   * ImageGroupSize is how many hosts were built from this host's disk
+   * image, this one included. Above 1 means somebody cloned a machine
+   * without resetting /etc/machine-id: the hosts are distinct and
+   * working, but they are indistinguishable by that id everywhere else
+   * it surfaces, and one of them may be a duplicate record of another.
+   * 0 or 1 is the ordinary answer and the UI says nothing.
+   */
+  imageGroupSize?: number /* int64 */;
 }
 /**
  * Host is a managed machine.
@@ -132,4 +141,28 @@ export interface AgentJoinToken {
   kind?: string;
   metadata: ObjectMeta;
   spec: AgentJoinTokenSpec;
+}
+/**
+ * HostMergeRequest folds one host record into another.
+ */
+export interface HostMergeRequest {
+  /**
+   * SourceHostID is the record to absorb and delete. Its agent, if it
+   * has one, moves to the host named in the URL.
+   */
+  sourceHostId: string;
+}
+/**
+ * HostMergeResponse reports what the merge did.
+ */
+export interface HostMergeResponse {
+  /**
+   * HostID is the surviving record.
+   */
+  hostId: string;
+  /**
+   * AgentMoved is true when the surviving record gained an agent from
+   * the one that was absorbed.
+   */
+  agentMoved: boolean;
 }

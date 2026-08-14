@@ -80,12 +80,16 @@ func main() {
 	}
 
 	ch := &client.Channel{
-		ServerURL:  st.ServerURL,
-		AgentToken: func() string { return st.AgentToken },
-		Version:    version,
-		Log:        logger,
-		HTTPClient: httpClient,
-		OnFrame:    onFrame(logger),
+		// Re-read on every connect rather than captured once: resetting
+		// /etc/machine-id is what an operator does to a cloned host, and
+		// the server only learns it happened if the next hello says so.
+		Fingerprint: func() agenttypes.MachineFingerprint { return hostinfo.Collect().Fingerprint() },
+		ServerURL:   st.ServerURL,
+		AgentToken:  func() string { return st.AgentToken },
+		Version:     version,
+		Log:         logger,
+		HTTPClient:  httpClient,
+		OnFrame:     onFrame(logger),
 	}
 
 	logger.Infof("vr-agent %s: agent %s, host %d, server %s", version, st.AgentID, st.HostID, st.ServerURL)
@@ -161,6 +165,7 @@ func ensureRegistered(ctx context.Context, httpClient *http.Client, statePath, s
 		DiskGB:         facts.DiskGB,
 		DefaultRouteIP: facts.DefaultRouteIP,
 		AgentVersion:   version,
+		Fingerprint:    facts.Fingerprint(),
 	})
 	if err != nil {
 		return nil, err

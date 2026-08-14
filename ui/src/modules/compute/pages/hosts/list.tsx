@@ -181,7 +181,7 @@ export default function HostListPage() {
         </Button>
       }
       rowActions={
-        (canUpdate || canDelete)
+        canUpdate || canDelete
           ? (h) => (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -225,7 +225,13 @@ export default function HostListPage() {
           if (!v) setDeleteTarget(null)
         }}
         title={t("common.delete")}
-        description={t("compute.host.deleteConfirm", { name: deleteTarget?.metadata.name ?? "" })}
+        // Same warning as the detail page: deleting the row leaves the
+        // machine's agent dialling in against a credential that will
+        // never be honoured again.
+        description={
+          t("compute.host.deleteConfirm", { name: deleteTarget?.metadata.name ?? "" }) +
+          (deleteTarget?.spec.agentId ? `\n\n${t("compute.host.deleteAgentWarning")}` : "")
+        }
         onConfirm={() => {
           if (deleteTarget) return deleteMutation.mutateAsync(deleteTarget.metadata.id)
         }}
