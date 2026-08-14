@@ -16,7 +16,7 @@ SET used_count = used_count + 1
 WHERE token_hash = $1
   AND expires_at > now()
   AND used_count < max_uses
-RETURNING id, name, token_hash, scope, workspace_id, namespace_id, max_uses, used_count, expires_at, created_by, created_at
+RETURNING id, name, token_hash, scope, workspace_id, namespace_id, max_uses, used_count, expires_at, created_by, created_at, target_host_id
 `
 
 // Atomic claim: the WHERE clause is the concurrency guard (the DB CHECK
@@ -36,6 +36,7 @@ func (q *Queries) ConsumeHostAgentJoinToken(ctx context.Context, tokenHash []byt
 		&i.ExpiresAt,
 		&i.CreatedBy,
 		&i.CreatedAt,
+		&i.TargetHostID,
 	)
 	return i, err
 }
@@ -71,22 +72,23 @@ const createHostAgentJoinToken = `-- name: CreateHostAgentJoinToken :one
 
 INSERT INTO host_agent_join_tokens (
     name, token_hash, scope, workspace_id, namespace_id,
-    max_uses, expires_at, created_by
+    max_uses, expires_at, created_by, target_host_id
 )
 VALUES ($1, $2, $3, $4, $5,
-        $6, $7, $8)
-RETURNING id, name, token_hash, scope, workspace_id, namespace_id, max_uses, used_count, expires_at, created_by, created_at
+        $6, $7, $8, $9)
+RETURNING id, name, token_hash, scope, workspace_id, namespace_id, max_uses, used_count, expires_at, created_by, created_at, target_host_id
 `
 
 type CreateHostAgentJoinTokenParams struct {
-	Name        string    `json:"name"`
-	TokenHash   []byte    `json:"token_hash"`
-	Scope       string    `json:"scope"`
-	WorkspaceID *int64    `json:"workspace_id"`
-	NamespaceID *int64    `json:"namespace_id"`
-	MaxUses     int32     `json:"max_uses"`
-	ExpiresAt   time.Time `json:"expires_at"`
-	CreatedBy   *int64    `json:"created_by"`
+	Name         string    `json:"name"`
+	TokenHash    []byte    `json:"token_hash"`
+	Scope        string    `json:"scope"`
+	WorkspaceID  *int64    `json:"workspace_id"`
+	NamespaceID  *int64    `json:"namespace_id"`
+	MaxUses      int32     `json:"max_uses"`
+	ExpiresAt    time.Time `json:"expires_at"`
+	CreatedBy    *int64    `json:"created_by"`
+	TargetHostID *int64    `json:"target_host_id"`
 }
 
 // host_agent_join_tokens: one-shot registration tokens exchanged for a
@@ -102,6 +104,7 @@ func (q *Queries) CreateHostAgentJoinToken(ctx context.Context, arg CreateHostAg
 		arg.MaxUses,
 		arg.ExpiresAt,
 		arg.CreatedBy,
+		arg.TargetHostID,
 	)
 	var i HostAgentJoinToken
 	err := row.Scan(
@@ -116,6 +119,7 @@ func (q *Queries) CreateHostAgentJoinToken(ctx context.Context, arg CreateHostAg
 		&i.ExpiresAt,
 		&i.CreatedBy,
 		&i.CreatedAt,
+		&i.TargetHostID,
 	)
 	return i, err
 }
@@ -142,7 +146,7 @@ func (q *Queries) DeleteHostAgentJoinToken(ctx context.Context, arg DeleteHostAg
 }
 
 const getHostAgentJoinTokenByID = `-- name: GetHostAgentJoinTokenByID :one
-SELECT t.id, t.name, t.token_hash, t.scope, t.workspace_id, t.namespace_id, t.max_uses, t.used_count, t.expires_at, t.created_by, t.created_at,
+SELECT t.id, t.name, t.token_hash, t.scope, t.workspace_id, t.namespace_id, t.max_uses, t.used_count, t.expires_at, t.created_by, t.created_at, t.target_host_id,
     COALESCE(NULLIF(u.display_name, ''), u.username, '') AS creator_name
 FROM host_agent_join_tokens t
 LEFT JOIN users u ON u.id = t.created_by
@@ -158,18 +162,19 @@ type GetHostAgentJoinTokenByIDParams struct {
 }
 
 type GetHostAgentJoinTokenByIDRow struct {
-	ID          int64     `json:"id"`
-	Name        string    `json:"name"`
-	TokenHash   []byte    `json:"token_hash"`
-	Scope       string    `json:"scope"`
-	WorkspaceID *int64    `json:"workspace_id"`
-	NamespaceID *int64    `json:"namespace_id"`
-	MaxUses     int32     `json:"max_uses"`
-	UsedCount   int32     `json:"used_count"`
-	ExpiresAt   time.Time `json:"expires_at"`
-	CreatedBy   *int64    `json:"created_by"`
-	CreatedAt   time.Time `json:"created_at"`
-	CreatorName string    `json:"creator_name"`
+	ID           int64     `json:"id"`
+	Name         string    `json:"name"`
+	TokenHash    []byte    `json:"token_hash"`
+	Scope        string    `json:"scope"`
+	WorkspaceID  *int64    `json:"workspace_id"`
+	NamespaceID  *int64    `json:"namespace_id"`
+	MaxUses      int32     `json:"max_uses"`
+	UsedCount    int32     `json:"used_count"`
+	ExpiresAt    time.Time `json:"expires_at"`
+	CreatedBy    *int64    `json:"created_by"`
+	CreatedAt    time.Time `json:"created_at"`
+	TargetHostID *int64    `json:"target_host_id"`
+	CreatorName  string    `json:"creator_name"`
 }
 
 func (q *Queries) GetHostAgentJoinTokenByID(ctx context.Context, arg GetHostAgentJoinTokenByIDParams) (GetHostAgentJoinTokenByIDRow, error) {
@@ -187,13 +192,14 @@ func (q *Queries) GetHostAgentJoinTokenByID(ctx context.Context, arg GetHostAgen
 		&i.ExpiresAt,
 		&i.CreatedBy,
 		&i.CreatedAt,
+		&i.TargetHostID,
 		&i.CreatorName,
 	)
 	return i, err
 }
 
 const listHostAgentJoinTokens = `-- name: ListHostAgentJoinTokens :many
-SELECT t.id, t.name, t.token_hash, t.scope, t.workspace_id, t.namespace_id, t.max_uses, t.used_count, t.expires_at, t.created_by, t.created_at,
+SELECT t.id, t.name, t.token_hash, t.scope, t.workspace_id, t.namespace_id, t.max_uses, t.used_count, t.expires_at, t.created_by, t.created_at, t.target_host_id,
     COALESCE(NULLIF(u.display_name, ''), u.username, '') AS creator_name
 FROM host_agent_join_tokens t
 LEFT JOIN users u ON u.id = t.created_by
@@ -224,18 +230,19 @@ type ListHostAgentJoinTokensParams struct {
 }
 
 type ListHostAgentJoinTokensRow struct {
-	ID          int64     `json:"id"`
-	Name        string    `json:"name"`
-	TokenHash   []byte    `json:"token_hash"`
-	Scope       string    `json:"scope"`
-	WorkspaceID *int64    `json:"workspace_id"`
-	NamespaceID *int64    `json:"namespace_id"`
-	MaxUses     int32     `json:"max_uses"`
-	UsedCount   int32     `json:"used_count"`
-	ExpiresAt   time.Time `json:"expires_at"`
-	CreatedBy   *int64    `json:"created_by"`
-	CreatedAt   time.Time `json:"created_at"`
-	CreatorName string    `json:"creator_name"`
+	ID           int64     `json:"id"`
+	Name         string    `json:"name"`
+	TokenHash    []byte    `json:"token_hash"`
+	Scope        string    `json:"scope"`
+	WorkspaceID  *int64    `json:"workspace_id"`
+	NamespaceID  *int64    `json:"namespace_id"`
+	MaxUses      int32     `json:"max_uses"`
+	UsedCount    int32     `json:"used_count"`
+	ExpiresAt    time.Time `json:"expires_at"`
+	CreatedBy    *int64    `json:"created_by"`
+	CreatedAt    time.Time `json:"created_at"`
+	TargetHostID *int64    `json:"target_host_id"`
+	CreatorName  string    `json:"creator_name"`
 }
 
 func (q *Queries) ListHostAgentJoinTokens(ctx context.Context, arg ListHostAgentJoinTokensParams) ([]ListHostAgentJoinTokensRow, error) {
@@ -268,6 +275,7 @@ func (q *Queries) ListHostAgentJoinTokens(ctx context.Context, arg ListHostAgent
 			&i.ExpiresAt,
 			&i.CreatedBy,
 			&i.CreatedAt,
+			&i.TargetHostID,
 			&i.CreatorName,
 		); err != nil {
 			return nil, err
@@ -281,7 +289,7 @@ func (q *Queries) ListHostAgentJoinTokens(ctx context.Context, arg ListHostAgent
 }
 
 const peekHostAgentJoinToken = `-- name: PeekHostAgentJoinToken :one
-SELECT id, name, token_hash, scope, workspace_id, namespace_id, max_uses, used_count, expires_at, created_by, created_at FROM host_agent_join_tokens
+SELECT id, name, token_hash, scope, workspace_id, namespace_id, max_uses, used_count, expires_at, created_by, created_at, target_host_id FROM host_agent_join_tokens
 WHERE token_hash = $1
   AND expires_at > now()
   AND used_count < max_uses
@@ -305,6 +313,7 @@ func (q *Queries) PeekHostAgentJoinToken(ctx context.Context, tokenHash []byte) 
 		&i.ExpiresAt,
 		&i.CreatedBy,
 		&i.CreatedAt,
+		&i.TargetHostID,
 	)
 	return i, err
 }

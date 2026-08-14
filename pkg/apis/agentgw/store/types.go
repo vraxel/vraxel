@@ -44,16 +44,21 @@ type JoinTokenRow struct {
 	CreatedBy   *int64
 	CreatedAt   time.Time
 	CreatorName string
+	// TargetHostID binds the token to a host that already exists; the
+	// agent redeeming it adopts that row instead of creating one. Nil
+	// for the onboarding path.
+	TargetHostID *int64
 }
 
 // JoinTokenCreateInput is the create payload for a join token.
 type JoinTokenCreateInput struct {
-	Name        string
-	TokenHash   []byte
-	Scope       string
-	WorkspaceID *int64
-	NamespaceID *int64
-	MaxUses     int32
-	ExpiresAt   time.Time
-	CreatedBy   *int64
+	Name         string
+	TokenHash    []byte
+	Scope        string
+	WorkspaceID  *int64
+	NamespaceID  *int64
+	MaxUses      int32
+	ExpiresAt    time.Time
+	CreatedBy    *int64
+	TargetHostID *int64
 }

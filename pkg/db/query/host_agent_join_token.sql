@@ -5,10 +5,10 @@
 -- name: CreateHostAgentJoinToken :one
 INSERT INTO host_agent_join_tokens (
     name, token_hash, scope, workspace_id, namespace_id,
-    max_uses, expires_at, created_by
+    max_uses, expires_at, created_by, target_host_id
 )
 VALUES (@name, @token_hash, @scope, @workspace_id, @namespace_id,
-        @max_uses, @expires_at, @created_by)
+        @max_uses, @expires_at, @created_by, sqlc.narg('target_host_id'))
 RETURNING *;
 
 -- name: GetHostAgentJoinTokenByID :one

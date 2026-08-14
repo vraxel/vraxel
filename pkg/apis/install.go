@@ -100,6 +100,7 @@ func moduleRegistrars(database *db.DB) []func(*apiserver.Server) {
 	return []func(*apiserver.Server){
 		iam.Registrar(database),
 		audit.Registrar(database),
+		compute.Registrar(database),
 	}
 }
 

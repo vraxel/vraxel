@@ -6,6 +6,10 @@ info:
 tags:
   - name: AuditLog
     description: 审计日志：记录 API 写操作和认证事件
+  - name: Host
+    description: 主机：通过 agent 纳管或手工录入的机器
+  - name: AgentJoinToken
+    description: Agent 接入令牌：主机侧执行 install-agent.sh 时携带，用于换取长期 agent token。明文只在创建响应中返回一次，库内仅存 SHA-256 哈希。
   - name: User
     description: 用户管理：平台用户的增删改查，支持密码设置与修改。用户可被添加为租户或项目的成员。
   - name: Workspace
@@ -100,6 +104,721 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuditLog'
+  /api/compute/v1/agent-join-tokens:
+    get:
+      summary: List agent-join-tokens
+      operationId: listAgentJoinTokens
+      tags:
+        - AgentJoinToken
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentJoinTokenList'
+    post:
+      summary: Create a AgentJoinToken
+      operationId: createAgentJoinTokens
+      tags:
+        - AgentJoinToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentJoinToken'
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentJoinToken'
+  /api/compute/v1/agent-join-tokens/{agent_join_tokenId}:
+    get:
+      summary: Get a AgentJoinToken
+      operationId: getAgentJoinTokens
+      tags:
+        - AgentJoinToken
+      parameters:
+        - name: agent_join_tokenId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentJoinToken'
+    delete:
+      summary: Delete a AgentJoinToken
+      operationId: deleteAgentJoinTokens
+      tags:
+        - AgentJoinToken
+      parameters:
+        - name: agent_join_tokenId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: No Content
+  /api/compute/v1/hosts:
+    get:
+      summary: 获取主机列表
+      operationId: listHosts
+      tags:
+        - Host
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HostList'
+    post:
+      summary: 录入主机
+      operationId: createHosts
+      tags:
+        - Host
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Host'
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Host'
+  /api/compute/v1/hosts/{hostId}:
+    get:
+      summary: 获取主机详情
+      operationId: getHosts
+      tags:
+        - Host
+      parameters:
+        - name: hostId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Host'
+    put:
+      summary: 更新主机
+      operationId: updateHosts
+      tags:
+        - Host
+      parameters:
+        - name: hostId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Host'
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Host'
+    delete:
+      summary: 删除主机
+      operationId: deleteHosts
+      tags:
+        - Host
+      parameters:
+        - name: hostId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: No Content
+  /api/compute/v1/workspaces/{workspaceId}/agent-join-tokens:
+    get:
+      summary: List agent-join-tokens
+      operationId: listWorkspacesAgentJoinTokens
+      tags:
+        - AgentJoinToken
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentJoinTokenList'
+    post:
+      summary: Create a AgentJoinToken
+      operationId: createWorkspacesAgentJoinTokens
+      tags:
+        - AgentJoinToken
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentJoinToken'
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentJoinToken'
+  /api/compute/v1/workspaces/{workspaceId}/agent-join-tokens/{agent_join_tokenId}:
+    get:
+      summary: Get a AgentJoinToken
+      operationId: getWorkspacesAgentJoinTokens
+      tags:
+        - AgentJoinToken
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: agent_join_tokenId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentJoinToken'
+    delete:
+      summary: Delete a AgentJoinToken
+      operationId: deleteWorkspacesAgentJoinTokens
+      tags:
+        - AgentJoinToken
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: agent_join_tokenId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: No Content
+  /api/compute/v1/workspaces/{workspaceId}/hosts:
+    get:
+      summary: 获取工作空间下的主机列表
+      operationId: listWorkspacesHosts
+      tags:
+        - Host
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HostList'
+    post:
+      summary: 在工作空间下录入主机
+      operationId: createWorkspacesHosts
+      tags:
+        - Host
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Host'
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Host'
+  /api/compute/v1/workspaces/{workspaceId}/hosts/{hostId}:
+    get:
+      summary: 获取工作空间下的主机详情
+      operationId: getWorkspacesHosts
+      tags:
+        - Host
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: hostId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Host'
+    put:
+      summary: 更新工作空间下的主机
+      operationId: updateWorkspacesHosts
+      tags:
+        - Host
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: hostId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Host'
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Host'
+    delete:
+      summary: 删除工作空间下的主机
+      operationId: deleteWorkspacesHosts
+      tags:
+        - Host
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: hostId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: No Content
+  /api/compute/v1/workspaces/{workspaceId}/namespaces/{namespaceId}/agent-join-tokens:
+    get:
+      summary: List agent-join-tokens
+      operationId: listWorkspacesNamespacesAgentJoinTokens
+      tags:
+        - AgentJoinToken
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: namespaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentJoinTokenList'
+    post:
+      summary: Create a AgentJoinToken
+      operationId: createWorkspacesNamespacesAgentJoinTokens
+      tags:
+        - AgentJoinToken
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: namespaceId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentJoinToken'
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentJoinToken'
+  /api/compute/v1/workspaces/{workspaceId}/namespaces/{namespaceId}/agent-join-tokens/{agent_join_tokenId}:
+    get:
+      summary: Get a AgentJoinToken
+      operationId: getWorkspacesNamespacesAgentJoinTokens
+      tags:
+        - AgentJoinToken
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: namespaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: agent_join_tokenId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentJoinToken'
+    delete:
+      summary: Delete a AgentJoinToken
+      operationId: deleteWorkspacesNamespacesAgentJoinTokens
+      tags:
+        - AgentJoinToken
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: namespaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: agent_join_tokenId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: No Content
+  /api/compute/v1/workspaces/{workspaceId}/namespaces/{namespaceId}/hosts:
+    get:
+      summary: 获取项目下的主机列表
+      operationId: listWorkspacesNamespacesHosts
+      tags:
+        - Host
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: namespaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HostList'
+    post:
+      summary: 在项目下录入主机
+      operationId: createWorkspacesNamespacesHosts
+      tags:
+        - Host
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: namespaceId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Host'
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Host'
+  /api/compute/v1/workspaces/{workspaceId}/namespaces/{namespaceId}/hosts/{hostId}:
+    get:
+      summary: 获取项目下的主机详情
+      operationId: getWorkspacesNamespacesHosts
+      tags:
+        - Host
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: namespaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: hostId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Host'
+    put:
+      summary: 更新项目下的主机
+      operationId: updateWorkspacesNamespacesHosts
+      tags:
+        - Host
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: namespaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: hostId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Host'
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Host'
+    delete:
+      summary: 删除项目下的主机
+      operationId: deleteWorkspacesNamespacesHosts
+      tags:
+        - Host
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: namespaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: hostId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: No Content
   /api/iam/v1/namespaces:
     get:
       summary: List namespaces
@@ -2238,6 +2957,22 @@ paths:
                 $ref: '#/components/schemas/OIDCErrorResponse'
 components:
   schemas:
+    AgentJoinToken:
+      type: object
+      properties:
+        metadata:
+          $ref: '#/components/schemas/ObjectMeta'
+        spec:
+          $ref: '#/components/schemas/AgentJoinTokenSpec'
+    AgentJoinTokenList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentJoinToken'
+        totalCount:
+          type: integer
     AuditLog:
       type: object
       properties:
@@ -2326,6 +3061,22 @@ components:
         workspaceId:
           type: string
           description: 租户 ID
+    Host:
+      type: object
+      properties:
+        metadata:
+          $ref: '#/components/schemas/ObjectMeta'
+        spec:
+          $ref: '#/components/schemas/HostSpec'
+    HostList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Host'
+        totalCount:
+          type: integer
     Namespace:
       type: object
       properties:
@@ -2912,6 +3663,10 @@ x-tagGroups:
   - name: audit
     tags:
       - AuditLog
+  - name: compute
+    tags:
+      - Host
+      - AgentJoinToken
   - name: iam
     tags:
       - User
