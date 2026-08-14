@@ -7,31 +7,43 @@ import { useTranslation } from "@/i18n"
 import { useWorkspaceStore } from "@/core/scope/workspace-store"
 import { buildScopedPath } from "@/core/registry/nav-config"
 import { WizardStepper, type WizardStep } from "@/modules/compute/components/wizard-stepper"
+import { AgentInstallPanel } from "@/modules/compute/components/agent-install-panel"
 import { createJoinToken, pollForRegisteredHost } from "@/modules/compute/api/join-tokens"
+import { createHost } from "@/modules/compute/api/hosts"
 import type { Host } from "@/modules/compute/api/types"
-import { StepIdentity, type NamingMode } from "./step-identity"
-import { StepInstall } from "./step-install"
+import { StepMethod, type ImportSource, type Method } from "./step-method"
+import { StepHostForm, type HostDraft } from "./step-host-form"
+import { StepAgent } from "./step-agent"
 
 // Host names follow the backend's rule (validation.go nameRegexp):
 // alphanumerics, underscore and hyphen, 3-50 chars, alphanumeric at both
-// ends. Checked here so a reserved name fails on this screen rather than
-// on the host, minutes later, after the operator has walked to the rack.
+// ends. Checked here so a bad name fails on this screen rather than on
+// submit, after the operator has filled in the rest of the form.
 const HOST_NAME_RE = /^[a-zA-Z0-9]([a-zA-Z0-9_-]{1,48}[a-zA-Z0-9])?$/
+
+const EMPTY_DRAFT: HostDraft = {
+  name: "",
+  description: "",
+  ip: "",
+  sshPort: "22",
+  autoInstallAgent: true,
+}
 
 /**
  * Full-page host creation wizard.
  *
- * A page rather than a dialog because the flow is going to branch:
- * provisioning from a cloud pool will ask for a pool, a template, a spec,
- * networking and a confirmation. A modal that has to hold six steps ends
- * up as LCP's 1026-line host-form-dialog, where one component carries
- * several unrelated creation semantics at once.
+ * A page rather than a dialog because the flow branches: the import path
+ * is three steps today and provisioning from a cloud pool will be six. A
+ * modal that has to hold all of them ends up as LCP's 1026-line
+ * host-form-dialog, where one component carries several unrelated
+ * creation semantics at once.
  *
- * Today there is one way a host comes into existence, so there is no
- * method step -- a step with a single option is a click that asks
- * nothing. When a second way lands it goes back in front as step one and
- * that branch's steps append below; the shell, the stepper and the footer
- * render whatever the step list holds.
+ * The two methods differ only in when the host record is written. Agent
+ * onboarding writes it on registration, so its last step waits for the
+ * machine to call home. Importing writes it at the end of step two, so
+ * step three is already optional follow-up work -- which is why the
+ * footer button reads "create host" on that step, and why the agent step
+ * can be walked away from without losing anything.
  */
 export default function HostOnboardPage() {
   const { t } = useTranslation()
@@ -40,20 +52,30 @@ export default function HostOnboardPage() {
   const workspaceName = useWorkspaceStore((s) => s.currentWorkspaceName)
 
   const [stepIndex, setStepIndex] = useState(0)
-  const [namingMode, setNamingMode] = useState<NamingMode>("auto")
-  const [hostName, setHostName] = useState("")
-  const [description, setDescription] = useState("")
+  const [method, setMethod] = useState<Method>("agent")
+  const [source, setSource] = useState<ImportSource>("manual")
+  const [draft, setDraft] = useState<HostDraft>(EMPTY_DRAFT)
   const [nameError, setNameError] = useState<string | undefined>()
+  const [createdHost, setCreatedHost] = useState<Host | null>(null)
   const [command, setCommand] = useState<string | null>(null)
-  const [minting, setMinting] = useState(false)
+  const [busy, setBusy] = useState(false)
   const [registeredHost, setRegisteredHost] = useState<Host | null>(null)
 
+  const importing = method === "import"
+
   const steps: WizardStep[] = useMemo(
-    () => [
-      { id: "identity", label: t("compute.onboard.step.identity") },
-      { id: "install", label: t("compute.onboard.step.install") },
-    ],
-    [t],
+    () =>
+      importing
+        ? [
+            { id: "method", label: t("compute.onboard.step.method") },
+            { id: "host", label: t("compute.onboard.step.host") },
+            { id: "agent", label: t("compute.onboard.step.agent") },
+          ]
+        : [
+            { id: "method", label: t("compute.onboard.step.method") },
+            { id: "install", label: t("compute.onboard.step.install") },
+          ],
+    [importing, t],
   )
 
   // Named from what is actually to hand. The workspace name is in the
@@ -86,36 +108,80 @@ export default function HostOnboardPage() {
     }
   }, [command, registeredHost])
 
+  const mintToken = async (targetHostId?: string, name?: string) => {
+    try {
+      const token = await createJoinToken(
+        { ws: workspaceId, ns: namespaceId },
+        { targetHostId, name },
+      )
+      setCommand(buildInstallCommand(token.spec.token ?? ""))
+      return true
+    } catch {
+      toast.error(t("compute.onboard.install.mintFailed"))
+      return false
+    }
+  }
+
   const goNext = async () => {
+    // Step one. Importing moves on to the form and mints nothing: there
+    // is no host to bind a token to yet. Agent onboarding mints on the
+    // way in rather than on page load, so an abandoned wizard leaves no
+    // live credential behind.
     if (stepIndex === 0) {
-      if (namingMode === "reserved" && !HOST_NAME_RE.test(hostName.trim())) {
-        setNameError(t("compute.onboard.identity.nameInvalid"))
+      if (importing) {
+        setStepIndex(1)
+        return
+      }
+      setStepIndex(1)
+      setBusy(true)
+      const ok = await mintToken()
+      setBusy(false)
+      if (!ok) setStepIndex(0)
+      return
+    }
+
+    // Step two of the import path: this is where the host is written.
+    if (importing && stepIndex === 1) {
+      if (!HOST_NAME_RE.test(draft.name.trim())) {
+        setNameError(t("compute.onboard.form.nameInvalid"))
+        return
+      }
+      if (draft.autoInstallAgent && !draft.ip.trim()) {
+        toast.error(t("compute.onboard.form.ipRequiredError"))
         return
       }
       setNameError(undefined)
-      // Minting on the way in rather than on page load means an abandoned
-      // wizard leaves no live credential behind.
-      setMinting(true)
-      setStepIndex(1)
+      setBusy(true)
       try {
-        const token = await createJoinToken(
+        const host = await createHost(
           { ws: workspaceId, ns: namespaceId },
           {
-            hostName: namingMode === "reserved" ? hostName.trim() : undefined,
-            name: description.trim() || undefined,
+            name: draft.name.trim(),
+            description: draft.description.trim() || undefined,
+            ip: draft.ip.trim() || undefined,
+            sshPort: Number(draft.sshPort) || 22,
           },
         )
-        setCommand(buildInstallCommand(token.spec.token ?? ""))
+        setCreatedHost(host)
+        setStepIndex(2)
+        // The SSH push needs a credential this deployment cannot hold
+        // yet, so the token is minted for the manual fallback. When the
+        // credential slice lands this becomes: probe, push, and mint only
+        // when the probe or the push fails.
+        if (draft.autoInstallAgent) await mintToken(host.metadata.id, host.metadata.name)
       } catch {
-        toast.error(t("compute.onboard.install.mintFailed"))
-        setStepIndex(0)
+        toast.error(t("compute.onboard.form.createFailed"))
       } finally {
-        setMinting(false)
+        setBusy(false)
       }
       return
     }
-    navigate(hostsPath)
+
+    navigate(createdHost ? `${hostsPath}/${createdHost.metadata.id}` : hostsPath)
   }
+
+  const nextLabel =
+    importing && stepIndex === 1 ? t("compute.onboard.create") : t("compute.onboard.next")
 
   return (
     <div className="p-6">
@@ -141,26 +207,41 @@ export default function HostOnboardPage() {
             across 1600px on a wide monitor. */}
         <div className="px-6 py-6">
           <div className="max-w-3xl">
-            {stepIndex === 0 && (
-              <StepIdentity
-                mode={namingMode}
-                hostName={hostName}
-                description={description}
+            {steps[stepIndex].id === "method" && (
+              <StepMethod
+                method={method}
+                source={source}
                 scopeLabel={scopeLabel}
-                nameError={nameError}
-                onModeChange={setNamingMode}
-                onHostNameChange={(v) => {
-                  setHostName(v)
-                  setNameError(undefined)
-                }}
-                onDescriptionChange={setDescription}
+                onMethodChange={setMethod}
+                onSourceChange={setSource}
               />
             )}
-            {stepIndex === 1 && (
-              <StepInstall
+            {steps[stepIndex].id === "host" && (
+              <StepHostForm
+                draft={draft}
+                nameError={nameError}
+                onChange={(patch) => {
+                  setDraft((d) => ({ ...d, ...patch }))
+                  if (patch.name !== undefined) setNameError(undefined)
+                }}
+              />
+            )}
+            {steps[stepIndex].id === "install" && (
+              <AgentInstallPanel
                 command={command}
                 hostsPath={hostsPath}
-                reservedName={namingMode === "reserved" ? hostName.trim() : undefined}
+                registeredHost={registeredHost}
+              />
+            )}
+            {steps[stepIndex].id === "agent" && createdHost && (
+              <StepAgent
+                createdHost={createdHost}
+                hostsPath={hostsPath}
+                autoInstall={draft.autoInstallAgent}
+                sshFailure={
+                  draft.autoInstallAgent ? t("compute.onboard.agent.noCredential") : undefined
+                }
+                command={command}
                 registeredHost={registeredHost}
               />
             )}
@@ -172,13 +253,17 @@ export default function HostOnboardPage() {
             <Link to={hostsPath}>{t("common.cancel")}</Link>
           </Button>
           <div className="flex items-center gap-2">
-            {stepIndex > 0 && !isLastStep && (
+            {/* No way back once the host is written or a token is handed
+                out: the previous step has already had an irreversible
+                effect, and a Back button that silently does not undo it
+                is worse than no Back button at all. */}
+            {stepIndex > 0 && !isLastStep && !createdHost && (
               <Button variant="outline" onClick={() => setStepIndex((i) => i - 1)}>
                 {t("compute.onboard.prev")}
               </Button>
             )}
-            <Button onClick={goNext} disabled={minting}>
-              {isLastStep ? t("compute.onboard.done") : t("compute.onboard.next")}
+            <Button onClick={goNext} disabled={busy}>
+              {isLastStep ? t("compute.onboard.done") : nextLabel}
             </Button>
           </div>
         </div>

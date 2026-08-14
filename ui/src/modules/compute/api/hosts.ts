@@ -50,3 +50,37 @@ export const hostsApi = {
     return delay(found)
   },
 }
+
+export interface CreateHostInput {
+  name: string
+  description?: string
+  /** Optional: a host reached only through an outbound agent has no
+   *  address the control plane can dial. */
+  ip?: string
+  sshPort?: number
+}
+
+/**
+ * DEMO: creates the record for a host that already exists somewhere.
+ *
+ * The row is written here and not at the end of the wizard, which is the
+ * whole reason installing the agent can be a separate step, skipped, and
+ * done days later from the host detail page. agentStatus starts empty
+ * rather than "offline": no agent has ever been bound, which is a
+ * different thing from one that is not answering.
+ */
+export async function createHost(_scope: ScopeRef, input: CreateHostInput): Promise<Host> {
+  return delay({
+    metadata: {
+      id: String(Date.now()),
+      name: input.name,
+      createdAt: new Date().toISOString(),
+    },
+    spec: {
+      description: input.description,
+      reportedPrimaryIp: input.ip,
+      sshPort: input.sshPort,
+      origin: "manual",
+    },
+  })
+}

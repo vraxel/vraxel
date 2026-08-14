@@ -14,12 +14,33 @@ interface Props {
   /** Scope-aware base path for the host list, e.g.
    *  /compute/workspaces/3/hosts. The joined host's link hangs off it. */
   hostsPath: string
-  reservedName?: string
+  /** Name of the host this token is bound to, when it is bound to one. */
+  boundHostName?: string
   /** Set once an agent has redeemed the token. */
   registeredHost: Host | null
+  /** True when the host record already exists and this agent is joining
+   *  it, rather than the agent bringing the record into existence. Only
+   *  changes the wording -- the operator is waiting on different news. */
+  attaching?: boolean
 }
 
-export function StepInstall({ command, hostsPath, reservedName, registeredHost }: Props) {
+/**
+ * The install-command panel: one-time token warning, the one-liner, and
+ * the wait for the agent to come back.
+ *
+ * Shared by both entry points on purpose. Agent onboarding lands here
+ * from step two; an imported host lands here from step three when the
+ * control plane could not push the agent over SSH. If these were two
+ * components they would drift, and the second one would be the one
+ * nobody notices is stale -- it is the failure path.
+ */
+export function AgentInstallPanel({
+  command,
+  hostsPath,
+  boundHostName,
+  registeredHost,
+  attaching,
+}: Props) {
   const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
   // Cleared on unmount: without it the "copied" tick fires setState on a
@@ -48,10 +69,10 @@ export function StepInstall({ command, hostsPath, reservedName, registeredHost }
         <ShieldAlert className="text-warning mt-0.5 size-4 shrink-0" />
         <p className="text-sm">
           {t("compute.onboard.install.onceWarning")}
-          {reservedName && (
+          {boundHostName && (
             <span className="text-muted-foreground mt-1 block text-xs">
-              {t("compute.onboard.install.reservedFor")}
-              <span className="text-foreground ml-1 font-medium">{reservedName}</span>
+              {t("compute.onboard.install.boundTo")}
+              <span className="text-foreground ml-1 font-medium">{boundHostName}</span>
             </span>
           )}
         </p>
@@ -82,7 +103,11 @@ export function StepInstall({ command, hostsPath, reservedName, registeredHost }
               <span className="bg-success/15 text-success flex size-6 items-center justify-center rounded-full">
                 <Check className="size-3.5" />
               </span>
-              <span className="text-sm font-medium">{t("compute.onboard.install.joined")}</span>
+              <span className="text-sm font-medium">
+                {attaching
+                  ? t("compute.onboard.install.agentOnline")
+                  : t("compute.onboard.install.joined")}
+              </span>
             </div>
             <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm md:grid-cols-3">
               <Field label={t("common.name")} value={registeredHost.metadata.name} />
@@ -111,9 +136,15 @@ export function StepInstall({ command, hostsPath, reservedName, registeredHost }
           <div className="flex items-center gap-3">
             <Loader2 className="text-muted-foreground size-4 animate-spin" />
             <div>
-              <p className="text-sm">{t("compute.onboard.install.waiting")}</p>
+              <p className="text-sm">
+                {attaching
+                  ? t("compute.onboard.install.waitingAgent")
+                  : t("compute.onboard.install.waiting")}
+              </p>
               <p className="text-muted-foreground text-xs">
-                {t("compute.onboard.install.waitingHint")}
+                {attaching
+                  ? t("compute.onboard.install.waitingAgentHint")
+                  : t("compute.onboard.install.waitingHint")}
               </p>
             </div>
             <Badge variant="secondary" className="ml-auto font-normal">

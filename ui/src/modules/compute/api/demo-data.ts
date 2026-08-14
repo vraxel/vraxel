@@ -136,7 +136,8 @@ export const demoJoinTokens: AgentJoinToken[] = [
     metadata: { id: "10", name: "", createdAt: minutesAgo(210) },
     spec: {
       scope: "platform",
-      hostName: "cache-02",
+      targetHostId: "3",
+      targetHostName: "cache-02",
       maxUses: 1,
       usedCount: 0,
       expiresAt: new Date(now + 20 * 3600_000).toISOString(),
