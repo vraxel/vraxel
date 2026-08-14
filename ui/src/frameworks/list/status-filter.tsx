@@ -25,20 +25,22 @@ interface Props {
 
 export function StatusFilter({ selected, onChange, options, allLabel, className }: Props) {
   const { t } = useTranslation()
-  const isFiltered = selected.size > 0 && selected.size < options.length
+  const allValues = options.map((o) => o.value)
+  const effective = selected.size === 0 ? new Set(allValues) : selected
+  const isFiltered = effective.size < options.length
 
-  const selectAll = () => onChange(new Set(options.map((o) => o.value)))
+  const selectAll = () => onChange(new Set())
   const toggle = (value: string) => {
-    const next = new Set(selected)
+    const next = new Set(effective)
     if (next.has(value)) next.delete(value)
     else next.add(value)
-    if (next.size === 0) return selectAll()
+    if (next.size === 0 || next.size === options.length) return selectAll()
     onChange(next)
   }
 
   const label = isFiltered
     ? options
-        .filter((o) => selected.has(o.value))
+        .filter((o) => effective.has(o.value))
         .map((o) => o.label)
         .join(", ")
     : (allLabel ?? t("common.all"))
@@ -61,7 +63,7 @@ export function StatusFilter({ selected, onChange, options, allLabel, className 
         {options.map((opt) => (
           <DropdownMenuCheckboxItem
             key={opt.value}
-            checked={selected.has(opt.value)}
+            checked={effective.has(opt.value)}
             onSelect={(e) => e.preventDefault()}
             onCheckedChange={() => toggle(opt.value)}
           >
