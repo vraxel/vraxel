@@ -93,7 +93,7 @@ func TestJoinTokenScopeComesFromTheHostNotTheCaller(t *testing.T) {
 
 	t.Run("unbound token takes the URL scope", func(t *testing.T) {
 		store := &fakeTokenStore{}
-		o := joinTokenOps{store: store, hostStore: hosts}
+		o := joinTokenOps{store: store, hostStore: hosts, serverURL: "https://vraxel.example.com"}
 		ctx := apiserver.Ctx{Context: context.Background(),
 			Scope: apiserver.ScopeInfo{Level: apiserver.ScopeWorkspace, WorkspaceID: 3}}
 
@@ -109,6 +109,13 @@ func TestJoinTokenScopeComesFromTheHostNotTheCaller(t *testing.T) {
 		}
 		if out.Spec.Token == "" {
 			t.Error("create returned no plaintext; it is the only copy there will ever be")
+		}
+		// Without this the frontend falls back to nothing and the
+		// install command points the agent at whatever address the
+		// OPERATOR happened to use, which is the host itself whenever
+		// that was localhost.
+		if out.Spec.ServerURL != "https://vraxel.example.com" {
+			t.Errorf("serverUrl = %q, want the configured external URL", out.Spec.ServerURL)
 		}
 	})
 

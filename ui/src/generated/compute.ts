@@ -13,6 +13,7 @@ import type { ObjectMeta } from "./meta"
  * agent and a hand-typed copy would be stale within a quarter. Only
  * DisplayName and Description are writable; everything else is either
  * reported by the machine or fixed when the record was created.
+ * +openapi:description=主机属性：可编辑的仅显示名称与描述，其余为 agent 上报或创建时固定。
  */
 export interface HostSpec {
   displayName?: string;
@@ -87,6 +88,7 @@ export interface Host {
  * The plaintext is returned once, by create, and never again: only its
  * SHA-256 hash is stored. The resource is marked Sensitive so the audit
  * log does not capture the create response body.
+ * +openapi:description=接入令牌属性：明文与 serverUrl 仅在创建响应中出现一次。
  */
 export interface AgentJoinTokenSpec {
   scope?: string;

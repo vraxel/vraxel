@@ -2973,6 +2973,37 @@ components:
             $ref: '#/components/schemas/AgentJoinToken'
         totalCount:
           type: integer
+    AgentJoinTokenSpec:
+      type: object
+      properties:
+        createdByName:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        maxUses:
+          type: integer
+          format: int32
+        namespaceId:
+          type: string
+        scope:
+          type: string
+        serverUrl:
+          type: string
+        targetHostId:
+          type: string
+        targetHostName:
+          type: string
+        token:
+          type: string
+        ttlHours:
+          type: integer
+          format: int32
+        usedCount:
+          type: integer
+          format: int32
+        workspaceId:
+          type: string
     AuditLog:
       type: object
       properties:
@@ -3077,6 +3108,62 @@ components:
             $ref: '#/components/schemas/Host'
         totalCount:
           type: integer
+    HostSpec:
+      type: object
+      properties:
+        agentConflictAt:
+          type: string
+          format: date-time
+        agentConnectedAt:
+          type: string
+          format: date-time
+        agentId:
+          type: string
+        agentLastSeenAt:
+          type: string
+          format: date-time
+        agentStatus:
+          type: string
+        agentVersion:
+          type: string
+        arch:
+          type: string
+        connectivityMode:
+          type: string
+        cpuCores:
+          type: integer
+          format: int32
+        createdByName:
+          type: string
+        description:
+          type: string
+        diskGb:
+          type: integer
+          format: int64
+        displayName:
+          type: string
+        hostname:
+          type: string
+        ip:
+          type: string
+        memoryMb:
+          type: integer
+          format: int64
+        namespaceId:
+          type: string
+        origin:
+          type: string
+        os:
+          type: string
+        reportedPrimaryIp:
+          type: string
+        scope:
+          type: string
+        sshPort:
+          type: integer
+          format: int32
+        workspaceId:
+          type: string
     Namespace:
       type: object
       properties:
