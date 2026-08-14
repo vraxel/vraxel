@@ -50,7 +50,7 @@ export default function HostListPage() {
     def: hostsDef,
     api: hostsApi,
     scope,
-    filterKeys: ["agent_status", "scope"],
+    filterKeys: ["agent_status", "scope", "origin"],
   })
   useHostWatch(scope)
 
@@ -146,6 +146,28 @@ export default function HostListPage() {
         <span className="text-sm">
           {h.spec.cpuCores ?? 0} {t("compute.host.cores")} /{" "}
           {Math.round((h.spec.memoryMb ?? 0) / 1024)} GiB
+        </span>
+      ),
+    },
+    {
+      key: "origin",
+      header: t("compute.host.origin"),
+      sortable: true,
+      filter: [
+        { value: "all", label: t("compute.host.originAll") },
+        { value: "agent", label: t("compute.host.originAgent") },
+        { value: "manual", label: t("compute.host.originManual") },
+      ],
+      // Deliberately not connectivityMode, which looks the same on most
+      // rows and means something else: origin is how the record came to
+      // exist and never changes, connectivity is how we reach the host
+      // today and does. An imported host that later installs an agent
+      // stays "manual" here.
+      cell: (h) => (
+        <span className="text-sm">
+          {h.spec.origin === "agent"
+            ? t("compute.host.originAgent")
+            : t("compute.host.originManual")}
         </span>
       ),
     },
