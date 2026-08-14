@@ -195,7 +195,7 @@ export default function HostListPage() {
         title={t("common.delete")}
         description={t("compute.host.deleteConfirm", { name: deleteTarget?.metadata.name ?? "" })}
         onConfirm={() => {
-          if (deleteTarget) deleteMutation.mutate(deleteTarget.metadata.id)
+          if (deleteTarget) return deleteMutation.mutateAsync(deleteTarget.metadata.id)
         }}
         confirmText={t("common.delete")}
       />
