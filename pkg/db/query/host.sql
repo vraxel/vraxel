@@ -151,6 +151,8 @@ ORDER BY
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'organization' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN COALESCE(NULLIF(ns.display_name, ''), ns.name, '') END ASC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'organization' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN COALESCE(NULLIF(w.display_name, ''), w.name, '') END DESC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'organization' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN COALESCE(NULLIF(ns.display_name, ''), ns.name, '') END DESC,
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'origin' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN h.origin END ASC,
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'origin' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN h.origin END DESC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'created_by' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN COALESCE(NULLIF(u.display_name, ''), u.username, '') END ASC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'created_by' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN COALESCE(NULLIF(u.display_name, ''), u.username, '') END DESC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'created_at' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN h.created_at END ASC,

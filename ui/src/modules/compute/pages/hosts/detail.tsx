@@ -168,6 +168,14 @@ export default function HostDetailPage() {
               />
               <Field label={t("compute.host.disk")} value={`${host.spec.diskGb ?? 0} GiB`} />
               <Field label={t("common.description")} value={host.spec.description} />
+              <Field
+                label={t("compute.host.origin")}
+                value={
+                  host.spec.origin === "agent"
+                    ? t("compute.host.originAgent")
+                    : t("compute.host.originManual")
+                }
+              />
               <Field label={t("common.createdBy")} value={host.spec.createdByName} />
               <Field label={t("common.created")} value={formatDateTime(host.metadata.createdAt)} />
             </dl>
