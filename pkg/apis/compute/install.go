@@ -5,11 +5,34 @@
 package compute
 
 import (
+	"context"
+
 	"vraxel.io/vraxel/lib/apiserver"
+	"vraxel.io/vraxel/lib/pgnotify"
+	"vraxel.io/vraxel/lib/statushub"
 	"vraxel.io/vraxel/pkg/apis/agentgw"
 	modstore "vraxel.io/vraxel/pkg/apis/compute/store"
 	"vraxel.io/vraxel/pkg/db"
 )
+
+// ModuleResult is what the assembly layer wires up.
+type ModuleResult struct {
+	// Hub is the in-process end of the host watch stream. Handed back to
+	// Registrar, which binds it into the /hosts/watch route.
+	Hub *statushub.Hub
+}
+
+// NewModule starts the module's background half: the bridge from
+// cross-instance host events to this instance's watchers.
+//
+// Separate from Registrar because the two run at different times and need
+// different things. Registration must work with no database at all (that
+// is how openapi-gen reads the route table), while the bridge needs both
+// a database and the pgnotify multiplexer, and must be subscribed before
+// mux.Start.
+func NewModule(ctx context.Context, database *db.DB, mux *pgnotify.Multiplexer) ModuleResult {
+	return ModuleResult{Hub: StartHostWatch(ctx, mux, modstore.NewPGHostStore(database))}
+}
 
 // NewAgentHostRegistrar builds compute's implementation of the agent
 // gateway's HostRegistrar. Lives here (rather than in agent_registrar.go)
@@ -27,7 +50,10 @@ func NewAgentHostRegistrar(d *db.DB) agentgw.HostRegistrar {
 // Passed in rather than read from the config global so the module has no
 // opinion about where configuration comes from, matching how agentgw
 // receives ServerName.
-func Registrar(database *db.DB, serverURL string) func(*apiserver.Server) {
+// hub is the watch stream from NewModule. It is required: the /watch
+// route binds it at registration, so a caller with nothing to stream
+// passes an unattached hub rather than nil.
+func Registrar(database *db.DB, serverURL string, hub *statushub.Hub) func(*apiserver.Server) {
 	hosts := modstore.NewPGHostStore(database)
 	// The join-token table belongs to the gateway, which owns the
 	// /register path that consumes them. compute reaches it through the
@@ -35,7 +61,7 @@ func Registrar(database *db.DB, serverURL string) func(*apiserver.Server) {
 	// cross-module data path in the tree works.
 	tokens := agentgw.NewJoinTokenStore(database)
 	return func(s *apiserver.Server) {
-		apiserver.Register(s, HostsDef(hosts))
+		apiserver.Register(s, HostsDef(hosts, hub))
 		apiserver.Register(s, AgentJoinTokensDef(tokens, hosts, serverURL))
 	}
 }

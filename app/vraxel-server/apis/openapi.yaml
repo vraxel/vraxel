@@ -296,6 +296,15 @@ paths:
       responses:
         "204":
           description: No Content
+  /api/compute/v1/hosts/watch:
+    get:
+      summary: watch Host
+      operationId: watchHosts
+      tags:
+        - Host
+      responses:
+        "200":
+          description: OK
   /api/compute/v1/workspaces/{workspaceId}/agent-join-tokens:
     get:
       summary: List agent-join-tokens
@@ -535,6 +544,21 @@ paths:
       responses:
         "204":
           description: No Content
+  /api/compute/v1/workspaces/{workspaceId}/hosts/watch:
+    get:
+      summary: watch Host
+      operationId: watchWorkspacesHosts
+      tags:
+        - Host
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
   /api/compute/v1/workspaces/{workspaceId}/namespaces/{namespaceId}/agent-join-tokens:
     get:
       summary: List agent-join-tokens
@@ -819,6 +843,26 @@ paths:
       responses:
         "204":
           description: No Content
+  /api/compute/v1/workspaces/{workspaceId}/namespaces/{namespaceId}/hosts/watch:
+    get:
+      summary: watch Host
+      operationId: watchWorkspacesNamespacesHosts
+      tags:
+        - Host
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: namespaceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
   /api/iam/v1/namespaces:
     get:
       summary: List namespaces

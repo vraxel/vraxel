@@ -76,11 +76,18 @@ func (q *Queries) CreateAgentHost(ctx context.Context, arg CreateAgentHostParams
 	return id, err
 }
 
-const deleteAgentHost = `-- name: DeleteAgentHost :execrows
+const deleteAgentHost = `-- name: DeleteAgentHost :one
 DELETE FROM hosts h
 WHERE h.id = $1
   AND NOT EXISTS (SELECT 1 FROM host_agents ha WHERE ha.host_id = h.id)
+RETURNING h.scope, h.workspace_id, h.namespace_id
 `
+
+type DeleteAgentHostRow struct {
+	Scope       string `json:"scope"`
+	WorkspaceID *int64 `json:"workspace_id"`
+	NamespaceID *int64 `json:"namespace_id"`
+}
 
 // Roll back a host row created by a registration that then failed.
 //
@@ -97,12 +104,16 @@ WHERE h.id = $1
 // The caller applies the same rule in-process (register.go passes the
 // create/attach outcome). This is the second lock on the same door,
 // because the thing behind it is an unrecoverable delete.
-func (q *Queries) DeleteAgentHost(ctx context.Context, id int64) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteAgentHost, id)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+//
+// RETURNING the tenancy serves the watch event, which has to route a
+// deletion after the row that carried its scope is gone. No rows means
+// the guard held (or the row was already gone), which is what zero
+// affected rows used to mean.
+func (q *Queries) DeleteAgentHost(ctx context.Context, id int64) (DeleteAgentHostRow, error) {
+	row := q.db.QueryRow(ctx, deleteAgentHost, id)
+	var i DeleteAgentHostRow
+	err := row.Scan(&i.Scope, &i.WorkspaceID, &i.NamespaceID)
+	return i, err
 }
 
 const getAgentHostScope = `-- name: GetAgentHostScope :one

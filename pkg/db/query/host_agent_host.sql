@@ -51,7 +51,7 @@ WHERE id = @id;
 -- of the host being claimed.
 SELECT scope, workspace_id, namespace_id FROM hosts WHERE id = @id;
 
--- name: DeleteAgentHost :execrows
+-- name: DeleteAgentHost :one
 -- Roll back a host row created by a registration that then failed.
 --
 -- The guard is "no agent is bound to this host", not the old
@@ -67,6 +67,12 @@ SELECT scope, workspace_id, namespace_id FROM hosts WHERE id = @id;
 -- The caller applies the same rule in-process (register.go passes the
 -- create/attach outcome). This is the second lock on the same door,
 -- because the thing behind it is an unrecoverable delete.
+--
+-- RETURNING the tenancy serves the watch event, which has to route a
+-- deletion after the row that carried its scope is gone. No rows means
+-- the guard held (or the row was already gone), which is what zero
+-- affected rows used to mean.
 DELETE FROM hosts h
 WHERE h.id = @id
-  AND NOT EXISTS (SELECT 1 FROM host_agents ha WHERE ha.host_id = h.id);
+  AND NOT EXISTS (SELECT 1 FROM host_agents ha WHERE ha.host_id = h.id)
+RETURNING h.scope, h.workspace_id, h.namespace_id;

@@ -28,11 +28,17 @@ type AgentStore interface {
 	// connected_at it wrote -- the session token's connEpoch, which a
 	// later reconnect changes to invalidate stale tokens (design §4.1).
 	MarkOnline(ctx context.Context, hostID int64, instanceID, version string, clockSkewMs int64) (time.Time, error)
-	// Touch records a heartbeat and restores status='online' for the row
-	// this instance owns, so a stale-sweep misfire heals on the next beat.
-	// It reports whether the row was ours: false means another instance
-	// (or a failed MarkOnline) holds the claim and the caller must take it
-	// back, since every further beat would be a no-op.
+	// Touch records a heartbeat against the row this instance owns and
+	// holds online. It reports whether that row was found: false means
+	// another instance holds the claim, MarkOnline never landed, or a
+	// stale-sweep misfire marked a live agent offline. All three are
+	// repaired by taking the row back with MarkOnline, which the caller
+	// must do -- every further beat would otherwise be a no-op.
+	//
+	// The heartbeat deliberately does not restore status itself. It runs
+	// once per agent per 15s, and a status write there would be
+	// indistinguishable from a real online transition on the watch
+	// channel.
 	Touch(ctx context.Context, hostID int64, instanceID string, clockSkewMs int64) (claimed bool, err error)
 	MarkOffline(ctx context.Context, hostID int64, instanceID string) error
 	// MarkOrphansOffline clears rows left online by instances that no

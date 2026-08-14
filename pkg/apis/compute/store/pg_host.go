@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"vraxel.io/vraxel/lib/list"
+	"vraxel.io/vraxel/pkg/apis/shared/hostevent"
 	"vraxel.io/vraxel/pkg/apis/shared/scope"
 	"vraxel.io/vraxel/pkg/db"
 	"vraxel.io/vraxel/pkg/db/generated"
@@ -184,6 +185,12 @@ func (s *pgHostStore) Create(ctx context.Context, in HostCreateInput) (int64, er
 	if err != nil {
 		return 0, fmt.Errorf("create host: %w", pgerrors.CheckPG(err))
 	}
+	// Announced from the store rather than the handler because a host row
+	// is written from more than one entry point (this one, and the agent
+	// registrar next door), and this is the layer they have in common.
+	hostevent.Channel.Publish(ctx, s.DB.GetPool(), hostevent.Event{
+		HostID: id, Scope: in.Scope, WorkspaceID: in.WorkspaceID, NamespaceID: in.NamespaceID,
+	})
 	return id, nil
 }
 
@@ -201,21 +208,29 @@ func (s *pgHostStore) Update(ctx context.Context, id int64, sf scope.Filter, in 
 	if n == 0 {
 		return fmt.Errorf("host %d: %w", id, pgerrors.ErrNotFound)
 	}
+	// No scope: the row is still there, so the subscriber can read the
+	// tenancy itself, and this statement does not have it at hand.
+	hostevent.Channel.Publish(ctx, s.DB.GetPool(), hostevent.Event{HostID: id})
 	return nil
 }
 
 func (s *pgHostStore) Delete(ctx context.Context, id int64, sf scope.Filter) error {
-	n, err := s.Q().DeleteHost(ctx, generated.DeleteHostParams{
+	row, err := s.Q().DeleteHost(ctx, generated.DeleteHostParams{
 		ID:                id,
 		WorkspaceIDFilter: sf.WorkspaceID,
 		NamespaceIDFilter: sf.NamespaceID,
 	})
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("host %d: %w", id, pgerrors.ErrNotFound)
+		}
 		return fmt.Errorf("delete host: %w", err)
 	}
-	if n == 0 {
-		return fmt.Errorf("host %d: %w", id, pgerrors.ErrNotFound)
-	}
+	// The deleted row's own tenancy, which nothing can look up afterwards.
+	hostevent.Channel.Publish(ctx, s.DB.GetPool(), hostevent.Event{
+		HostID: id, Scope: row.Scope, WorkspaceID: row.WorkspaceID, NamespaceID: row.NamespaceID,
+		Deleted: true,
+	})
 	return nil
 }
 

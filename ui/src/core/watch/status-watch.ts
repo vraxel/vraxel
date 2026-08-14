@@ -1,25 +1,22 @@
 import { create } from "zustand"
 import { buildTaskWsUrl } from "@/core/watch/ws-url"
+import { openReconnectingSocket } from "./reconnecting-socket"
 
+/**
+ * One entity change, as pushed by a module's /watch endpoint.
+ *
+ * It deliberately carries no data about the entity. Subscribers refetch
+ * through the normal API on receipt, so the socket never becomes a
+ * second, subtly different source of truth for what a row looks like --
+ * and a dropped event (the server drops for slow readers, and pgnotify
+ * drops during a reconnect) costs a stale row until the next event
+ * rather than a wrong one.
+ */
 export interface StatusEvent {
+  /** Discriminates resources when one module's hub carries several. */
   entityType: string
   entityId: number
-  // status 是 P1-P3 dual-track 期间保留的旧字段，承载 hosts.status 列
-  // 的字面值（含 active / provisioning 等 legacy 值）。
-  status: string
-  // host status redesign — 新前端只读这三个字段，phase 是单一 badge
-  // 数据源。后端 PhaseStore.Apply 在 commit 后通过 statushub 推过来；
-  // legacy 写入路径（provision_host.go 等）发的事件不会带这三个字段，
-  // 此时 phase 为 undefined，前端不更新 host.status.phase（保留旧值）。
-  phase?: string
-  opKind?: string
-  phaseAt?: string
-  // 节点级事件（如 mysql_node）携带 status_message，订阅者可同步更新 detail
-  // 页 error tooltip。空字符串明确清空消息（成功收尾）；undefined 表示该事件
-  // 不带 message 字段（实例级事件等），订阅者保留缓存。
-  statusMessage?: string
-  // deleted 是硬删除信号：行已从数据库消失，订阅者应该把它从缓存
-  // 列表里剔除。替代曾经用 status === "deleted" 做哨兵的旧约定。
+  /** The row is gone: drop it from caches instead of refetching a 404. */
   deleted?: boolean
 }
 
@@ -40,20 +37,21 @@ export const useStatusWatch = create<StatusWatchState>()((_set, get) => ({
   },
 }))
 
-// Per-module WS connections. The map keys by module so a host page +
-// a mysql page can run their watchers in parallel without one closing
-// the other (covers split-pane setups, future side-panel previews,
-// etc.). Each connection auto-reconnects on close.
+// Per-module WS connections. The map keys by module so two pages from
+// different modules can watch in parallel without one closing the
+// other's socket. Each connection reconnects on its own.
 type Connection = {
-  ws: WebSocket | null
+  /**
+   * Close handle from openReconnectingSocket, which owns the socket and
+   * the retry policy. null = nothing open for this module.
+   */
+  close: (() => void) | null
   scopeKey: string
-  reconnectTimer: ReturnType<typeof setTimeout> | null
-  // Refcount of mounted subscribers (pages/components). The socket used
-  // to live forever once opened (disconnectModuleWatch had zero callers)
-  // and kept 3s-reconnecting even after logout. Now each
-  // connectModuleWatch() returns a release fn; when the count drops to
-  // zero the connection closes after a short linger (so a list->detail
-  // navigation within the same module doesn't bounce the socket).
+  /**
+   * Mounted subscribers (pages/components). When it drops to zero the
+   * connection closes after a short linger, so navigating list -> detail
+   * within one module does not bounce the socket.
+   */
   refCount: number
   idleCloseTimer: ReturnType<typeof setTimeout> | null
 }
@@ -67,54 +65,43 @@ function dispatch(event: StatusEvent) {
 
 function connect(module: string, wsUrl: string, scopeKey: string) {
   const c = connections.get(module) || {
-    ws: null,
+    close: null,
     scopeKey: "",
-    reconnectTimer: null,
     refCount: 0,
     idleCloseTimer: null,
   }
-  if (c.reconnectTimer) {
-    clearTimeout(c.reconnectTimer)
-    c.reconnectTimer = null
-  }
-  if (c.ws) {
-    c.ws.close()
-    c.ws = null
+  if (c.close) {
+    c.close()
+    c.close = null
   }
 
   c.scopeKey = scopeKey
-  const ws = new WebSocket(wsUrl)
-  ws.binaryType = "arraybuffer"
-  ws.onmessage = (e) => {
-    const arr = new Uint8Array(e.data as ArrayBuffer)
-    if (arr[0] !== 0x00) return
-    try {
-      dispatch(JSON.parse(new TextDecoder().decode(arr.slice(1))))
-    } catch {
-      /* ignore */
-    }
-  }
-  ws.onclose = () => {
-    // The browser fires close asynchronously: when connect() replaces a
-    // socket (scope change) or disconnectModuleWatch() closed it, this
-    // stale handler must not null out the CURRENT socket or reconnect.
-    if (c.ws !== ws) return
-    c.ws = null
-    if (c.scopeKey === scopeKey) {
-      c.reconnectTimer = setTimeout(() => connect(module, wsUrl, scopeKey), 3000)
-    }
-  }
-  c.ws = ws
+  c.close = openReconnectingSocket(
+    () => wsUrl,
+    {
+      onMessage: (e) => {
+        // Frames are [type][payload]; 0x00 is MsgData (lib/websocket).
+        const arr = new Uint8Array(e.data as ArrayBuffer)
+        if (arr[0] !== 0x00) return
+        try {
+          dispatch(JSON.parse(new TextDecoder().decode(arr.slice(1))))
+        } catch {
+          /* a frame we cannot parse is not worth a broken page */
+        }
+      },
+    },
+    { binaryType: "arraybuffer" },
+  )
   connections.set(module, c)
 }
 
-// connectModuleWatch is the generic entry point: subscribe to one
-// module's resource-collection /watch endpoint. Listeners filter by
-// event.entityType to discard events from other entity types if the
-// module hub is shared across resources (db's hub will fan out
-// mysql/pgsql/redis events; subscribers on /db/mysql/watch only get
-// mysql events because the watch handler filters server-side, but
-// listeners should still defensively check entityType).
+/**
+ * Subscribe to one module's resource-collection /watch endpoint.
+ *
+ * Returns a release function; call it from the effect cleanup. Listeners
+ * are registered separately (useStatusWatch.subscribe) and are shared
+ * across modules, so they should check event.entityType.
+ */
 export function connectModuleWatch(
   module: string,
   resource: string,
@@ -124,7 +111,7 @@ export function connectModuleWatch(
   const scopeKey = `${resource}:${scopeWorkspaceId || ""}:${scopeNamespaceId || ""}`
   let c = connections.get(module)
   if (!c) {
-    c = { ws: null, scopeKey: "", reconnectTimer: null, refCount: 0, idleCloseTimer: null }
+    c = { close: null, scopeKey: "", refCount: 0, idleCloseTimer: null }
     connections.set(module, c)
   }
   c.refCount++
@@ -132,12 +119,9 @@ export function connectModuleWatch(
     clearTimeout(c.idleCloseTimer)
     c.idleCloseTimer = null
   }
-  const sameScopeAlive =
-    c.scopeKey === scopeKey &&
-    ((c.ws && c.ws.readyState <= WebSocket.OPEN) || c.reconnectTimer !== null)
+  const sameScopeAlive = c.scopeKey === scopeKey && c.close !== null
   if (!sameScopeAlive) {
-    const wsUrl = buildTaskWsUrl(module, resource, scopeWorkspaceId, scopeNamespaceId)
-    connect(module, wsUrl, scopeKey)
+    connect(module, buildTaskWsUrl(module, resource, scopeWorkspaceId, scopeNamespaceId), scopeKey)
   }
   let released = false
   return () => {
@@ -156,25 +140,13 @@ export function disconnectModuleWatch(module: string) {
   const c = connections.get(module)
   if (!c) return
   c.scopeKey = ""
-  if (c.reconnectTimer) {
-    clearTimeout(c.reconnectTimer)
-    c.reconnectTimer = null
-  }
   if (c.idleCloseTimer) {
     clearTimeout(c.idleCloseTimer)
     c.idleCloseTimer = null
   }
-  if (c.ws) {
-    c.ws.close()
-    c.ws = null
+  if (c.close) {
+    c.close()
+    c.close = null
   }
   connections.delete(module)
-}
-
-// Backward-compat shim: existing host pages call this.
-export function connectStatusWatch(
-  scopeWorkspaceId?: string,
-  scopeNamespaceId?: string,
-): () => void {
-  return connectModuleWatch("compute", "hosts/watch", scopeWorkspaceId, scopeNamespaceId)
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"vraxel.io/vraxel/pkg/apis/shared/hostevent"
 	"vraxel.io/vraxel/pkg/db"
 	"vraxel.io/vraxel/pkg/db/generated"
 	"vraxel.io/vraxel/pkg/db/pgerrors"
@@ -96,6 +97,11 @@ func (s *pgAgentHostStore) Create(ctx context.Context, in AgentHostCreateInput) 
 	if err != nil {
 		return 0, fmt.Errorf("create agent host: %w", pgerrors.CheckPG(err))
 	}
+	// The one event an operator is most likely to be watching for: a
+	// machine that just onboarded itself appearing in the list.
+	hostevent.Channel.Publish(ctx, s.DB.GetPool(), hostevent.Event{
+		HostID: id, Scope: in.Scope, WorkspaceID: in.WorkspaceID, NamespaceID: in.NamespaceID,
+	})
 	return id, nil
 }
 
@@ -115,13 +121,17 @@ func (s *pgAgentHostStore) GetScope(ctx context.Context, hostID int64) (*AgentHo
 }
 
 func (s *pgAgentHostStore) Delete(ctx context.Context, hostID int64) error {
-	n, err := s.Q().DeleteAgentHost(ctx, hostID)
+	row, err := s.Q().DeleteAgentHost(ctx, hostID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("host %d: %w", hostID, pgerrors.ErrNotFound)
+		}
 		return fmt.Errorf("delete agent host: %w", pgerrors.CheckPG(err))
 	}
-	if n == 0 {
-		return fmt.Errorf("host %d: %w", hostID, pgerrors.ErrNotFound)
-	}
+	hostevent.Channel.Publish(ctx, s.DB.GetPool(), hostevent.Event{
+		HostID: hostID, Scope: row.Scope, WorkspaceID: row.WorkspaceID, NamespaceID: row.NamespaceID,
+		Deleted: true,
+	})
 	return nil
 }
 
@@ -142,5 +152,8 @@ func (s *pgAgentHostStore) UpdateFacts(ctx context.Context, hostID int64, in Age
 	if n == 0 {
 		return fmt.Errorf("host %d: %w", hostID, pgerrors.ErrNotFound)
 	}
+	// Facts are half the columns the list renders (os / arch / cpu / mem /
+	// ip), and they change exactly once per registration.
+	hostevent.Channel.Publish(ctx, s.DB.GetPool(), hostevent.Event{HostID: hostID})
 	return nil
 }

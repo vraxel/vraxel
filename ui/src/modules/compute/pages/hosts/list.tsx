@@ -28,6 +28,7 @@ import { hostsApi } from "@/modules/compute/api/hosts"
 import type { Host } from "@/modules/compute/api/types"
 import { hostsDef } from "@/modules/compute/defs"
 import { AgentStatusBadge } from "@/modules/compute/components/agent-status-badge"
+import { useHostWatch } from "@/modules/compute/use-host-watch"
 
 export default function HostListPage() {
   const { t } = useTranslation()
@@ -51,6 +52,9 @@ export default function HostListPage() {
     scope,
     filterKeys: ["agentStatus"],
   })
+  // Agents come and go without anyone touching this page, and a machine
+  // running the install script adds itself to this list.
+  useHostWatch(scope)
 
   const deleteMutation = useApiMutation({
     mutationFn: (id: string) => hostsApi.delete(scope, id),

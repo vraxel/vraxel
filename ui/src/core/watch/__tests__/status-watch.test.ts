@@ -1,71 +1,104 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import { connectModuleWatch, useStatusWatch, type StatusEvent } from "../status-watch"
 
-// Confirms the StatusEvent.deleted lifecycle flag is dispatched
-// untouched and that subscribers can branch on it. Replaces the
-// legacy `event.status === "deleted"` sentinel pattern.
-describe("StatusWatch.deleted", () => {
+class FakeWebSocket {
+  static instances: FakeWebSocket[] = []
+  static CONNECTING = 0
+  static OPEN = 1
+  static CLOSING = 2
+  static CLOSED = 3
+  url: string
+  binaryType = ""
+  readyState = 1
+  onopen: (() => void) | null = null
+  onmessage: ((e: unknown) => void) | null = null
+  onclose: (() => void) | null = null
+  onerror: (() => void) | null = null
+  constructor(url: string) {
+    this.url = url
+    FakeWebSocket.instances.push(this)
+  }
+  close() {
+    this.readyState = 3
+    // Browsers dispatch the close event asynchronously; mirroring that
+    // is what exposes stale-onclose bugs (a replaced socket's close
+    // firing after the replacement socket was opened).
+    setTimeout(() => this.onclose?.(), 0)
+  }
+}
+
+/** One server frame: [msgType][json]. 0x00 is MsgData. */
+function frame(msgType: number, body: string): { data: ArrayBuffer } {
+  const payload = new TextEncoder().encode(body)
+  const buf = new Uint8Array(payload.length + 1)
+  buf[0] = msgType
+  buf.set(payload, 1)
+  return { data: buf.buffer }
+}
+
+// The wire format is the contract between lib/websocket's framing and
+// this decoder. Every test here drives it through the socket rather than
+// calling listeners directly, because "the listener runs when someone
+// calls it" is not a fact about the code under test.
+describe("StatusWatch frame decoding", () => {
+  let received: StatusEvent[]
+
   beforeEach(() => {
+    vi.useFakeTimers()
+    FakeWebSocket.instances = []
+    vi.stubGlobal("WebSocket", FakeWebSocket)
     useStatusWatch.getState().listeners.clear()
+    received = []
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
   })
 
-  it("dispatches event with deleted=true to subscribers", () => {
-    const received: StatusEvent[] = []
-    const unsub = useStatusWatch.getState().subscribe((ev) => received.push(ev))
+  function open(module: string) {
+    useStatusWatch.getState().subscribe((ev) => received.push(ev))
+    const release = connectModuleWatch(module, "hosts/watch")
+    return { socket: FakeWebSocket.instances[0], release }
+  }
 
-    const ev: StatusEvent = {
-      entityType: "mysql",
-      entityId: 42,
-      status: "",
-      phase: "",
-      opKind: "",
-      deleted: true,
-    }
-    useStatusWatch.getState().listeners.forEach((fn) => fn(ev))
+  it("dispatches a data frame to every listener", () => {
+    const second: StatusEvent[] = []
+    useStatusWatch.getState().subscribe((ev) => second.push(ev))
+    const { socket, release } = open("t-decode")
 
-    expect(received).toHaveLength(1)
+    socket.onmessage?.(frame(0x00, JSON.stringify({ entityType: "host", entityId: 42 })))
+
+    expect(received).toEqual([{ entityType: "host", entityId: 42 }])
+    expect(second).toHaveLength(1)
+    release()
+  })
+
+  it("carries the deleted flag through", () => {
+    const { socket, release } = open("t-deleted")
+
+    socket.onmessage?.(
+      frame(0x00, JSON.stringify({ entityType: "host", entityId: 7, deleted: true })),
+    )
+
     expect(received[0].deleted).toBe(true)
-    expect(received[0].entityId).toBe(42)
-    unsub()
+    release()
   })
 
-  it("non-delete events have undefined deleted field", () => {
-    const received: StatusEvent[] = []
-    const unsub = useStatusWatch.getState().subscribe((ev) => received.push(ev))
+  it("ignores frames that are not MsgData", () => {
+    const { socket, release } = open("t-msgtype")
 
-    useStatusWatch.getState().listeners.forEach((fn) =>
-      fn({
-        entityType: "mysql",
-        entityId: 1,
-        status: "running",
-      }),
-    )
+    socket.onmessage?.(frame(0x01, JSON.stringify({ entityType: "host", entityId: 1 })))
 
-    expect(received[0].deleted).toBeUndefined()
-    unsub()
+    expect(received).toHaveLength(0)
+    release()
   })
 
-  it("multiple listeners all receive deleted event independently", () => {
-    const a: StatusEvent[] = []
-    const b: StatusEvent[] = []
-    const unsubA = useStatusWatch.getState().subscribe((ev) => a.push(ev))
-    const unsubB = useStatusWatch.getState().subscribe((ev) => b.push(ev))
+  it("survives a malformed payload", () => {
+    const { socket, release } = open("t-garbage")
 
-    useStatusWatch.getState().listeners.forEach((fn) =>
-      fn({
-        entityType: "redis",
-        entityId: 7,
-        status: "",
-        deleted: true,
-      }),
-    )
-
-    expect(a).toHaveLength(1)
-    expect(b).toHaveLength(1)
-    expect(a[0].deleted).toBe(true)
-    expect(b[0].deleted).toBe(true)
-    unsubA()
-    unsubB()
+    expect(() => socket.onmessage?.(frame(0x00, "{not json"))).not.toThrow()
+    expect(received).toHaveLength(0)
+    release()
   })
 })
 
@@ -75,30 +108,6 @@ describe("StatusWatch.deleted", () => {
 // Each test uses a distinct module name because the module-level
 // `connections` map is shared across tests (static import, no reset).
 describe("StatusWatch connection refcount", () => {
-  class FakeWebSocket {
-    static instances: FakeWebSocket[] = []
-    static CONNECTING = 0
-    static OPEN = 1
-    static CLOSING = 2
-    static CLOSED = 3
-    url: string
-    binaryType = ""
-    readyState = 1
-    onmessage: ((e: unknown) => void) | null = null
-    onclose: (() => void) | null = null
-    constructor(url: string) {
-      this.url = url
-      FakeWebSocket.instances.push(this)
-    }
-    close() {
-      this.readyState = 3
-      // Browsers dispatch the close event asynchronously; mirroring that
-      // is what exposes stale-onclose bugs (a replaced socket's close
-      // firing after the replacement socket was opened).
-      setTimeout(() => this.onclose?.(), 0)
-    }
-  }
-
   beforeEach(() => {
     vi.useFakeTimers()
     FakeWebSocket.instances = []
@@ -172,8 +181,24 @@ describe("StatusWatch connection refcount", () => {
     const r1 = connectModuleWatch("t-idle", "x/watch")
     r1()
     vi.advanceTimersByTime(60_000) // linger close + async close event
-    const ws = FakeWebSocket.instances[0]
-    expect(ws.readyState).toBe(3)
-    expect(FakeWebSocket.instances).toHaveLength(1) // no 3s auto-reconnect
+    expect(FakeWebSocket.instances[0].readyState).toBe(3)
+    expect(FakeWebSocket.instances).toHaveLength(1) // no reconnect after a deliberate close
+  })
+
+  // A server restart drops every open socket. The retry has to come back
+  // on its own, and it has to back off: the pre-port version retried on a
+  // fixed 3s timer, so every tab in the building knocked in unison.
+  it("reconnects with backoff after the server drops the connection", () => {
+    const release = connectModuleWatch("t-drop", "x/watch")
+    FakeWebSocket.instances[0].readyState = 3
+    FakeWebSocket.instances[0].onclose?.()
+
+    expect(FakeWebSocket.instances).toHaveLength(1) // not immediately
+    vi.advanceTimersByTime(2_000) // first retry is ~1s +/- jitter
+    expect(FakeWebSocket.instances).toHaveLength(2)
+
+    release()
+    vi.advanceTimersByTime(60_000)
+    expect(FakeWebSocket.instances[1].readyState).toBe(3)
   })
 })

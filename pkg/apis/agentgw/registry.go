@@ -224,10 +224,11 @@ func (r *Registry) Remove(ctx context.Context, sess *Session) {
 	logger.Infof("agentgw: agent %s (host %d) channel closed", sess.AgentID, sess.HostID)
 }
 
-// Touch records a heartbeat, which also restores status='online' for the
-// row this instance owns (see the SQL): the stale sweep can misfire while
-// DB writes are unavailable, and the next beat must heal that rather than
-// leave a connected agent marked offline forever.
+// Touch records a heartbeat against the row this instance owns and holds
+// online. A beat that matches nothing falls through to a re-claim, which
+// is what heals a stale-sweep misfire: the sweep can fire while DB writes
+// are unavailable, and without the re-claim a connected agent would stay
+// marked offline forever.
 //
 // It returns a non-zero time when the row had to be re-claimed, which the
 // caller must treat as a new connection epoch (see below).
@@ -241,14 +242,14 @@ func (r *Registry) Touch(ctx context.Context, sess *Session, clockSkewMs int64) 
 		return time.Time{}
 	}
 
-	// The heartbeat matched nothing, so host_agents says some other
-	// instance owns this agent while we are the one holding its socket.
-	// Two ways in: MarkOnline failed when this channel was accepted, or a
-	// sibling's delayed write landed after ours during a reconnect. Both
-	// are silent and permanent if left alone -- the guard makes every
-	// later beat a no-op too, so the row stays wrong (offline, or pointing
-	// at an instance that cannot reach this agent) until the agent happens
-	// to reconnect, which a healthy channel never does.
+	// The heartbeat matched nothing, so host_agents disagrees with the
+	// socket we are holding: another instance owns the row, or it is
+	// marked offline. Three ways in: MarkOnline failed when this channel
+	// was accepted, a sibling's delayed write landed after ours during a
+	// reconnect, or the stale sweep fired while our beats could not reach
+	// the DB. All are silent and permanent if left alone -- the guard
+	// makes every later beat a no-op too, so the row stays wrong until the
+	// agent happens to reconnect, which a healthy channel never does.
 	//
 	// Taking the row back rewrites connected_at, which is precisely what
 	// invalidates the session tokens minted for the old epoch, so the

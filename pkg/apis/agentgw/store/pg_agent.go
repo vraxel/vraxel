@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"vraxel.io/vraxel/pkg/apis/shared/hostevent"
 	"vraxel.io/vraxel/pkg/db"
 	"vraxel.io/vraxel/pkg/db/generated"
 	"vraxel.io/vraxel/pkg/db/pgerrors"
@@ -21,6 +22,20 @@ type pgAgentStore struct {
 
 // NewPGAgentStore creates a PostgreSQL-backed AgentStore.
 func NewPGAgentStore(d *db.DB) AgentStore { return &pgAgentStore{Store: db.Store{DB: d}} }
+
+// notifyHost announces that the agent bound to hostID changed, so every
+// instance's host watchers refresh.
+//
+// Scope is left empty on purpose: this module owns host_agents, not
+// hosts, and tenancy is a property of the host row -- compute's
+// subscriber resolves it. See pkg/apis/shared/hostevent.
+//
+// Every caller sits behind a guard that makes the write worth showing,
+// which is why a heartbeat (TouchHostAgent, one per agent per 15s) never
+// reaches here.
+func (s *pgAgentStore) notifyHost(ctx context.Context, hostID int64) {
+	hostevent.Channel.Publish(ctx, s.DB.GetPool(), hostevent.Event{HostID: hostID})
+}
 
 func (s *pgAgentStore) Upsert(ctx context.Context, hostID int64, agentID, version string) (*AgentRow, error) {
 	uid, err := parseAgentUUID(agentID)
@@ -35,6 +50,9 @@ func (s *pgAgentStore) Upsert(ctx context.Context, hostID int64, agentID, versio
 	if err != nil {
 		return nil, fmt.Errorf("upsert host agent: %w", pgerrors.CheckPG(err))
 	}
+	// Binding an agent moves the host from "never installed" to
+	// "offline", which is a state the list draws differently.
+	s.notifyHost(ctx, hostID)
 	return agentToDomain(&row), nil
 }
 
@@ -79,7 +97,21 @@ func (s *pgAgentStore) CheckIdentity(ctx context.Context, hostID int64, bootNonc
 	// The expression is NULL-free (conflict_at IS NOT NULL AND ...), so a
 	// nil pointer cannot happen; treating it as "not contended" keeps the
 	// admit path working if that ever changes.
-	return contended != nil && *contended, nil
+	if contended != nil && *contended {
+		// conflict_at is rendered -- it is the one badge state that
+		// outranks online/offline -- and a contended agent never reaches
+		// MarkOnline, so without this the page that most needs to update
+		// is the one that never would.
+		//
+		// This fires per refused connection rather than once per conflict,
+		// because a single statement cannot say whether it was the write
+		// that stamped conflict_at. That is a clone reconnecting on its
+		// backoff, not a hot path, and an operator staring at a flapping
+		// conflict is better served by a live page than by a quiet one.
+		s.notifyHost(ctx, hostID)
+		return true, nil
+	}
+	return false, nil
 }
 
 func (s *pgAgentStore) MarkOnline(ctx context.Context, hostID int64, instanceID, version string, clockSkewMs int64) (time.Time, error) {
@@ -99,6 +131,11 @@ func (s *pgAgentStore) MarkOnline(ctx context.Context, hostID int64, instanceID,
 	if connectedAt == nil {
 		return time.Time{}, nil
 	}
+	// Unguarded, so a re-claim of an already-online row publishes too.
+	// That is one redundant refetch on a path that runs when a channel is
+	// accepted or a drifted row is taken back -- neither is frequent, and
+	// the alternative (reading the old status first) would race the write.
+	s.notifyHost(ctx, hostID)
 	return *connectedAt, nil
 }
 
@@ -115,27 +152,47 @@ func (s *pgAgentStore) Touch(ctx context.Context, hostID int64, instanceID strin
 }
 
 func (s *pgAgentStore) MarkOffline(ctx context.Context, hostID int64, instanceID string) error {
-	if err := s.Q().MarkHostAgentOffline(ctx, generated.MarkHostAgentOfflineParams{
+	n, err := s.Q().MarkHostAgentOffline(ctx, generated.MarkHostAgentOfflineParams{
 		HostID:     hostID,
 		InstanceID: instanceID,
-	}); err != nil {
+	})
+	if err != nil {
 		return fmt.Errorf("mark host agent offline: %w", err)
+	}
+	// Zero rows means the guard held: the row is another instance's, or it
+	// was already offline. Nothing changed, so nothing is announced.
+	if n > 0 {
+		s.notifyHost(ctx, hostID)
 	}
 	return nil
 }
 
 func (s *pgAgentStore) MarkOrphansOffline(ctx context.Context, staleAfter time.Duration) error {
-	if err := s.Q().MarkOrphanedHostAgentsOffline(ctx, staleAfter.Seconds()); err != nil {
+	hostIDs, err := s.Q().MarkOrphanedHostAgentsOffline(ctx, staleAfter.Seconds())
+	if err != nil {
 		return fmt.Errorf("mark orphaned host agents offline: %w", err)
 	}
+	s.notifyHosts(ctx, hostIDs)
 	return nil
 }
 
 func (s *pgAgentStore) MarkStaleOffline(ctx context.Context, staleAfter time.Duration) error {
-	if err := s.Q().MarkStaleHostAgentsOffline(ctx, staleAfter.Seconds()); err != nil {
+	hostIDs, err := s.Q().MarkStaleHostAgentsOffline(ctx, staleAfter.Seconds())
+	if err != nil {
 		return fmt.Errorf("mark stale host agents offline: %w", err)
 	}
+	s.notifyHosts(ctx, hostIDs)
 	return nil
+}
+
+// notifyHosts announces a sweep's worth of transitions. The sweeps are
+// guarded on status='online', so the returned set is exactly the hosts
+// that just went offline -- usually empty, occasionally one, and
+// everything at once only when an instance died holding many channels.
+func (s *pgAgentStore) notifyHosts(ctx context.Context, hostIDs []int64) {
+	for _, id := range hostIDs {
+		s.notifyHost(ctx, id)
+	}
 }
 
 // versionColumnWidth is host_agents.version's varchar width.
