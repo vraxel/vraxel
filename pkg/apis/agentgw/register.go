@@ -183,6 +183,14 @@ func (h *protocolHandler) handleRegister(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Record which host this token brought in, so the operator's wizard
+	// can tell them. Best-effort: the registration has already succeeded
+	// and the agent is bound, so failing here costs a progress display,
+	// not an onboarding.
+	if err := h.joinTokens.BindTarget(r.Context(), token.ID, hostID); err != nil {
+		logger.Warnf("agentgw register: bind token %d to host %d: %v", token.ID, hostID, err)
+	}
+
 	logger.Infof("agentgw: agent %s registered as host %d (%s, %s/%s, ip=%s)",
 		agentID, hostID, req.Hostname, req.OS, req.Arch, req.DefaultRouteIP)
 	writeJSON(w, http.StatusOK, agenttypes.RegisterResponse{

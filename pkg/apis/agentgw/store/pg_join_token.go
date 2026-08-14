@@ -167,6 +167,16 @@ func (s *pgJoinTokenStore) Consume(ctx context.Context, tokenHash []byte) (*Join
 	return joinTokenToDomain(&row, ""), nil
 }
 
+func (s *pgJoinTokenStore) BindTarget(ctx context.Context, id, hostID int64) error {
+	if err := s.Q().BindHostAgentJoinTokenTarget(ctx, generated.BindHostAgentJoinTokenTargetParams{
+		ID:           id,
+		TargetHostID: &hostID,
+	}); err != nil {
+		return fmt.Errorf("bind join token target: %w", err)
+	}
+	return nil
+}
+
 func joinTokenToDomain(r *generated.HostAgentJoinToken, creatorName string) *JoinTokenRow {
 	return &JoinTokenRow{
 		ID:           r.ID,

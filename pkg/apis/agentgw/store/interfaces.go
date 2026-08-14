@@ -61,6 +61,10 @@ type JoinTokenStore interface {
 	Consume(ctx context.Context, tokenHash []byte) (*JoinTokenRow, error)
 	// Refund returns a claimed use after a registration failed downstream.
 	Refund(ctx context.Context, id int64) error
+	// BindTarget records which host a token onboarded, once it has. A
+	// token minted against a specific host already names one and is left
+	// alone.
+	BindTarget(ctx context.Context, id, hostID int64) error
 }
 
 // Stores aggregates the gateway's stores. server_instances is

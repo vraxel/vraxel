@@ -71,6 +71,21 @@ WHERE token_hash = @token_hash
   AND expires_at > now()
   AND used_count < max_uses;
 
+-- name: BindHostAgentJoinTokenTarget :exec
+-- Record which host a token actually onboarded, once it has.
+--
+-- Before redemption target_host_id is an operator's intent ("attach to
+-- this host"); after redemption it is the outcome. One column, one
+-- meaning throughout: the host this token concerns. The wizard reads it
+-- to learn which machine answered, which it cannot know any other way --
+-- /register's response goes to the agent, not to the browser.
+--
+-- Only fills a blank: a token minted against a specific host keeps
+-- naming that host, and this is a no-op for it.
+UPDATE host_agent_join_tokens
+SET target_host_id = @target_host_id
+WHERE id = @id AND target_host_id IS NULL;
+
 -- name: RefundHostAgentJoinToken :exec
 -- Give a use back when registration failed after the claim. The token is
 -- typically single-use, so without this a machine whose registration

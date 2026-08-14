@@ -26,3 +26,19 @@ packages:
     type_mappings:
       "time.Time": "string"
       "*time.Time": "string"
+
+  - path: "vraxel.io/vraxel/pkg/apis/compute"
+    output_path: "ui/src/generated/compute.ts"
+    include_files:
+      - "types.go"
+    frontmatter: |
+      // TypeMeta is not imported: the make target's post-process step
+      // inlines the embedded field to apiVersion?/kind?, matching what
+      // encoding/json puts on the wire.
+      import type { ObjectMeta } from "./meta"
+    type_mappings:
+      "time.Time": "string"
+      "*time.Time": "string"
+      "types.ObjectMeta": "ObjectMeta"
+      "apitypes.ObjectMeta": "ObjectMeta"
+      "runtime.TypeMeta": "TypeMeta"

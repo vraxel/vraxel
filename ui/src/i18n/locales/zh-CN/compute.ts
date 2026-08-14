@@ -30,7 +30,6 @@ const compute = {
   "compute.host.agentId": "Agent ID",
   "compute.host.connectedAt": "连接时间",
   "compute.host.lastSeenAt": "最近心跳",
-  "compute.host.revokeAgentToken": "吊销 Agent 令牌",
   "compute.host.reportedNote":
     "以上信息由 agent 自动上报，不支持手工修改；仅显示名称与描述可编辑。",
 

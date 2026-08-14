@@ -10,6 +10,32 @@ import (
 	"time"
 )
 
+const bindHostAgentJoinTokenTarget = `-- name: BindHostAgentJoinTokenTarget :exec
+UPDATE host_agent_join_tokens
+SET target_host_id = $1
+WHERE id = $2 AND target_host_id IS NULL
+`
+
+type BindHostAgentJoinTokenTargetParams struct {
+	TargetHostID *int64 `json:"target_host_id"`
+	ID           int64  `json:"id"`
+}
+
+// Record which host a token actually onboarded, once it has.
+//
+// Before redemption target_host_id is an operator's intent ("attach to
+// this host"); after redemption it is the outcome. One column, one
+// meaning throughout: the host this token concerns. The wizard reads it
+// to learn which machine answered, which it cannot know any other way --
+// /register's response goes to the agent, not to the browser.
+//
+// Only fills a blank: a token minted against a specific host keeps
+// naming that host, and this is a no-op for it.
+func (q *Queries) BindHostAgentJoinTokenTarget(ctx context.Context, arg BindHostAgentJoinTokenTargetParams) error {
+	_, err := q.db.Exec(ctx, bindHostAgentJoinTokenTarget, arg.TargetHostID, arg.ID)
+	return err
+}
+
 const consumeHostAgentJoinToken = `-- name: ConsumeHostAgentJoinToken :one
 UPDATE host_agent_join_tokens
 SET used_count = used_count + 1

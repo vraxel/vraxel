@@ -8,8 +8,8 @@ import { useWorkspaceStore } from "@/core/scope/workspace-store"
 import { buildScopedPath } from "@/core/registry/nav-config"
 import { WizardStepper, type WizardStep } from "@/modules/compute/components/wizard-stepper"
 import { AgentInstallPanel } from "@/modules/compute/components/agent-install-panel"
-import { createJoinToken, pollForRegisteredHost } from "@/modules/compute/api/join-tokens"
-import { createHost } from "@/modules/compute/api/hosts"
+import { joinTokensApi } from "@/modules/compute/api/join-tokens"
+import { hostsApi } from "@/modules/compute/api/hosts"
 import type { Host } from "@/modules/compute/api/types"
 import { StepMethod, type ImportSource, type Method } from "./step-method"
 import { StepHostForm, type HostDraft } from "./step-host-form"
@@ -20,6 +20,11 @@ import { StepAgent } from "./step-agent"
 // ends. Checked here so a bad name fails on this screen rather than on
 // submit, after the operator has filled in the rest of the form.
 const HOST_NAME_RE = /^[a-zA-Z0-9]([a-zA-Z0-9_-]{1,48}[a-zA-Z0-9])?$/
+
+// An operator is watching this screen, so the interval is short. It
+// stops as soon as a host is found, and the whole effect is scoped to
+// the wizard being open.
+const POLL_INTERVAL_MS = 3000
 
 const EMPTY_DRAFT: HostDraft = {
   name: "",
@@ -58,6 +63,7 @@ export default function HostOnboardPage() {
   const [nameError, setNameError] = useState<string | undefined>()
   const [createdHost, setCreatedHost] = useState<Host | null>(null)
   const [command, setCommand] = useState<string | null>(null)
+  const [tokenId, setTokenId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [registeredHost, setRegisteredHost] = useState<Host | null>(null)
 
@@ -95,26 +101,45 @@ export default function HostOnboardPage() {
   // opened from, not to the platform one.
   const hostsPath = buildScopedPath("hosts", workspaceId ?? null, namespaceId ?? null)
 
-  // DEMO: stands in for the host list refetch that will reveal the row
-  // once an agent redeems the token.
+  // Waiting for the machine to answer.
+  //
+  // The token is what gets polled, not the host list. /register stamps
+  // the consumed token with the host it onboarded, so this learns both
+  // "did it happen" and "which host" from one row -- the register
+  // response itself goes to the agent, not to this browser. Guessing
+  // from the list ("the newest host created since I minted this") would
+  // show the wrong machine's facts whenever two operators onboard at
+  // once.
   useEffect(() => {
-    if (!command || registeredHost) return
+    if (!tokenId || registeredHost) return
     let live = true
-    void pollForRegisteredHost().then((host) => {
-      if (live) setRegisteredHost(host)
-    })
+    const scope = { ws: workspaceId, ns: namespaceId }
+    const timer = setInterval(async () => {
+      try {
+        const token = await joinTokensApi.get(scope, tokenId)
+        const hostId = token.spec.targetHostId
+        if (!live || !hostId) return
+        const host = await hostsApi.get(scope, hostId)
+        if (live) setRegisteredHost(host)
+      } catch {
+        // A poll that fails changes nothing: the next tick retries, and
+        // the operator's real feedback is the host list either way.
+      }
+    }, POLL_INTERVAL_MS)
     return () => {
       live = false
+      clearInterval(timer)
     }
-  }, [command, registeredHost])
+  }, [tokenId, registeredHost, workspaceId, namespaceId])
 
   const mintToken = async (targetHostId?: string, name?: string) => {
     try {
-      const token = await createJoinToken(
+      const token = await joinTokensApi.create(
         { ws: workspaceId, ns: namespaceId },
-        { targetHostId, name },
+        { metadata: { name }, spec: { targetHostId } },
       )
       setCommand(buildInstallCommand(token.spec.token ?? ""))
+      setTokenId(token.metadata.id)
       return true
     } catch {
       toast.error(t("compute.onboard.install.mintFailed"))
@@ -153,13 +178,15 @@ export default function HostOnboardPage() {
       setNameError(undefined)
       setBusy(true)
       try {
-        const host = await createHost(
+        const host = await hostsApi.create(
           { ws: workspaceId, ns: namespaceId },
           {
-            name: draft.name.trim(),
-            description: draft.description.trim() || undefined,
-            ip: draft.ip.trim() || undefined,
-            sshPort: Number(draft.sshPort) || 22,
+            metadata: { name: draft.name.trim() },
+            spec: {
+              description: draft.description.trim() || undefined,
+              ip: draft.ip.trim() || undefined,
+              sshPort: Number(draft.sshPort) || 22,
+            },
           },
         )
         setCreatedHost(host)

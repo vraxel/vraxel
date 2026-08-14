@@ -29,7 +29,6 @@ const compute = {
   "compute.host.agentId": "Agent ID",
   "compute.host.connectedAt": "Connected at",
   "compute.host.lastSeenAt": "Last heartbeat",
-  "compute.host.revokeAgentToken": "Revoke agent token",
   "compute.host.reportedNote":
     "Everything above is reported by the agent and cannot be edited; only the display name and description are yours to change.",
 
