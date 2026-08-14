@@ -14,7 +14,6 @@ import {
 import { useTranslation } from "@/i18n"
 import { useListQuery } from "@/frameworks/list/use-list-query"
 import { NameCell } from "@/frameworks/list/name-cell"
-import { StatusFilter } from "@/frameworks/list/status-filter"
 import { ResourceListPage, type ColumnDef } from "@/frameworks/list/resource-list-page"
 import { ConfirmDialog } from "@/shared/components/confirm-dialog"
 import { useQueryClient } from "@tanstack/react-query"
@@ -51,7 +50,7 @@ export default function HostListPage() {
     def: hostsDef,
     api: hostsApi,
     scope,
-    filterKeys: ["agentStatus"],
+    filterKeys: ["agent_status"],
   })
   useHostWatch(scope)
 
@@ -73,6 +72,12 @@ export default function HostListPage() {
       key: "name",
       header: t("common.name"),
       sortable: true,
+      filterKey: "agent_status",
+      filter: [
+        { value: "all", label: t("compute.host.agentStatusAll") },
+        { value: "online", label: t("compute.agent.online") },
+        { value: "offline", label: t("compute.agent.offline") },
+      ],
       cell: (h) => (
         <NameCell
           to={hostPath(`${h.metadata.id}`)}
@@ -136,18 +141,6 @@ export default function HostListPage() {
       searchPlaceholderKey="compute.host.searchPlaceholder"
       emptyKey="compute.host.empty"
       selectable={false}
-      toolbarExtra={
-        <StatusFilter
-          value={query.filters.agentStatus ?? "all"}
-          onChange={(v) => query.setFilter("agentStatus", v)}
-          allLabel={t("compute.host.agentStatusAll")}
-          placeholder={t("compute.host.agentStatus")}
-          options={[
-            { value: "online", label: t("compute.agent.online") },
-            { value: "offline", label: t("compute.agent.offline") },
-          ]}
-        />
-      }
       createButton={
         <Button asChild>
           <Link to={hostPath("onboard")}>
