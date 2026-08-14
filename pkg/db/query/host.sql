@@ -129,8 +129,10 @@ ORDER BY
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'os' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN h.os END DESC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'cpu_cores' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN h.cpu_cores END ASC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'cpu_cores' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN h.cpu_cores END DESC,
-    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'organization' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN COALESCE(NULLIF(w.display_name, ''), w.name, '') END ASC,
-    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'organization' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN COALESCE(NULLIF(w.display_name, ''), w.name, '') END DESC,
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'organization' AND sqlc.arg('sort_order')::VARCHAR = 'asc'
+         THEN COALESCE(NULLIF(w.display_name, ''), w.name, '') || chr(0) || COALESCE(NULLIF(ns.display_name, ''), ns.name, '') END ASC,
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'organization' AND sqlc.arg('sort_order')::VARCHAR = 'desc'
+         THEN COALESCE(NULLIF(w.display_name, ''), w.name, '') || chr(0) || COALESCE(NULLIF(ns.display_name, ''), ns.name, '') END DESC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'created_at' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN h.created_at END ASC,
     h.created_at DESC
 LIMIT sqlc.arg('page_size')::INT
