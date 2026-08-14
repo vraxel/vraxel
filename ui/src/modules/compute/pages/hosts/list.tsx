@@ -163,6 +163,8 @@ export default function HostListPage() {
     {
       key: "createdBy",
       header: t("common.createdBy"),
+      sortable: true,
+      sortKey: "created_by",
       cell: (h) => <span className="text-sm">{h.spec.createdByName || "-"}</span>,
     },
   ]

@@ -368,6 +368,8 @@ ORDER BY
     CASE WHEN $7::VARCHAR = 'organization' AND $8::VARCHAR = 'asc' THEN COALESCE(NULLIF(ns.display_name, ''), ns.name, '') END ASC,
     CASE WHEN $7::VARCHAR = 'organization' AND $8::VARCHAR = 'desc' THEN COALESCE(NULLIF(w.display_name, ''), w.name, '') END DESC,
     CASE WHEN $7::VARCHAR = 'organization' AND $8::VARCHAR = 'desc' THEN COALESCE(NULLIF(ns.display_name, ''), ns.name, '') END DESC,
+    CASE WHEN $7::VARCHAR = 'created_by' AND $8::VARCHAR = 'asc' THEN COALESCE(NULLIF(u.display_name, ''), u.username, '') END ASC,
+    CASE WHEN $7::VARCHAR = 'created_by' AND $8::VARCHAR = 'desc' THEN COALESCE(NULLIF(u.display_name, ''), u.username, '') END DESC,
     CASE WHEN $7::VARCHAR = 'created_at' AND $8::VARCHAR = 'asc' THEN h.created_at END ASC,
     h.created_at DESC
 LIMIT $10::INT
