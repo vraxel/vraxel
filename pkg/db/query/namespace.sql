@@ -56,7 +56,7 @@ SELECT count(ns.id)
 FROM namespaces ns
 WHERE
     (sqlc.narg('accessible_ids')::BIGINT[] IS NULL OR ns.id = ANY(sqlc.narg('accessible_ids')::BIGINT[]))
-    AND (sqlc.narg('status')::VARCHAR IS NULL OR ns.status = sqlc.narg('status'))
+    AND (sqlc.narg('status')::VARCHAR IS NULL OR ns.status = ANY(string_to_array(sqlc.narg('status')::VARCHAR, ',')))
     AND (sqlc.narg('name')::VARCHAR IS NULL OR ns.name ILIKE '%' || sqlc.narg('name') || '%')
     AND (sqlc.narg('visibility')::VARCHAR IS NULL OR ns.visibility = sqlc.narg('visibility'))
     AND (sqlc.narg('owner_id')::BIGINT IS NULL OR ns.owner_id = sqlc.narg('owner_id'))
@@ -82,7 +82,7 @@ WITH ns_data AS (
     LEFT JOIN users cu ON cu.id = ns.created_by
     WHERE
         (sqlc.narg('accessible_ids')::BIGINT[] IS NULL OR ns.id = ANY(sqlc.narg('accessible_ids')::BIGINT[]))
-        AND (sqlc.narg('status')::VARCHAR IS NULL OR ns.status = sqlc.narg('status'))
+        AND (sqlc.narg('status')::VARCHAR IS NULL OR ns.status = ANY(string_to_array(sqlc.narg('status')::VARCHAR, ',')))
         AND (sqlc.narg('name')::VARCHAR IS NULL OR ns.name ILIKE '%' || sqlc.narg('name') || '%')
         AND (sqlc.narg('visibility')::VARCHAR IS NULL OR ns.visibility = sqlc.narg('visibility'))
         AND (sqlc.narg('owner_id')::BIGINT IS NULL OR ns.owner_id = sqlc.narg('owner_id'))

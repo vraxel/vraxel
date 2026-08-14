@@ -18,15 +18,13 @@ FROM hosts h
 LEFT JOIN workspaces w ON w.id = h.workspace_id
 LEFT JOIN namespaces ns ON ns.id = h.namespace_id
 LEFT JOIN host_agents a ON a.host_id = h.id
-WHERE ($1::VARCHAR IS NULL OR h.scope = $1)
+WHERE ($1::VARCHAR IS NULL OR h.scope = ANY(string_to_array($1::VARCHAR, ',')))
   AND ($2::BIGINT IS NULL OR h.workspace_id = $2)
   AND ($3::BIGINT IS NULL OR h.namespace_id = $3)
-  AND ($4::VARCHAR IS NULL OR h.origin = $4)
-  -- 'none' is not a value of host_agents.status; it selects the rows that
-  -- have no agent at all, which is the state an imported host sits in.
+  AND ($4::VARCHAR IS NULL OR h.origin = ANY(string_to_array($4::VARCHAR, ',')))
   AND ($5::VARCHAR IS NULL
-       OR ($5::VARCHAR = 'none' AND a.host_id IS NULL)
-       OR a.status = $5)
+       OR (a.host_id IS NULL AND 'none' = ANY(string_to_array($5::VARCHAR, ',')))
+       OR a.status = ANY(string_to_array($5::VARCHAR, ',')))
   AND ($6::VARCHAR IS NULL
        OR h.name ILIKE '%' || $6::VARCHAR || '%'
        OR h.display_name ILIKE '%' || $6::VARCHAR || '%'
@@ -314,13 +312,13 @@ LEFT JOIN users u ON u.id = h.created_by
 LEFT JOIN workspaces w ON w.id = h.workspace_id
 LEFT JOIN namespaces ns ON ns.id = h.namespace_id
 LEFT JOIN host_agents a ON a.host_id = h.id
-WHERE ($1::VARCHAR IS NULL OR h.scope = $1)
+WHERE ($1::VARCHAR IS NULL OR h.scope = ANY(string_to_array($1::VARCHAR, ',')))
   AND ($2::BIGINT IS NULL OR h.workspace_id = $2)
   AND ($3::BIGINT IS NULL OR h.namespace_id = $3)
-  AND ($4::VARCHAR IS NULL OR h.origin = $4)
+  AND ($4::VARCHAR IS NULL OR h.origin = ANY(string_to_array($4::VARCHAR, ',')))
   AND ($5::VARCHAR IS NULL
-       OR ($5::VARCHAR = 'none' AND a.host_id IS NULL)
-       OR a.status = $5)
+       OR (a.host_id IS NULL AND 'none' = ANY(string_to_array($5::VARCHAR, ',')))
+       OR a.status = ANY(string_to_array($5::VARCHAR, ',')))
   AND ($6::VARCHAR IS NULL
        OR h.name ILIKE '%' || $6::VARCHAR || '%'
        OR h.display_name ILIKE '%' || $6::VARCHAR || '%'

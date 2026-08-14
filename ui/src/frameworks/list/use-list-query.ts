@@ -85,8 +85,11 @@ export function useListQuery<T extends ListRow>(opts: UseListQueryOptions<T>) {
   const sortBy = sp.get("sort_by") ?? defaultSortBy
   const sortOrder = (sp.get("sort_order") as "asc" | "desc" | null) ?? defaultSortOrder
   const search = sp.get("q") ?? ""
-  const filters: Record<string, string> = {}
-  for (const k of filterKeys) filters[k] = sp.get(k) ?? "all"
+  const filters: Record<string, Set<string>> = {}
+  for (const k of filterKeys) {
+    const raw = sp.get(k)
+    filters[k] = raw ? new Set(raw.split(",")) : new Set()
+  }
 
   // Search input is local + immediate; the URL commits after a 300ms
   // debounce, resetting page there (single place).
@@ -159,8 +162,9 @@ export function useListQuery<T extends ListRow>(opts: UseListQueryOptions<T>) {
     [sortBy, sortOrder, patchParams],
   )
   const setFilter = useCallback(
-    (key: string, value: string) => {
-      const patch: Record<string, string | null> = { [key]: value === "all" ? null : value }
+    (key: string, value: Set<string>) => {
+      const csv = Array.from(value).sort().join(",")
+      const patch: Record<string, string | null> = { [key]: csv || null }
       for (const dep of resetsByKey[key] ?? []) patch[dep] = null
       patchParams(patch, true)
     },
@@ -190,8 +194,10 @@ export function useListQuery<T extends ListRow>(opts: UseListQueryOptions<T>) {
 
   const params: ListParams = { page, page_size: pageSize, sort_by: sortBy, sort_order: sortOrder }
   if (search) params.search = search
-  for (const k of filterKeys)
-    if (filters[k] !== "all") (params as Record<string, unknown>)[k] = filters[k]
+  for (const k of filterKeys) {
+    const s = filters[k]
+    if (s.size > 0) (params as Record<string, unknown>)[k] = Array.from(s).sort().join(",")
+  }
   if (extraParams)
     for (const [k, v] of Object.entries(extraParams))
       if (v !== undefined) (params as Record<string, unknown>)[k] = v

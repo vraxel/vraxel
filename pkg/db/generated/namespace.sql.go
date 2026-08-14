@@ -15,7 +15,7 @@ SELECT count(ns.id)
 FROM namespaces ns
 WHERE
     ($1::BIGINT[] IS NULL OR ns.id = ANY($1::BIGINT[]))
-    AND ($2::VARCHAR IS NULL OR ns.status = $2)
+    AND ($2::VARCHAR IS NULL OR ns.status = ANY(string_to_array($2::VARCHAR, ',')))
     AND ($3::VARCHAR IS NULL OR ns.name ILIKE '%' || $3 || '%')
     AND ($4::VARCHAR IS NULL OR ns.visibility = $4)
     AND ($5::BIGINT IS NULL OR ns.owner_id = $5)
@@ -269,7 +269,7 @@ WITH ns_data AS (
     LEFT JOIN users cu ON cu.id = ns.created_by
     WHERE
         ($5::BIGINT[] IS NULL OR ns.id = ANY($5::BIGINT[]))
-        AND ($6::VARCHAR IS NULL OR ns.status = $6)
+        AND ($6::VARCHAR IS NULL OR ns.status = ANY(string_to_array($6::VARCHAR, ',')))
         AND ($7::VARCHAR IS NULL OR ns.name ILIKE '%' || $7 || '%')
         AND ($8::VARCHAR IS NULL OR ns.visibility = $8)
         AND ($9::BIGINT IS NULL OR ns.owner_id = $9)

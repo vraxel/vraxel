@@ -2,8 +2,10 @@ import { Filter } from "lucide-react"
 import { TableHead } from "@/shared/ui/table"
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu"
 import { SortIcon } from "@/shared/components/sort-icon"
@@ -14,20 +16,13 @@ export interface FilterOption {
   label: string
 }
 
-/**
- * FilterTableHead is a generic table-header cell with both sort
- * (click the label) and filter (click the funnel icon) controls.
- * Generic parameter T is the union of allowed sort field names;
- * pass an empty string for the field when sort isn't meaningful
- * for this column and use `hideSort` to drop the arrow.
- */
 export function FilterTableHead<T extends string = string>({
   field,
   sortBy,
   sortOrder,
   onSort,
-  filterValue,
-  onFilterChange,
+  selected,
+  onChange,
   options,
   allLabel,
   className,
@@ -38,17 +33,26 @@ export function FilterTableHead<T extends string = string>({
   sortBy: T | null | string
   sortOrder: "asc" | "desc"
   onSort: (field: T) => void
-  filterValue: string
-  onFilterChange: (value: string) => void
+  selected: Set<string>
+  onChange: (next: Set<string>) => void
   options: FilterOption[]
-  /** Label for the built-in "unset" item; defaults to common.all. */
   allLabel?: string
   className?: string
   children: React.ReactNode
   hideSort?: boolean
 }) {
   const { t } = useTranslation()
-  const isFiltered = filterValue !== "all"
+  const isFiltered = selected.size > 0 && selected.size < options.length
+
+  const selectAll = () => onChange(new Set(options.map((o) => o.value)))
+  const toggle = (value: string) => {
+    const next = new Set(selected)
+    if (next.has(value)) next.delete(value)
+    else next.add(value)
+    if (next.size === 0) return selectAll()
+    onChange(next)
+  }
+
   return (
     <TableHead className={className}>
       <span className="inline-flex items-center gap-1">
@@ -64,28 +68,32 @@ export function FilterTableHead<T extends string = string>({
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="focus-visible:ring-ring/40 inline-flex items-center rounded-sm outline-none focus-visible:ring-2"
+              className="focus-visible:ring-ring/40 inline-flex cursor-pointer items-center rounded-sm outline-none focus-visible:ring-2"
               aria-label="filter"
             >
-              {/* Like SortIcon: the funnel only advertises itself on header
-                  hover; an active filter is state and stays visible. */}
               <Filter
                 className={
                   isFiltered
                     ? "fill-primary text-primary h-3 w-3"
-                    : "h-3 w-3 opacity-0 transition-opacity group-hover/thead:opacity-40"
+                    : "text-muted-foreground h-3 w-3"
                 }
               />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
-            <DropdownMenuItem onClick={() => onFilterChange("all")}>
+            <DropdownMenuItem onClick={selectAll}>
               {allLabel ?? t("common.all")}
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
             {options.map((opt) => (
-              <DropdownMenuItem key={opt.value} onClick={() => onFilterChange(opt.value)}>
+              <DropdownMenuCheckboxItem
+                key={opt.value}
+                checked={selected.has(opt.value)}
+                onSelect={(e) => e.preventDefault()}
+                onCheckedChange={() => toggle(opt.value)}
+              >
                 {opt.label}
-              </DropdownMenuItem>
+              </DropdownMenuCheckboxItem>
             ))}
           </DropdownMenuContent>
         </DropdownMenu>

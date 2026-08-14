@@ -154,7 +154,7 @@ export default function WorkspaceListPage() {
       // the name header it would read as filtering by name.
       toolbarExtra={
         <StatusFilter
-          value={query.filters.status ?? "all"}
+          selected={query.filters.status ?? new Set()}
           onChange={(v) => query.setFilter("status", v)}
           options={[
             { value: "active", label: t("common.active") },

@@ -59,15 +59,13 @@ FROM hosts h
 LEFT JOIN workspaces w ON w.id = h.workspace_id
 LEFT JOIN namespaces ns ON ns.id = h.namespace_id
 LEFT JOIN host_agents a ON a.host_id = h.id
-WHERE (sqlc.narg('scope')::VARCHAR IS NULL OR h.scope = sqlc.narg('scope'))
+WHERE (sqlc.narg('scope')::VARCHAR IS NULL OR h.scope = ANY(string_to_array(sqlc.narg('scope')::VARCHAR, ',')))
   AND (sqlc.narg('workspace_id')::BIGINT IS NULL OR h.workspace_id = sqlc.narg('workspace_id'))
   AND (sqlc.narg('namespace_id')::BIGINT IS NULL OR h.namespace_id = sqlc.narg('namespace_id'))
-  AND (sqlc.narg('origin')::VARCHAR IS NULL OR h.origin = sqlc.narg('origin'))
-  -- 'none' is not a value of host_agents.status; it selects the rows that
-  -- have no agent at all, which is the state an imported host sits in.
+  AND (sqlc.narg('origin')::VARCHAR IS NULL OR h.origin = ANY(string_to_array(sqlc.narg('origin')::VARCHAR, ',')))
   AND (sqlc.narg('agent_status')::VARCHAR IS NULL
-       OR (sqlc.narg('agent_status')::VARCHAR = 'none' AND a.host_id IS NULL)
-       OR a.status = sqlc.narg('agent_status'))
+       OR (a.host_id IS NULL AND 'none' = ANY(string_to_array(sqlc.narg('agent_status')::VARCHAR, ',')))
+       OR a.status = ANY(string_to_array(sqlc.narg('agent_status')::VARCHAR, ',')))
   AND (sqlc.narg('search')::VARCHAR IS NULL
        OR h.name ILIKE '%' || sqlc.narg('search')::VARCHAR || '%'
        OR h.display_name ILIKE '%' || sqlc.narg('search')::VARCHAR || '%'
@@ -99,13 +97,13 @@ LEFT JOIN users u ON u.id = h.created_by
 LEFT JOIN workspaces w ON w.id = h.workspace_id
 LEFT JOIN namespaces ns ON ns.id = h.namespace_id
 LEFT JOIN host_agents a ON a.host_id = h.id
-WHERE (sqlc.narg('scope')::VARCHAR IS NULL OR h.scope = sqlc.narg('scope'))
+WHERE (sqlc.narg('scope')::VARCHAR IS NULL OR h.scope = ANY(string_to_array(sqlc.narg('scope')::VARCHAR, ',')))
   AND (sqlc.narg('workspace_id')::BIGINT IS NULL OR h.workspace_id = sqlc.narg('workspace_id'))
   AND (sqlc.narg('namespace_id')::BIGINT IS NULL OR h.namespace_id = sqlc.narg('namespace_id'))
-  AND (sqlc.narg('origin')::VARCHAR IS NULL OR h.origin = sqlc.narg('origin'))
+  AND (sqlc.narg('origin')::VARCHAR IS NULL OR h.origin = ANY(string_to_array(sqlc.narg('origin')::VARCHAR, ',')))
   AND (sqlc.narg('agent_status')::VARCHAR IS NULL
-       OR (sqlc.narg('agent_status')::VARCHAR = 'none' AND a.host_id IS NULL)
-       OR a.status = sqlc.narg('agent_status'))
+       OR (a.host_id IS NULL AND 'none' = ANY(string_to_array(sqlc.narg('agent_status')::VARCHAR, ',')))
+       OR a.status = ANY(string_to_array(sqlc.narg('agent_status')::VARCHAR, ',')))
   AND (sqlc.narg('search')::VARCHAR IS NULL
        OR h.name ILIKE '%' || sqlc.narg('search')::VARCHAR || '%'
        OR h.display_name ILIKE '%' || sqlc.narg('search')::VARCHAR || '%'
