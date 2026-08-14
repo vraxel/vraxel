@@ -16,14 +16,14 @@ CONFIG := $(if $(wildcard app/$(APP_NAME)/config.dev.yaml),app/$(APP_NAME)/confi
 help: ## List available commands
 	@awk 'BEGIN{FS=":.*## "} /^[a-z][a-z-]*:.*## /{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-dev: ## Run vraxel-server (:9099) + vite (:5199) with HMR
+dev: agent-binaries ## Run vraxel-server (:9099) + vite (:5199) with HMR
 	@echo "config: $(CONFIG)"
 	@trap 'kill 0' EXIT; \
 	go run $(PKG_PREFIX)/app/$(APP_NAME) -config ./$(CONFIG) & \
 	(cd ui && pnpm dev) & \
 	wait
 
-build: ## Build the frontend and link the release binary into bin/
+build: agent-binaries ## Build the frontend and link the release binary into bin/
 	cd ui && pnpm build
 	CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o bin/$(APP_NAME) $(PKG_PREFIX)/app/$(APP_NAME)
 
@@ -32,11 +32,30 @@ build: ## Build the frontend and link the release binary into bin/
 # whatever minimal image the customer happens to run; the server hashes
 # whatever is in bin/ at request time, so rebuilding here is enough to
 # change what hosts install.
-agent-binaries: ## Cross-compile vr-agent into bin/ for the targets the server serves
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-	  go build -ldflags "$(LDFLAGS)" -o bin/vr-agent-linux-amd64 $(PKG_PREFIX)/app/vr-agent
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 \
-	  go build -ldflags "$(LDFLAGS)" -o bin/vr-agent-linux-arm64 $(PKG_PREFIX)/app/vr-agent
+#
+# A prerequisite of both `dev` and `build`, because nothing else rebuilds
+# them and a stale one is silent: the agent still installs, still comes
+# online, and merely omits whatever the server learned to ask for since.
+# That cost a debugging session -- an agent built before machine
+# fingerprinting reported none, so every reinstall failed to match its own
+# host row and split off a duplicate for an operator to merge.
+#
+# File targets, not a phony recipe, so the common case (source unchanged)
+# is a stat and the cross-compile only runs when it would produce
+# something different.
+AGENT_BINS := bin/vr-agent-linux-amd64 bin/vr-agent-linux-arm64
+
+# What the agent is built from. `go list -deps ./app/vr-agent` reaches
+# app/vr-agent and lib/ only, so these two trees plus the module files are
+# the whole input: listing less would miss a rebuild, listing more only
+# costs an occasional needless one.
+AGENT_SRC := $(shell find app/vr-agent lib -name '*.go') go.mod go.sum
+
+agent-binaries: $(AGENT_BINS) ## Cross-compile vr-agent into bin/ for the targets the server serves
+
+$(AGENT_BINS): bin/vr-agent-linux-%: $(AGENT_SRC)
+	CGO_ENABLED=0 GOOS=linux GOARCH=$* \
+	  go build -ldflags "$(LDFLAGS)" -o $@ $(PKG_PREFIX)/app/vr-agent
 
 # Refreshes the three committed artifact sets, in dependency order:
 #   pkg/db/query/*.sql          -> pkg/db/generated/            (sqlc)
