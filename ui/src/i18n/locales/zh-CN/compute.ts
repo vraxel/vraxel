@@ -43,17 +43,6 @@ const compute = {
   "compute.agent.conflictHint":
     "有多个 agent 进程在使用同一身份，通常是从已接入主机克隆磁盘导致的。冲突期间该主机的所有连接都会被拒绝；请在克隆机上重置 /etc/machine-id 后重新接入。",
 
-  // join tokens
-  "compute.token.pending": "待使用令牌",
-  "compute.token.pendingHint":
-    "已发放但尚未被使用的接入令牌。令牌明文只在创建时显示一次，若已外泄请在此吊销。",
-  "compute.token.nonePending": "没有待使用的令牌",
-  "compute.token.unnamed": "未命名令牌",
-  "compute.token.reserves": "预留主机名",
-  "compute.token.uses": "已用 {used} / {max}",
-  "compute.token.expiresAt": "过期于",
-  "compute.token.revoke": "吊销",
-
   // onboarding wizard
   "compute.onboard.title": "创建主机",
   "compute.onboard.subtitle": "选择主机的接入方式，按步骤完成纳管。",

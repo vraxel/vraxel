@@ -1,6 +1,5 @@
-import { useState } from "react"
 import { Link, useParams } from "react-router"
-import { KeyRound, Plus } from "lucide-react"
+import { Plus } from "lucide-react"
 import { formatDateTime } from "@/shared/lib/format"
 import { Button } from "@/shared/ui/button"
 import { useTranslation } from "@/i18n"
@@ -14,11 +13,9 @@ import type { Host } from "@/modules/compute/api/types"
 import { hostsDef } from "@/modules/compute/defs"
 import { buildScopedPath } from "@/core/registry/nav-config"
 import { AgentStatusBadge } from "@/modules/compute/components/agent-status-badge"
-import { PendingTokensSheet } from "@/modules/compute/components/pending-tokens-sheet"
 
 export default function HostListPage() {
   const { t } = useTranslation()
-  const [tokensOpen, setTokensOpen] = useState(false)
 
   // Scope comes from the route, exactly as it does on every other
   // scoped list: the selector navigates to /compute/workspaces/{ws}/hosts
@@ -124,26 +121,23 @@ export default function HostListPage() {
             ]}
           />
         }
+        // No pending-token affordance here. In the single-host flow a
+        // token is alive for the minutes between opening the wizard and
+        // the machine registering, so the list it would open is empty
+        // almost always. It earns its place when batch onboarding lands
+        // and one token serves a whole team -- max_uses stops being
+        // pinned to 1 and there is something to watch being consumed.
+        // Until then the API (GET / DELETE agent-join-tokens) is where a
+        // leaked token gets cleaned up.
         createButton={
-          <div className="flex items-center gap-2">
-            {/* Pending tokens live behind a secondary affordance: they are
-                an operational loose end, not a resource an operator
-                manages day to day. But they must be reachable -- a token
-                that leaked before it was redeemed has to be revocable. */}
-            <Button variant="outline" onClick={() => setTokensOpen(true)}>
-              <KeyRound className="size-4" />
-              {t("compute.token.pending")}
-            </Button>
-            <Button asChild>
-              <Link to={hostPath("onboard")}>
-                <Plus className="size-4" />
-                {t("compute.host.create")}
-              </Link>
-            </Button>
-          </div>
+          <Button asChild>
+            <Link to={hostPath("onboard")}>
+              <Plus className="size-4" />
+              {t("compute.host.create")}
+            </Link>
+          </Button>
         }
       />
-      <PendingTokensSheet open={tokensOpen} onOpenChange={setTokensOpen} scope={scope} />
     </>
   )
 }
