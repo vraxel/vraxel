@@ -134,3 +134,5 @@ REST 资源在 `pkg/apis/<module>/install.go` 通过 `rest.APIGroupInfo` 声明�
 新增模块时按 `pkg/apis/ARCHITECTURE.md` 的 New Module Checklist 执行，完成后跑 `./scripts/check-layer-leak.sh` 应零告警。
 
 **Query Params**: URL query param 统一 snake_case（`page_size`、`sort_by`、`sort_order`、`agent_status`）。Go store 通过 `list.Parse[T]` + `filter:"snake_case"` struct tag 从 `Filters` map 读取，Go 字段名保持 PascalCase。新增 filter 参数：① store 的 filter struct 加字段 + `filter:"snake_case"` tag；② 前端 `filterKeys` 用 snake_case；③ `ListParams` 对象 key 用 snake_case。**禁止直接调 `list.FilterStr` 等手动函数**（新代码一律用 `list.Parse[T]`）。
+
+**列表筛选**: 所有列表筛选统一**多选**（`DropdownMenuCheckboxItem`），**禁止单选下拉**。筛选图标常驻可见，不允许 hover 才显示。前端筛选状态为 `Set<string>`，URL 编码为 comma-separated（如 `?status=active,inactive`）；后端 SQL 对应字段用 `= ANY(string_to_array($1::VARCHAR, ','))` 而非 `= $1`。新增筛选列：① `ColumnDef` 加 `filter` options + `filterKey`；② `filterKeys` 数组加对应 key；③ SQL 的 WHERE 条件用 `ANY(string_to_array())` 模式。
