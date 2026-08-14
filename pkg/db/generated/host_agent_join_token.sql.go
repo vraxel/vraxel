@@ -13,7 +13,7 @@ import (
 const bindHostAgentJoinTokenTarget = `-- name: BindHostAgentJoinTokenTarget :exec
 UPDATE host_agent_join_tokens
 SET target_host_id = $1
-WHERE id = $2 AND target_host_id IS NULL
+WHERE id = $2 AND target_host_id IS NULL AND max_uses = 1
 `
 
 type BindHostAgentJoinTokenTargetParams struct {
@@ -31,6 +31,15 @@ type BindHostAgentJoinTokenTargetParams struct {
 //
 // Only fills a blank: a token minted against a specific host keeps
 // naming that host, and this is a no-op for it.
+//
+// And only for a single-use token. Intent and outcome have opposite
+// cardinality: "attach to this one host" implies one use (which is what
+// chk_join_token_bound_single_use encodes), while a token good for N
+// machines has N outcomes and no single host to name. Without the
+// max_uses guard, the first registration against a batch token would
+// violate that CHECK -- silently, since the caller treats this as
+// best-effort. Batch onboarding needs its own answer to "which hosts did
+// this token bring in"; one column is not it.
 func (q *Queries) BindHostAgentJoinTokenTarget(ctx context.Context, arg BindHostAgentJoinTokenTargetParams) error {
 	_, err := q.db.Exec(ctx, bindHostAgentJoinTokenTarget, arg.TargetHostID, arg.ID)
 	return err

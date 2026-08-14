@@ -117,8 +117,12 @@ export default function HostOnboardPage() {
     const timer = setInterval(async () => {
       try {
         const token = await joinTokensApi.get(scope, tokenId)
+        // usedCount is the half that means "a machine actually answered".
+        // targetHostId alone is not: a token minted against an imported
+        // host carries it from birth, so keying on it made the import
+        // path report the agent online before anyone had installed one.
         const hostId = token.spec.targetHostId
-        if (!live || !hostId) return
+        if (!live || !token.spec.usedCount || !hostId) return
         const host = await hostsApi.get(scope, hostId)
         if (live) setRegisteredHost(host)
       } catch {

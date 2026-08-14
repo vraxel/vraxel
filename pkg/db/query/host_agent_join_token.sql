@@ -82,9 +82,18 @@ WHERE token_hash = @token_hash
 --
 -- Only fills a blank: a token minted against a specific host keeps
 -- naming that host, and this is a no-op for it.
+--
+-- And only for a single-use token. Intent and outcome have opposite
+-- cardinality: "attach to this one host" implies one use (which is what
+-- chk_join_token_bound_single_use encodes), while a token good for N
+-- machines has N outcomes and no single host to name. Without the
+-- max_uses guard, the first registration against a batch token would
+-- violate that CHECK -- silently, since the caller treats this as
+-- best-effort. Batch onboarding needs its own answer to "which hosts did
+-- this token bring in"; one column is not it.
 UPDATE host_agent_join_tokens
 SET target_host_id = @target_host_id
-WHERE id = @id AND target_host_id IS NULL;
+WHERE id = @id AND target_host_id IS NULL AND max_uses = 1;
 
 -- name: RefundHostAgentJoinToken :exec
 -- Give a use back when registration failed after the claim. The token is

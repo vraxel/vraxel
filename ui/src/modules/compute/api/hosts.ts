@@ -10,8 +10,6 @@ export interface HostListParams extends ListParams {
   /** "online" | "offline" | "none" -- none selects hosts with no agent
    *  bound at all, which is where an imported host starts. */
   agentStatus?: string
-  /** "agent" | "manual" -- how the record came into existence. */
-  origin?: string
 }
 
 // Create sends only what an operator can decide. Everything else on the
