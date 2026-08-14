@@ -23,6 +23,10 @@ const compute = {
   "compute.host.hostname": "Hostname",
   "compute.host.agentVersion": "Agent version",
 
+  "compute.host.edit": "Edit host",
+  "compute.host.deleteConfirm":
+    "Are you sure you want to delete host \"{name}\"? This action cannot be undone.",
+
   // host detail
   "compute.host.basicInfo": "Basic information",
   "compute.host.agentSession": "Agent session",

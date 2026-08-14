@@ -24,6 +24,9 @@ const compute = {
   "compute.host.hostname": "主机名",
   "compute.host.agentVersion": "Agent 版本",
 
+  "compute.host.edit": "编辑主机",
+  "compute.host.deleteConfirm": "确定要删除主机「{name}」吗？此操作不可撤销。",
+
   // host detail
   "compute.host.basicInfo": "基本信息",
   "compute.host.agentSession": "Agent 会话",
