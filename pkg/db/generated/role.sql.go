@@ -13,7 +13,7 @@ import (
 const countRoles = `-- name: CountRoles :one
 SELECT count(id)
 FROM roles
-WHERE ($1::VARCHAR IS NULL OR scope = $1)
+WHERE ($1::VARCHAR IS NULL OR scope = ANY(string_to_array($1::VARCHAR, ',')))
   AND ($2::BOOLEAN IS NULL OR builtin = $2)
   AND ($3::BIGINT IS NULL OR workspace_id = $3)
   AND ($4::BIGINT IS NULL OR namespace_id = $4)
@@ -329,7 +329,7 @@ const listRoles = `-- name: ListRoles :many
 SELECT id, name, display_name, description, scope, builtin, workspace_id, namespace_id, created_at, updated_at,
        (SELECT COUNT(*) FROM role_permission_rules WHERE role_id = roles.id)::INT AS rule_count
 FROM roles
-WHERE ($1::VARCHAR IS NULL OR scope = $1)
+WHERE ($1::VARCHAR IS NULL OR scope = ANY(string_to_array($1::VARCHAR, ',')))
   AND ($2::BOOLEAN IS NULL OR builtin = $2)
   AND ($3::BIGINT IS NULL OR workspace_id = $3)
   AND ($4::BIGINT IS NULL OR namespace_id = $4)

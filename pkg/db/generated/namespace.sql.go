@@ -17,7 +17,7 @@ WHERE
     ($1::BIGINT[] IS NULL OR ns.id = ANY($1::BIGINT[]))
     AND ($2::VARCHAR IS NULL OR ns.status = ANY(string_to_array($2::VARCHAR, ',')))
     AND ($3::VARCHAR IS NULL OR ns.name ILIKE '%' || $3 || '%')
-    AND ($4::VARCHAR IS NULL OR ns.visibility = $4)
+    AND ($4::VARCHAR IS NULL OR ns.visibility = ANY(string_to_array($4::VARCHAR, ',')))
     AND ($5::BIGINT IS NULL OR ns.owner_id = $5)
     AND ($6::BIGINT IS NULL OR ns.workspace_id = $6)
     AND ($7::VARCHAR IS NULL OR (
@@ -271,7 +271,7 @@ WITH ns_data AS (
         ($5::BIGINT[] IS NULL OR ns.id = ANY($5::BIGINT[]))
         AND ($6::VARCHAR IS NULL OR ns.status = ANY(string_to_array($6::VARCHAR, ',')))
         AND ($7::VARCHAR IS NULL OR ns.name ILIKE '%' || $7 || '%')
-        AND ($8::VARCHAR IS NULL OR ns.visibility = $8)
+        AND ($8::VARCHAR IS NULL OR ns.visibility = ANY(string_to_array($8::VARCHAR, ',')))
         AND ($9::BIGINT IS NULL OR ns.owner_id = $9)
         AND ($10::BIGINT IS NULL OR ns.workspace_id = $10)
         AND ($11::VARCHAR IS NULL OR (

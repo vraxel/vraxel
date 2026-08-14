@@ -121,6 +121,7 @@ export default function AuditLogListPage() {
     {
       key: "event_type",
       header: t("audit.eventType"),
+      sortable: true,
       filter: [
         { value: "all", label: t("common.all") },
         { value: "api_operation", label: t("audit.eventType.api_operation") },
@@ -199,6 +200,7 @@ export default function AuditLogListPage() {
     {
       key: "action",
       header: t("audit.action"),
+      sortable: true,
       filter: [
         { value: "all", label: t("common.all") },
         ...AUDIT_ACTIONS.map((a) => ({ value: a, label: t(`audit.action.${a}`) })),

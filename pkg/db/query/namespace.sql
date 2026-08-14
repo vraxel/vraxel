@@ -58,7 +58,7 @@ WHERE
     (sqlc.narg('accessible_ids')::BIGINT[] IS NULL OR ns.id = ANY(sqlc.narg('accessible_ids')::BIGINT[]))
     AND (sqlc.narg('status')::VARCHAR IS NULL OR ns.status = ANY(string_to_array(sqlc.narg('status')::VARCHAR, ',')))
     AND (sqlc.narg('name')::VARCHAR IS NULL OR ns.name ILIKE '%' || sqlc.narg('name') || '%')
-    AND (sqlc.narg('visibility')::VARCHAR IS NULL OR ns.visibility = sqlc.narg('visibility'))
+    AND (sqlc.narg('visibility')::VARCHAR IS NULL OR ns.visibility = ANY(string_to_array(sqlc.narg('visibility')::VARCHAR, ',')))
     AND (sqlc.narg('owner_id')::BIGINT IS NULL OR ns.owner_id = sqlc.narg('owner_id'))
     AND (sqlc.narg('workspace_id')::BIGINT IS NULL OR ns.workspace_id = sqlc.narg('workspace_id'))
     AND (sqlc.narg('search')::VARCHAR IS NULL OR (
@@ -84,7 +84,7 @@ WITH ns_data AS (
         (sqlc.narg('accessible_ids')::BIGINT[] IS NULL OR ns.id = ANY(sqlc.narg('accessible_ids')::BIGINT[]))
         AND (sqlc.narg('status')::VARCHAR IS NULL OR ns.status = ANY(string_to_array(sqlc.narg('status')::VARCHAR, ',')))
         AND (sqlc.narg('name')::VARCHAR IS NULL OR ns.name ILIKE '%' || sqlc.narg('name') || '%')
-        AND (sqlc.narg('visibility')::VARCHAR IS NULL OR ns.visibility = sqlc.narg('visibility'))
+        AND (sqlc.narg('visibility')::VARCHAR IS NULL OR ns.visibility = ANY(string_to_array(sqlc.narg('visibility')::VARCHAR, ',')))
         AND (sqlc.narg('owner_id')::BIGINT IS NULL OR ns.owner_id = sqlc.narg('owner_id'))
         AND (sqlc.narg('workspace_id')::BIGINT IS NULL OR ns.workspace_id = sqlc.narg('workspace_id'))
         AND (sqlc.narg('search')::VARCHAR IS NULL OR (

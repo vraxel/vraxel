@@ -142,6 +142,7 @@ export default function NamespaceListPage() {
     {
       key: "visibility",
       header: t("namespace.visibility"),
+      sortable: true,
       filter: [
         { value: "all", label: t("common.all") },
         { value: "public", label: t("namespace.visibility.public") },
