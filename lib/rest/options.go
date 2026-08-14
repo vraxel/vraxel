@@ -49,10 +49,10 @@ func (p Pagination) Validate() error {
 
 // ReservedQueryParams are query parameter names that should not be used as filters.
 var ReservedQueryParams = map[string]bool{
-	"page":      true,
-	"pageSize":  true,
-	"sortBy":    true,
-	"sortOrder": true,
+	"page":       true,
+	"page_size":  true,
+	"sort_by":    true,
+	"sort_order": true,
 }
 
 // ParseListOptions parses ListOptions from URL query parameters.
@@ -78,15 +78,15 @@ func ParseListOptions(query url.Values) *ListOptions {
 			options.Pagination.Page = p
 		}
 	}
-	if pageSize := query.Get("pageSize"); pageSize != "" {
+	if pageSize := query.Get("page_size"); pageSize != "" {
 		if ps, err := strconv.Atoi(pageSize); err == nil && ps > 0 {
 			options.Pagination.PageSize = ps
 		}
 	}
 
 	// Parse sorting
-	options.SortBy = query.Get("sortBy")
-	if sortOrder := query.Get("sortOrder"); sortOrder != "" {
+	options.SortBy = query.Get("sort_by")
+	if sortOrder := query.Get("sort_order"); sortOrder != "" {
 		options.SortOrder = SortOrder(sortOrder)
 	}
 

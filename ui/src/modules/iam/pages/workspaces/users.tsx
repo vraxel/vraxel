@@ -84,7 +84,7 @@ export default function WorkspaceUsersPage() {
       statusFilter,
     ],
     queryFn: () => {
-      const params: ListParams = { page, pageSize, sortBy, sortOrder }
+      const params: ListParams = { page, page_size: pageSize, sort_by: sortBy, sort_order: sortOrder }
       if (search) params.search = search
       if (statusFilter !== "all") params.status = statusFilter
       return listWorkspaceUsers(workspaceId, params)
@@ -425,8 +425,8 @@ function AddMemberDialog({
     queryKey: ["iam", "workspace-add-users", workspaceId],
     queryFn: async () => {
       const [userData, roleData] = await Promise.all([
-        listWorkspaceUsers(workspaceId, { pageSize: 100, available: "true" }),
-        listWorkspaceRoles(workspaceId, { pageSize: 100 }),
+        listWorkspaceUsers(workspaceId, { page_size: 100, available: "true" }),
+        listWorkspaceRoles(workspaceId, { page_size: 100 }),
       ])
       return { users: userData.items ?? [], roles: roleData.items ?? [] }
     },

@@ -322,7 +322,7 @@ function NamespaceFormDialog({
   const [loading, setLoading] = useState(false)
   const workspacesQuery = useApiQuery({
     queryKey: ["iam", "workspaces", "active"],
-    queryFn: () => listWorkspaces({ page: 1, pageSize: 100, status: "active" }),
+    queryFn: () => listWorkspaces({ page: 1, page_size: 100, status: "active" }),
     enabled: open,
     meta: { skipGlobalError: true },
   })
@@ -405,7 +405,7 @@ function NamespaceFormDialog({
   const checkUniqueness = async (value: string) => {
     if (!value || isEdit) return
     try {
-      const data = await listNamespaces({ page: 1, pageSize: 1, search: value })
+      const data = await listNamespaces({ page: 1, page_size: 1, search: value })
       const exists = data.items?.some((ns) => ns.metadata.name === value)
       if (exists) form.setError("name", { message: t("namespace.validation.name.taken") })
     } catch {

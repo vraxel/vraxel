@@ -73,16 +73,21 @@ func (s *pgPermissionStore) GetByCode(ctx context.Context, code, scope string) (
 	return &out, nil
 }
 
+type permissionFilters struct {
+	ModulePrefix *string `filter:"module_prefix"`
+	Search       *string `filter:"search"`
+	Scope        *string `filter:"scope"`
+}
+
 func (s *pgPermissionStore) List(ctx context.Context, q list.Query) (*list.Result[PermissionRow], error) {
 	offset, limit := list.PaginationToOffsetLimit(q.Pagination)
+	f := list.Parse[permissionFilters](q.Filters)
 
-	countParams := generated.CountPermissionsParams{
-		ModulePrefix: list.FilterStr(q.Filters, "module_prefix"),
-		Search:       list.FilterStr(q.Filters, "search"),
-		Scope:        list.FilterStr(q.Filters, "scope"),
-	}
-
-	count, err := s.Q().CountPermissions(ctx, countParams)
+	count, err := s.Q().CountPermissions(ctx, generated.CountPermissionsParams{
+		ModulePrefix: f.ModulePrefix,
+		Search:       f.Search,
+		Scope:        f.Scope,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("count permissions: %w", err)
 	}
@@ -93,9 +98,9 @@ func (s *pgPermissionStore) List(ctx context.Context, q list.Query) (*list.Resul
 	}
 
 	rows, err := s.Q().ListPermissions(ctx, generated.ListPermissionsParams{
-		ModulePrefix: countParams.ModulePrefix,
-		Search:       countParams.Search,
-		Scope:        countParams.Scope,
+		ModulePrefix: f.ModulePrefix,
+		Search:       f.Search,
+		Scope:        f.Scope,
 		SortField:    q.SortBy,
 		SortOrder:    sortOrder,
 		PageOffset:   offset,

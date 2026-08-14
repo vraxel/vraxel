@@ -23,7 +23,7 @@ export async function listAllPermissions(): Promise<Permission[]> {
   const allItems: Permission[] = []
   let totalCount: number
   do {
-    const data = await listPermissions({ page, pageSize } as ListParams)
+    const data = await listPermissions({ page, page_size: pageSize } as ListParams)
     allItems.push(...(data.items ?? []))
     totalCount = data.totalCount
     page++

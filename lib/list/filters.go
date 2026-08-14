@@ -1,10 +1,64 @@
 package list
 
 import (
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
 )
+
+var (
+	tPtrString   = reflect.TypeFor[*string]()
+	tPtrInt32    = reflect.TypeFor[*int32]()
+	tPtrInt64    = reflect.TypeFor[*int64]()
+	tPtrBool     = reflect.TypeFor[*bool]()
+	tPtrTime     = reflect.TypeFor[*time.Time]()
+	tSliceInt64  = reflect.TypeFor[[]int64]()
+	tSliceString = reflect.TypeFor[[]string]()
+)
+
+// Parse populates a struct from a Filters map using `filter` struct tags.
+// Each field's tag value is the snake_case key in the map; the matching
+// FilterStr / FilterInt64 / ... extractor is chosen by the field's type.
+//
+//	type hostFilters struct {
+//	    AgentStatus *string `filter:"agent_status"`
+//	    Search      *string `filter:"search"`
+//	}
+//	f := list.Parse[hostFilters](q.Filters)
+func Parse[T any](filters map[string]any) T {
+	var result T
+	rv := reflect.ValueOf(&result).Elem()
+	rt := rv.Type()
+	for i := range rt.NumField() {
+		sf := rt.Field(i)
+		tag := sf.Tag.Get("filter")
+		if tag == "" || tag == "-" {
+			continue
+		}
+		var val any
+		switch sf.Type {
+		case tPtrString:
+			val = FilterStr(filters, tag)
+		case tPtrInt32:
+			val = FilterInt32(filters, tag)
+		case tPtrInt64:
+			val = FilterInt64(filters, tag)
+		case tPtrBool:
+			val = FilterBool(filters, tag)
+		case tPtrTime:
+			val = FilterTime(filters, tag)
+		case tSliceInt64:
+			val = FilterInt64Slice(filters, tag)
+		case tSliceString:
+			val = FilterStrSlice(filters, tag)
+		default:
+			continue
+		}
+		rv.Field(i).Set(reflect.ValueOf(val))
+	}
+	return result
+}
 
 // FilterStr extracts a string filter value from a Query.Filters map. An
 // empty string is treated as "no filter" (returns nil), so callers can

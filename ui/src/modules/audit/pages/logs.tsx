@@ -101,11 +101,11 @@ export default function AuditLogListPage() {
     def: auditLogsDef,
     api: auditLogsApi,
     scope,
-    filterKeys: ["eventType", "action", "module", "success"],
+    filterKeys: ["event_type", "action", "module", "success"],
     extraParams: {
-      resourceType: resourceTypeFilter || undefined,
-      startTime: dateRange?.from?.toISOString(),
-      endTime: dateRange?.to?.toISOString(),
+      resource_type: resourceTypeFilter || undefined,
+      start_time: dateRange?.from?.toISOString(),
+      end_time: dateRange?.to?.toISOString(),
     },
   })
 
@@ -119,7 +119,7 @@ export default function AuditLogListPage() {
       cell: (log) => log.spec.username || log.spec.clientIp || "-",
     },
     {
-      key: "eventType",
+      key: "event_type",
       header: t("audit.eventType"),
       filter: [
         { value: "all", label: t("common.all") },

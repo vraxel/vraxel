@@ -81,9 +81,9 @@ export function useListQuery<T extends ListRow>(opts: UseListQueryOptions<T>) {
   const [sp, setSp] = useSearchParams()
 
   const page = Number(sp.get("page") ?? 1) || 1
-  const pageSize = Number(sp.get("pageSize") ?? defaultPageSize) || defaultPageSize
-  const sortBy = sp.get("sortBy") ?? defaultSortBy
-  const sortOrder = (sp.get("sortOrder") as "asc" | "desc" | null) ?? defaultSortOrder
+  const pageSize = Number(sp.get("page_size") ?? defaultPageSize) || defaultPageSize
+  const sortBy = sp.get("sort_by") ?? defaultSortBy
+  const sortOrder = (sp.get("sort_order") as "asc" | "desc" | null) ?? defaultSortOrder
   const search = sp.get("q") ?? ""
   const filters: Record<string, string> = {}
   for (const k of filterKeys) filters[k] = sp.get(k) ?? "all"
@@ -147,14 +147,14 @@ export function useListQuery<T extends ListRow>(opts: UseListQueryOptions<T>) {
 
   const setPage = useCallback((p: number) => patchParams({ page: String(p) }), [patchParams])
   const setPageSize = useCallback(
-    (s: number) => patchParams({ pageSize: String(s) }, true),
+    (s: number) => patchParams({ page_size: String(s) }, true),
     [patchParams],
   )
   const handleSort = useCallback(
     (field: string) => {
       const nextOrder = sortBy === field && sortOrder === "asc" ? "desc" : "asc"
       // Clicking a new field starts at asc; clicking the current flips.
-      patchParams({ sortBy: field, sortOrder: sortBy === field ? nextOrder : "asc" })
+      patchParams({ sort_by: field, sort_order: sortBy === field ? nextOrder : "asc" })
     },
     [sortBy, sortOrder, patchParams],
   )
@@ -188,7 +188,7 @@ export function useListQuery<T extends ListRow>(opts: UseListQueryOptions<T>) {
   )
   const clearSelection = useCallback(() => setSelected(new Set()), [setSelected])
 
-  const params: ListParams = { page, pageSize, sortBy, sortOrder }
+  const params: ListParams = { page, page_size: pageSize, sort_by: sortBy, sort_order: sortOrder }
   if (search) params.search = search
   for (const k of filterKeys)
     if (filters[k] !== "all") (params as Record<string, unknown>)[k] = filters[k]

@@ -112,32 +112,42 @@ type pgHostStore struct {
 // NewPGHostStore creates a PostgreSQL-backed HostStore.
 func NewPGHostStore(d *db.DB) HostStore { return &pgHostStore{Store: db.Store{DB: d}} }
 
+type hostFilters struct {
+	Scope       *string `filter:"scope"`
+	WorkspaceID *int64  `filter:"workspace_id"`
+	NamespaceID *int64  `filter:"namespace_id"`
+	Origin      *string `filter:"origin"`
+	AgentStatus *string `filter:"agent_status"`
+	Search      *string `filter:"search"`
+}
+
 func (s *pgHostStore) List(ctx context.Context, q list.Query) (*list.Result[HostRow], error) {
 	offset, limit := q.OffsetLimit()
 	sortOrder := q.SortOrder
 	if sortOrder == "" {
 		sortOrder = "desc"
 	}
+	f := list.Parse[hostFilters](q.Filters)
 
 	count, err := s.Q().CountHosts(ctx, generated.CountHostsParams{
-		Scope:       list.FilterStr(q.Filters, "scope"),
-		WorkspaceID: list.FilterInt64(q.Filters, "workspace_id"),
-		NamespaceID: list.FilterInt64(q.Filters, "namespace_id"),
-		Origin:      list.FilterStr(q.Filters, "origin"),
-		AgentStatus: list.FilterStr(q.Filters, "agent_status"),
-		Search:      list.FilterStr(q.Filters, "search"),
+		Scope:       f.Scope,
+		WorkspaceID: f.WorkspaceID,
+		NamespaceID: f.NamespaceID,
+		Origin:      f.Origin,
+		AgentStatus: f.AgentStatus,
+		Search:      f.Search,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("count hosts: %w", err)
 	}
 
 	rows, err := s.Q().ListHosts(ctx, generated.ListHostsParams{
-		Scope:       list.FilterStr(q.Filters, "scope"),
-		WorkspaceID: list.FilterInt64(q.Filters, "workspace_id"),
-		NamespaceID: list.FilterInt64(q.Filters, "namespace_id"),
-		Origin:      list.FilterStr(q.Filters, "origin"),
-		AgentStatus: list.FilterStr(q.Filters, "agent_status"),
-		Search:      list.FilterStr(q.Filters, "search"),
+		Scope:       f.Scope,
+		WorkspaceID: f.WorkspaceID,
+		NamespaceID: f.NamespaceID,
+		Origin:      f.Origin,
+		AgentStatus: f.AgentStatus,
+		Search:      f.Search,
 		SortField:   q.SortBy,
 		SortOrder:   sortOrder,
 		PageOffset:  offset,

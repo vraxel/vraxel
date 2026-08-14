@@ -52,7 +52,7 @@ func get(t *testing.T, s *apiserver.Server, path string) *httptest.ResponseRecor
 func TestAuditLogList(t *testing.T) {
 	s, stub := newServer(t)
 
-	w := get(t, s, "/api/audit/v1/logs?page=2&pageSize=10&action=create&sortBy=created_at&sortOrder=asc")
+	w := get(t, s, "/api/audit/v1/logs?page=2&page_size=10&action=create&sort_by=created_at&sort_order=asc")
 	if w.Code != 200 {
 		t.Fatalf("list = %d %s", w.Code, w.Body.String())
 	}
@@ -81,7 +81,7 @@ func TestAuditLogList(t *testing.T) {
 		t.Errorf("sort = %s/%s", q.SortBy, q.SortOrder)
 	}
 	// Reserved pagination keys never leak into filters.
-	for _, reserved := range []string{"page", "pageSize", "sortBy", "sortOrder"} {
+	for _, reserved := range []string{"page", "page_size", "sort_by", "sort_order"} {
 		if _, ok := q.Filters[reserved]; ok {
 			t.Errorf("reserved key %q leaked into filters", reserved)
 		}

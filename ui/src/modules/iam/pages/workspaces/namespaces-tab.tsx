@@ -87,7 +87,7 @@ export default function WorkspaceNamespacesPage() {
       visibilityFilter,
     ],
     queryFn: () => {
-      const params: ListParams = { page, pageSize, sortBy, sortOrder }
+      const params: ListParams = { page, page_size: pageSize, sort_by: sortBy, sort_order: sortOrder }
       if (search) params.search = search
       if (statusFilter !== "all") params.status = statusFilter
       if (visibilityFilter !== "all") params.visibility = visibilityFilter
@@ -539,7 +539,7 @@ function NamespaceFormDialog({
   const checkUniqueness = async (value: string) => {
     if (!value || isEdit) return
     try {
-      const data = await listNamespaces({ page: 1, pageSize: 1, search: value })
+      const data = await listNamespaces({ page: 1, page_size: 1, search: value })
       const exists = data.items?.some((n) => n.metadata.name === value)
       if (exists) form.setError("name", { message: t("namespace.validation.name.taken") })
     } catch {

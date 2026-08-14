@@ -206,15 +206,19 @@ func (s *pgUserStore) SetBuiltin(ctx context.Context, id int64, builtin bool) er
 	return nil
 }
 
+type userFilters struct {
+	Status *string `filter:"status"`
+	Search *string `filter:"search"`
+}
+
 func (s *pgUserStore) List(ctx context.Context, q list.Query) (*list.Result[UserWithNamespacesRow], error) {
 	offset, limit := list.PaginationToOffsetLimit(q.Pagination)
+	f := list.Parse[userFilters](q.Filters)
 
-	filterParams := generated.CountUsersParams{
-		Status: list.FilterStr(q.Filters, "status"),
-		Search: list.FilterStr(q.Filters, "search"),
-	}
-
-	count, err := s.Q().CountUsers(ctx, filterParams)
+	count, err := s.Q().CountUsers(ctx, generated.CountUsersParams{
+		Status: f.Status,
+		Search: f.Search,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("count users: %w", err)
 	}
@@ -225,8 +229,8 @@ func (s *pgUserStore) List(ctx context.Context, q list.Query) (*list.Result[User
 	}
 
 	rows, err := s.Q().ListUsers(ctx, generated.ListUsersParams{
-		Status:     filterParams.Status,
-		Search:     filterParams.Search,
+		Status:     f.Status,
+		Search:     f.Search,
 		SortField:  q.SortBy,
 		SortOrder:  sortOrder,
 		PageOffset: offset,

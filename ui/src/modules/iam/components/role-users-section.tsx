@@ -78,10 +78,10 @@ export function RoleUsersSection({ config }: { config: RoleUsersConfig }) {
     queryFn: () => {
       const params: ListParams = {
         page,
-        pageSize,
+        page_size: pageSize,
         role_id: config.roleId,
-        sortBy: "created_at",
-        sortOrder: "asc",
+        sort_by: "created_at",
+        sort_order: "asc",
       }
       if (search) params.search = search
       return config.listBindings(params)
@@ -240,7 +240,7 @@ function AssignUsersDialog({
 
   const candidatesQuery = useApiQuery({
     queryKey: ["iam", "role-assign-candidates", ...config.cacheKey],
-    queryFn: () => config.listCandidates({ pageSize: 100 }),
+    queryFn: () => config.listCandidates({ page_size: 100 }),
     enabled: open,
   })
   // Users already holding THIS role are not candidates. Keyed under the
@@ -249,7 +249,7 @@ function AssignUsersDialog({
   // idempotent, so any holder that slips through just counts as skipped.
   const holdersQuery = useApiQuery({
     queryKey: ["iam", "role-users", ...config.cacheKey, "assign-holders"],
-    queryFn: () => config.listBindings({ role_id: config.roleId, pageSize: 100 }),
+    queryFn: () => config.listBindings({ role_id: config.roleId, page_size: 100 }),
     enabled: open,
   })
   const users = useMemo(() => {

@@ -34,9 +34,9 @@ export interface ServiceControlResult {
 
 export interface ListParams {
   page?: number
-  pageSize?: number
-  sortBy?: string
-  sortOrder?: "asc" | "desc"
+  page_size?: number
+  sort_by?: string
+  sort_order?: "asc" | "desc"
   [key: string]: string | number | undefined
 }
 

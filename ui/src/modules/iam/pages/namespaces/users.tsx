@@ -86,7 +86,7 @@ export default function NamespaceUsersPage() {
       statusFilter,
     ],
     queryFn: () => {
-      const params: ListParams = { page, pageSize, sortBy, sortOrder }
+      const params: ListParams = { page, page_size: pageSize, sort_by: sortBy, sort_order: sortOrder }
       if (search) params.search = search
       if (statusFilter !== "all") params.status = statusFilter
       return listNamespaceUsers(workspaceId, namespaceId, params)
@@ -433,8 +433,8 @@ function AddMemberDialog({
     queryKey: ["iam", "namespace-add-users", workspaceId, namespaceId],
     queryFn: async () => {
       const [userData, roleData] = await Promise.all([
-        listNamespaceUsers(workspaceId, namespaceId, { pageSize: 100, available: "true" }),
-        listNamespaceRoles(workspaceId, namespaceId, { pageSize: 100 }),
+        listNamespaceUsers(workspaceId, namespaceId, { page_size: 100, available: "true" }),
+        listNamespaceRoles(workspaceId, namespaceId, { page_size: 100 }),
       ])
       return { users: userData.items ?? [], roles: roleData.items ?? [] }
     },

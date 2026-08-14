@@ -68,28 +68,36 @@ func (s *pgJoinTokenStore) GetByID(ctx context.Context, id int64, sf scope.Filte
 	}, nil
 }
 
+type joinTokenFilters struct {
+	Scope       *string `filter:"scope"`
+	WorkspaceID *int64  `filter:"workspace_id"`
+	NamespaceID *int64  `filter:"namespace_id"`
+	Search      *string `filter:"search"`
+}
+
 func (s *pgJoinTokenStore) List(ctx context.Context, q list.Query) (*list.Result[JoinTokenRow], error) {
 	offset, limit := list.PaginationToOffsetLimit(q.Pagination)
 	sortOrder := q.SortOrder
 	if sortOrder == "" {
 		sortOrder = "desc"
 	}
+	f := list.Parse[joinTokenFilters](q.Filters)
 
 	count, err := s.Q().CountHostAgentJoinTokens(ctx, generated.CountHostAgentJoinTokensParams{
-		Scope:       list.FilterStr(q.Filters, "scope"),
-		WorkspaceID: list.FilterInt64(q.Filters, "workspace_id"),
-		NamespaceID: list.FilterInt64(q.Filters, "namespace_id"),
-		Search:      list.FilterStr(q.Filters, "search"),
+		Scope:       f.Scope,
+		WorkspaceID: f.WorkspaceID,
+		NamespaceID: f.NamespaceID,
+		Search:      f.Search,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("count join tokens: %w", err)
 	}
 
 	rows, err := s.Q().ListHostAgentJoinTokens(ctx, generated.ListHostAgentJoinTokensParams{
-		Scope:       list.FilterStr(q.Filters, "scope"),
-		WorkspaceID: list.FilterInt64(q.Filters, "workspace_id"),
-		NamespaceID: list.FilterInt64(q.Filters, "namespace_id"),
-		Search:      list.FilterStr(q.Filters, "search"),
+		Scope:       f.Scope,
+		WorkspaceID: f.WorkspaceID,
+		NamespaceID: f.NamespaceID,
+		Search:      f.Search,
 		SortField:   q.SortBy,
 		SortOrder:   sortOrder,
 		PageOffset:  offset,

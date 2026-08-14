@@ -314,7 +314,7 @@ function WorkspaceFormDialog({
   const checkUniqueness = async (value: string) => {
     if (!value || isEdit) return
     try {
-      const data = await listWorkspaces({ page: 1, pageSize: 1, search: value })
+      const data = await listWorkspaces({ page: 1, page_size: 1, search: value })
       const exists = data.items?.some((w) => w.metadata.name === value)
       if (exists) form.setError("name", { message: t("workspace.validation.name.taken") })
     } catch {

@@ -265,20 +265,29 @@ func (s *pgNamespaceStore) DeleteByIDs(ctx context.Context, ids []int64) (int64,
 	return int64(len(deletedIDs)), nil
 }
 
+type namespaceFilters struct {
+	AccessibleIds []int64 `filter:"accessible_ids"`
+	Status        *string `filter:"status"`
+	Name          *string `filter:"name"`
+	Visibility    *string `filter:"visibility"`
+	OwnerID       *int64  `filter:"owner_id"`
+	WorkspaceID   *int64  `filter:"workspace_id"`
+	Search        *string `filter:"search"`
+}
+
 func (s *pgNamespaceStore) List(ctx context.Context, q list.Query) (*list.Result[NamespaceWithOwnerRow], error) {
 	offset, limit := list.PaginationToOffsetLimit(q.Pagination)
+	f := list.Parse[namespaceFilters](q.Filters)
 
-	countParams := generated.CountNamespacesParams{
-		AccessibleIds: list.FilterInt64Slice(q.Filters, "accessible_ids"),
-		Status:        list.FilterStr(q.Filters, "status"),
-		Name:          list.FilterStr(q.Filters, "name"),
-		Visibility:    list.FilterStr(q.Filters, "visibility"),
-		OwnerID:       list.FilterInt64(q.Filters, "owner_id"),
-		WorkspaceID:   list.FilterInt64(q.Filters, "workspace_id"),
-		Search:        list.FilterStr(q.Filters, "search"),
-	}
-
-	count, err := s.Q().CountNamespaces(ctx, countParams)
+	count, err := s.Q().CountNamespaces(ctx, generated.CountNamespacesParams{
+		AccessibleIds: f.AccessibleIds,
+		Status:        f.Status,
+		Name:          f.Name,
+		Visibility:    f.Visibility,
+		OwnerID:       f.OwnerID,
+		WorkspaceID:   f.WorkspaceID,
+		Search:        f.Search,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("count namespaces: %w", err)
 	}
@@ -289,13 +298,13 @@ func (s *pgNamespaceStore) List(ctx context.Context, q list.Query) (*list.Result
 	}
 
 	rows, err := s.Q().ListNamespaces(ctx, generated.ListNamespacesParams{
-		AccessibleIds: countParams.AccessibleIds,
-		Status:        countParams.Status,
-		Name:          countParams.Name,
-		Visibility:    countParams.Visibility,
-		OwnerID:       countParams.OwnerID,
-		WorkspaceID:   countParams.WorkspaceID,
-		Search:        countParams.Search,
+		AccessibleIds: f.AccessibleIds,
+		Status:        f.Status,
+		Name:          f.Name,
+		Visibility:    f.Visibility,
+		OwnerID:       f.OwnerID,
+		WorkspaceID:   f.WorkspaceID,
+		Search:        f.Search,
 		SortField:     q.SortBy,
 		SortOrder:     sortOrder,
 		PageOffset:    offset,

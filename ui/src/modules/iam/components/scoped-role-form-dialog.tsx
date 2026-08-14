@@ -125,8 +125,8 @@ export function ScopedRoleFormDialog({
     try {
       const data =
         scope === "workspace"
-          ? await listWorkspaceRoles(scopeId, { page: 1, pageSize: 1, search: value })
-          : await listNamespaceRoles(workspaceId!, scopeId, { page: 1, pageSize: 1, search: value })
+          ? await listWorkspaceRoles(scopeId, { page: 1, page_size: 1, search: value })
+          : await listNamespaceRoles(workspaceId!, scopeId, { page: 1, page_size: 1, search: value })
       const exists = data.items?.some((r) => {
         if (isEdit && r.metadata.id === role?.metadata.id) return false
         return r.spec.name === value

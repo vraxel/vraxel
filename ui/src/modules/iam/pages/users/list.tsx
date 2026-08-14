@@ -375,7 +375,7 @@ function UserFormDialog({
   const checkUniqueness = async (field: "username" | "email" | "phone", value: string) => {
     if (!value) return
     try {
-      const params: ListParams = { page: 1, pageSize: 1, [field]: value }
+      const params: ListParams = { page: 1, page_size: 1, [field]: value }
       const data = await listUsers(params)
       const exists = data.items?.some((u) => {
         if (isEdit && u.metadata.id === user?.metadata.id) return false

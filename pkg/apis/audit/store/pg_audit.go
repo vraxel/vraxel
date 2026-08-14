@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	libaudit "vraxel.io/vraxel/lib/audit"
@@ -81,27 +82,43 @@ func (s *pgAuditLogStore) GetByID(ctx context.Context, id int64) (*AuditLogRow, 
 	return &out, nil
 }
 
+type auditFilters struct {
+	UserID       *int64     `filter:"user_id"`
+	EventType    *string    `filter:"event_type"`
+	Action       *string    `filter:"action"`
+	ResourceType *string    `filter:"resource_type"`
+	ResourceID   *string    `filter:"resource_id"`
+	Module       *string    `filter:"module"`
+	ClientIp     *string    `filter:"client_ip"`
+	WorkspaceID  *int64     `filter:"workspace_id"`
+	NamespaceID  *int64     `filter:"namespace_id"`
+	Success      *bool      `filter:"success"`
+	StatusCode   *int32     `filter:"status_code"`
+	StartTime    *time.Time `filter:"start_time"`
+	EndTime      *time.Time `filter:"end_time"`
+	Search       *string    `filter:"search"`
+}
+
 func (s *pgAuditLogStore) List(ctx context.Context, query list.Query) (*list.Result[AuditLogRow], error) {
 	offset, limit := list.PaginationToOffsetLimit(query.Pagination)
-
-	filterParams := buildFilterParams(query.Filters)
+	f := list.Parse[auditFilters](query.Filters)
 
 	q := s.Q()
 	count, err := q.CountAuditLogs(ctx, generated.CountAuditLogsParams{
-		UserID:       filterParams.UserID,
-		EventType:    filterParams.EventType,
-		Action:       filterParams.Action,
-		ResourceType: filterParams.ResourceType,
-		ResourceID:   filterParams.ResourceID,
-		Module:       filterParams.Module,
-		ClientIp:     filterParams.ClientIp,
-		WorkspaceID:  filterParams.WorkspaceID,
-		NamespaceID:  filterParams.NamespaceID,
-		Success:      filterParams.Success,
-		StatusCode:   filterParams.StatusCode,
-		StartTime:    filterParams.StartTime,
-		EndTime:      filterParams.EndTime,
-		Search:       filterParams.Search,
+		UserID:       f.UserID,
+		EventType:    f.EventType,
+		Action:       f.Action,
+		ResourceType: f.ResourceType,
+		ResourceID:   f.ResourceID,
+		Module:       f.Module,
+		ClientIp:     f.ClientIp,
+		WorkspaceID:  f.WorkspaceID,
+		NamespaceID:  f.NamespaceID,
+		Success:      f.Success,
+		StatusCode:   f.StatusCode,
+		StartTime:    f.StartTime,
+		EndTime:      f.EndTime,
+		Search:       f.Search,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("count audit logs: %w", err)
@@ -117,20 +134,20 @@ func (s *pgAuditLogStore) List(ctx context.Context, query list.Query) (*list.Res
 	}
 
 	rows, err := q.ListAuditLogs(ctx, generated.ListAuditLogsParams{
-		UserID:       filterParams.UserID,
-		EventType:    filterParams.EventType,
-		Action:       filterParams.Action,
-		ResourceType: filterParams.ResourceType,
-		ResourceID:   filterParams.ResourceID,
-		Module:       filterParams.Module,
-		ClientIp:     filterParams.ClientIp,
-		WorkspaceID:  filterParams.WorkspaceID,
-		NamespaceID:  filterParams.NamespaceID,
-		Success:      filterParams.Success,
-		StatusCode:   filterParams.StatusCode,
-		StartTime:    filterParams.StartTime,
-		EndTime:      filterParams.EndTime,
-		Search:       filterParams.Search,
+		UserID:       f.UserID,
+		EventType:    f.EventType,
+		Action:       f.Action,
+		ResourceType: f.ResourceType,
+		ResourceID:   f.ResourceID,
+		Module:       f.Module,
+		ClientIp:     f.ClientIp,
+		WorkspaceID:  f.WorkspaceID,
+		NamespaceID:  f.NamespaceID,
+		Success:      f.Success,
+		StatusCode:   f.StatusCode,
+		StartTime:    f.StartTime,
+		EndTime:      f.EndTime,
+		Search:       f.Search,
 		SortField:    sortField,
 		SortOrder:    sortOrder,
 		PageOffset:   offset,
@@ -148,25 +165,6 @@ func (s *pgAuditLogStore) List(ctx context.Context, query list.Query) (*list.Res
 		Items:      items,
 		TotalCount: count,
 	}, nil
-}
-
-func buildFilterParams(filters map[string]any) generated.ListAuditLogsParams {
-	return generated.ListAuditLogsParams{
-		UserID:       list.FilterInt64(filters, "userId"),
-		EventType:    list.FilterStr(filters, "eventType"),
-		Action:       list.FilterStr(filters, "action"),
-		ResourceType: list.FilterStr(filters, "resourceType"),
-		ResourceID:   list.FilterStr(filters, "resourceId"),
-		Module:       list.FilterStr(filters, "module"),
-		ClientIp:     list.FilterStr(filters, "clientIp"),
-		WorkspaceID:  list.FilterInt64(filters, "workspaceId"),
-		NamespaceID:  list.FilterInt64(filters, "namespaceId"),
-		Success:      list.FilterBool(filters, "success"),
-		StatusCode:   list.FilterInt32(filters, "statusCode"),
-		StartTime:    list.FilterTime(filters, "startTime"),
-		EndTime:      list.FilterTime(filters, "endTime"),
-		Search:       list.FilterStr(filters, "search"),
-	}
 }
 
 // rowToDomain maps the sqlc audit_logs row onto the store's domain type.

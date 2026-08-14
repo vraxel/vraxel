@@ -266,19 +266,27 @@ func (s *pgRoleStore) Delete(ctx context.Context, id int64) error {
 	return nil
 }
 
+type roleFilters struct {
+	Scope       *string  `filter:"scope"`
+	Builtin     *bool    `filter:"builtin"`
+	WorkspaceID *int64   `filter:"workspace_id"`
+	NamespaceID *int64   `filter:"namespace_id"`
+	Search      *string  `filter:"search"`
+	ExtraNames  []string `filter:"extra_names"`
+}
+
 func (s *pgRoleStore) List(ctx context.Context, q list.Query) (*list.Result[RoleListItem], error) {
 	offset, limit := list.PaginationToOffsetLimit(q.Pagination)
+	f := list.Parse[roleFilters](q.Filters)
 
-	countParams := generated.CountRolesParams{
-		Scope:       list.FilterStr(q.Filters, "scope"),
-		Builtin:     list.FilterBool(q.Filters, "builtin"),
-		WorkspaceID: list.FilterInt64(q.Filters, "workspace_id"),
-		NamespaceID: list.FilterInt64(q.Filters, "namespace_id"),
-		Search:      list.FilterStr(q.Filters, "search"),
-		ExtraNames:  list.FilterStrSlice(q.Filters, "extra_names"),
-	}
-
-	count, err := s.Q().CountRoles(ctx, countParams)
+	count, err := s.Q().CountRoles(ctx, generated.CountRolesParams{
+		Scope:       f.Scope,
+		Builtin:     f.Builtin,
+		WorkspaceID: f.WorkspaceID,
+		NamespaceID: f.NamespaceID,
+		Search:      f.Search,
+		ExtraNames:  f.ExtraNames,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("count roles: %w", err)
 	}
@@ -289,12 +297,12 @@ func (s *pgRoleStore) List(ctx context.Context, q list.Query) (*list.Result[Role
 	}
 
 	rows, err := s.Q().ListRoles(ctx, generated.ListRolesParams{
-		Scope:       countParams.Scope,
-		Builtin:     countParams.Builtin,
-		WorkspaceID: countParams.WorkspaceID,
-		NamespaceID: countParams.NamespaceID,
-		Search:      countParams.Search,
-		ExtraNames:  countParams.ExtraNames,
+		Scope:       f.Scope,
+		Builtin:     f.Builtin,
+		WorkspaceID: f.WorkspaceID,
+		NamespaceID: f.NamespaceID,
+		Search:      f.Search,
+		ExtraNames:  f.ExtraNames,
 		SortField:   q.SortBy,
 		SortOrder:   sortOrder,
 		PageOffset:  offset,

@@ -159,16 +159,26 @@ func (s *pgRoleBindingStore) GetByID(ctx context.Context, id int64) (*RoleBindin
 	return &out, nil
 }
 
+type roleBindingFilters struct {
+	Scope       *string `filter:"scope"`
+	RoleID      *int64  `filter:"role_id"`
+	IsOwner     *bool   `filter:"is_owner"`
+	Status      *string `filter:"status"`
+	Visibility  *string `filter:"visibility"`
+	WorkspaceID *int64  `filter:"workspace_id"`
+	NamespaceID *int64  `filter:"namespace_id"`
+	Search      *string `filter:"search"`
+}
+
 func (s *pgRoleBindingStore) ListPlatform(ctx context.Context, q list.Query) (*list.Result[RoleBindingWithDetailsRow], error) {
 	offset, limit := list.PaginationToOffsetLimit(q.Pagination)
+	f := list.Parse[roleBindingFilters](q.Filters)
 
-	countParams := generated.CountRoleBindingsPlatformParams{
-		RoleID:  list.FilterInt64(q.Filters, "role_id"),
-		IsOwner: list.FilterBool(q.Filters, "is_owner"),
-		Search:  list.FilterStr(q.Filters, "search"),
-	}
-
-	count, err := s.Q().CountRoleBindingsPlatform(ctx, countParams)
+	count, err := s.Q().CountRoleBindingsPlatform(ctx, generated.CountRoleBindingsPlatformParams{
+		RoleID:  f.RoleID,
+		IsOwner: f.IsOwner,
+		Search:  f.Search,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("count platform role bindings: %w", err)
 	}
@@ -179,9 +189,9 @@ func (s *pgRoleBindingStore) ListPlatform(ctx context.Context, q list.Query) (*l
 	}
 
 	rows, err := s.Q().ListRoleBindingsPlatform(ctx, generated.ListRoleBindingsPlatformParams{
-		RoleID:     countParams.RoleID,
-		IsOwner:    countParams.IsOwner,
-		Search:     countParams.Search,
+		RoleID:     f.RoleID,
+		IsOwner:    f.IsOwner,
+		Search:     f.Search,
 		SortField:  q.SortBy,
 		SortOrder:  sortOrder,
 		PageOffset: offset,
@@ -211,15 +221,14 @@ func (s *pgRoleBindingStore) ListPlatform(ctx context.Context, q list.Query) (*l
 func (s *pgRoleBindingStore) ListByWorkspaceID(ctx context.Context, workspaceID int64, q list.Query) (*list.Result[RoleBindingWithDetailsRow], error) {
 	offset, limit := list.PaginationToOffsetLimit(q.Pagination)
 	wsID := &workspaceID
+	f := list.Parse[roleBindingFilters](q.Filters)
 
-	countParams := generated.CountRoleBindingsByWorkspaceIDParams{
+	count, err := s.Q().CountRoleBindingsByWorkspaceID(ctx, generated.CountRoleBindingsByWorkspaceIDParams{
 		WorkspaceID: wsID,
-		RoleID:      list.FilterInt64(q.Filters, "role_id"),
-		IsOwner:     list.FilterBool(q.Filters, "is_owner"),
-		Search:      list.FilterStr(q.Filters, "search"),
-	}
-
-	count, err := s.Q().CountRoleBindingsByWorkspaceID(ctx, countParams)
+		RoleID:      f.RoleID,
+		IsOwner:     f.IsOwner,
+		Search:      f.Search,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("count workspace role bindings: %w", err)
 	}
@@ -231,9 +240,9 @@ func (s *pgRoleBindingStore) ListByWorkspaceID(ctx context.Context, workspaceID 
 
 	rows, err := s.Q().ListRoleBindingsByWorkspaceID(ctx, generated.ListRoleBindingsByWorkspaceIDParams{
 		WorkspaceID: wsID,
-		RoleID:      countParams.RoleID,
-		IsOwner:     countParams.IsOwner,
-		Search:      countParams.Search,
+		RoleID:      f.RoleID,
+		IsOwner:     f.IsOwner,
+		Search:      f.Search,
 		SortField:   q.SortBy,
 		SortOrder:   sortOrder,
 		PageOffset:  offset,
@@ -263,15 +272,14 @@ func (s *pgRoleBindingStore) ListByWorkspaceID(ctx context.Context, workspaceID 
 func (s *pgRoleBindingStore) ListByNamespaceID(ctx context.Context, namespaceID int64, q list.Query) (*list.Result[RoleBindingWithDetailsRow], error) {
 	offset, limit := list.PaginationToOffsetLimit(q.Pagination)
 	nsID := &namespaceID
+	f := list.Parse[roleBindingFilters](q.Filters)
 
-	countParams := generated.CountRoleBindingsByNamespaceIDParams{
+	count, err := s.Q().CountRoleBindingsByNamespaceID(ctx, generated.CountRoleBindingsByNamespaceIDParams{
 		NamespaceID: nsID,
-		RoleID:      list.FilterInt64(q.Filters, "role_id"),
-		IsOwner:     list.FilterBool(q.Filters, "is_owner"),
-		Search:      list.FilterStr(q.Filters, "search"),
-	}
-
-	count, err := s.Q().CountRoleBindingsByNamespaceID(ctx, countParams)
+		RoleID:      f.RoleID,
+		IsOwner:     f.IsOwner,
+		Search:      f.Search,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("count namespace role bindings: %w", err)
 	}
@@ -283,9 +291,9 @@ func (s *pgRoleBindingStore) ListByNamespaceID(ctx context.Context, namespaceID 
 
 	rows, err := s.Q().ListRoleBindingsByNamespaceID(ctx, generated.ListRoleBindingsByNamespaceIDParams{
 		NamespaceID: nsID,
-		RoleID:      countParams.RoleID,
-		IsOwner:     countParams.IsOwner,
-		Search:      countParams.Search,
+		RoleID:      f.RoleID,
+		IsOwner:     f.IsOwner,
+		Search:      f.Search,
 		SortField:   q.SortBy,
 		SortOrder:   sortOrder,
 		PageOffset:  offset,
@@ -314,17 +322,16 @@ func (s *pgRoleBindingStore) ListByNamespaceID(ctx context.Context, namespaceID 
 
 func (s *pgRoleBindingStore) ListByUserID(ctx context.Context, userID int64, q list.Query) (*list.Result[RoleBindingWithDetailsRow], error) {
 	offset, limit := list.PaginationToOffsetLimit(q.Pagination)
+	f := list.Parse[roleBindingFilters](q.Filters)
 
-	countParams := generated.CountRoleBindingsByUserIDParams{
+	count, err := s.Q().CountRoleBindingsByUserID(ctx, generated.CountRoleBindingsByUserIDParams{
 		UserID:      userID,
-		Scope:       list.FilterStr(q.Filters, "scope"),
-		RoleID:      list.FilterInt64(q.Filters, "role_id"),
-		WorkspaceID: list.FilterInt64(q.Filters, "workspace_id"),
-		NamespaceID: list.FilterInt64(q.Filters, "namespace_id"),
-		Search:      list.FilterStr(q.Filters, "search"),
-	}
-
-	count, err := s.Q().CountRoleBindingsByUserID(ctx, countParams)
+		Scope:       f.Scope,
+		RoleID:      f.RoleID,
+		WorkspaceID: f.WorkspaceID,
+		NamespaceID: f.NamespaceID,
+		Search:      f.Search,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("count user role bindings: %w", err)
 	}
@@ -336,11 +343,11 @@ func (s *pgRoleBindingStore) ListByUserID(ctx context.Context, userID int64, q l
 
 	rows, err := s.Q().ListRoleBindingsByUserID(ctx, generated.ListRoleBindingsByUserIDParams{
 		UserID:      userID,
-		Scope:       countParams.Scope,
-		RoleID:      countParams.RoleID,
-		WorkspaceID: countParams.WorkspaceID,
-		NamespaceID: countParams.NamespaceID,
-		Search:      countParams.Search,
+		Scope:       f.Scope,
+		RoleID:      f.RoleID,
+		WorkspaceID: f.WorkspaceID,
+		NamespaceID: f.NamespaceID,
+		Search:      f.Search,
 		SortField:   q.SortBy,
 		SortOrder:   sortOrder,
 		PageOffset:  offset,
@@ -385,14 +392,13 @@ func (s *pgRoleBindingStore) CountByRoleAndScope(ctx context.Context, roleID int
 
 func (s *pgRoleBindingStore) ListUserWorkspaces(ctx context.Context, userID int64, q list.Query) (*list.Result[WorkspaceWithOwnerAndRoleRow], error) {
 	offset, limit := list.PaginationToOffsetLimit(q.Pagination)
+	f := list.Parse[roleBindingFilters](q.Filters)
 
-	countParams := generated.CountUserWorkspacesParams{
+	count, err := s.Q().CountUserWorkspaces(ctx, generated.CountUserWorkspacesParams{
 		UserID: userID,
-		Status: list.FilterStr(q.Filters, "status"),
-		Search: list.FilterStr(q.Filters, "search"),
-	}
-
-	count, err := s.Q().CountUserWorkspaces(ctx, countParams)
+		Status: f.Status,
+		Search: f.Search,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("count user workspaces: %w", err)
 	}
@@ -404,8 +410,8 @@ func (s *pgRoleBindingStore) ListUserWorkspaces(ctx context.Context, userID int6
 
 	rows, err := s.Q().ListUserWorkspaces(ctx, generated.ListUserWorkspacesParams{
 		UserID:     userID,
-		Status:     countParams.Status,
-		Search:     countParams.Search,
+		Status:     f.Status,
+		Search:     f.Search,
 		SortField:  q.SortBy,
 		SortOrder:  sortOrder,
 		PageOffset: offset,
@@ -445,16 +451,15 @@ func (s *pgRoleBindingStore) ListUserWorkspaces(ctx context.Context, userID int6
 
 func (s *pgRoleBindingStore) ListUserNamespaces(ctx context.Context, userID int64, q list.Query) (*list.Result[NamespaceWithOwnerAndRoleRow], error) {
 	offset, limit := list.PaginationToOffsetLimit(q.Pagination)
+	f := list.Parse[roleBindingFilters](q.Filters)
 
-	countParams := generated.CountUserNamespacesParams{
+	count, err := s.Q().CountUserNamespaces(ctx, generated.CountUserNamespacesParams{
 		UserID:      userID,
-		Status:      list.FilterStr(q.Filters, "status"),
-		Visibility:  list.FilterStr(q.Filters, "visibility"),
-		WorkspaceID: list.FilterInt64(q.Filters, "workspace_id"),
-		Search:      list.FilterStr(q.Filters, "search"),
-	}
-
-	count, err := s.Q().CountUserNamespaces(ctx, countParams)
+		Status:      f.Status,
+		Visibility:  f.Visibility,
+		WorkspaceID: f.WorkspaceID,
+		Search:      f.Search,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("count user namespaces: %w", err)
 	}
@@ -466,10 +471,10 @@ func (s *pgRoleBindingStore) ListUserNamespaces(ctx context.Context, userID int6
 
 	rows, err := s.Q().ListUserNamespaces(ctx, generated.ListUserNamespacesParams{
 		UserID:      userID,
-		Status:      countParams.Status,
-		Visibility:  countParams.Visibility,
-		WorkspaceID: countParams.WorkspaceID,
-		Search:      countParams.Search,
+		Status:      f.Status,
+		Visibility:  f.Visibility,
+		WorkspaceID: f.WorkspaceID,
+		Search:      f.Search,
 		SortField:   q.SortBy,
 		SortOrder:   sortOrder,
 		PageOffset:  offset,

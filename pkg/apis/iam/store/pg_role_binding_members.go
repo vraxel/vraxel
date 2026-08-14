@@ -124,17 +124,21 @@ func (s *pgRoleBindingStore) RemoveNamespaceMember(ctx context.Context, userID, 
 	return nil
 }
 
+type memberFilters struct {
+	Status *string `filter:"status"`
+	Search *string `filter:"search"`
+}
+
 func (s *pgRoleBindingStore) ListWorkspaceMembers(ctx context.Context, workspaceID int64, q list.Query) (*list.Result[UserWithRoleRow], error) {
 	offset, limit := list.PaginationToOffsetLimit(q.Pagination)
 	wsID := &workspaceID
+	f := list.Parse[memberFilters](q.Filters)
 
-	countParams := generated.CountWorkspaceMembersParams{
+	count, err := s.Q().CountWorkspaceMembers(ctx, generated.CountWorkspaceMembersParams{
 		WorkspaceID: wsID,
-		Status:      list.FilterStr(q.Filters, "status"),
-		Search:      list.FilterStr(q.Filters, "search"),
-	}
-
-	count, err := s.Q().CountWorkspaceMembers(ctx, countParams)
+		Status:      f.Status,
+		Search:      f.Search,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("count workspace members: %w", err)
 	}
@@ -146,8 +150,8 @@ func (s *pgRoleBindingStore) ListWorkspaceMembers(ctx context.Context, workspace
 
 	rows, err := s.Q().ListWorkspaceMembers(ctx, generated.ListWorkspaceMembersParams{
 		WorkspaceID: wsID,
-		Status:      countParams.Status,
-		Search:      countParams.Search,
+		Status:      f.Status,
+		Search:      f.Search,
 		SortField:   q.SortBy,
 		SortOrder:   sortOrder,
 		PageOffset:  offset,
@@ -185,14 +189,13 @@ func (s *pgRoleBindingStore) ListWorkspaceMembers(ctx context.Context, workspace
 func (s *pgRoleBindingStore) ListNamespaceMembers(ctx context.Context, namespaceID int64, q list.Query) (*list.Result[UserWithRoleRow], error) {
 	offset, limit := list.PaginationToOffsetLimit(q.Pagination)
 	nsID := &namespaceID
+	f := list.Parse[memberFilters](q.Filters)
 
-	countParams := generated.CountNamespaceMembersParams{
+	count, err := s.Q().CountNamespaceMembers(ctx, generated.CountNamespaceMembersParams{
 		NamespaceID: nsID,
-		Status:      list.FilterStr(q.Filters, "status"),
-		Search:      list.FilterStr(q.Filters, "search"),
-	}
-
-	count, err := s.Q().CountNamespaceMembers(ctx, countParams)
+		Status:      f.Status,
+		Search:      f.Search,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("count namespace members: %w", err)
 	}
@@ -204,8 +207,8 @@ func (s *pgRoleBindingStore) ListNamespaceMembers(ctx context.Context, namespace
 
 	rows, err := s.Q().ListNamespaceMembers(ctx, generated.ListNamespaceMembersParams{
 		NamespaceID: nsID,
-		Status:      countParams.Status,
-		Search:      countParams.Search,
+		Status:      f.Status,
+		Search:      f.Search,
 		SortField:   q.SortBy,
 		SortOrder:   sortOrder,
 		PageOffset:  offset,
@@ -243,14 +246,13 @@ func (s *pgRoleBindingStore) ListNamespaceMembers(ctx context.Context, namespace
 func (s *pgRoleBindingStore) ListWorkspaceNonMembers(ctx context.Context, workspaceID int64, q list.Query) (*list.Result[UserRow], error) {
 	offset, limit := list.PaginationToOffsetLimit(q.Pagination)
 	wsID := &workspaceID
+	f := list.Parse[memberFilters](q.Filters)
 
-	countParams := generated.CountWorkspaceNonMembersParams{
+	count, err := s.Q().CountWorkspaceNonMembers(ctx, generated.CountWorkspaceNonMembersParams{
 		WorkspaceID: wsID,
-		Status:      list.FilterStr(q.Filters, "status"),
-		Search:      list.FilterStr(q.Filters, "search"),
-	}
-
-	count, err := s.Q().CountWorkspaceNonMembers(ctx, countParams)
+		Status:      f.Status,
+		Search:      f.Search,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("count workspace non-members: %w", err)
 	}
@@ -262,8 +264,8 @@ func (s *pgRoleBindingStore) ListWorkspaceNonMembers(ctx context.Context, worksp
 
 	rows, err := s.Q().ListWorkspaceNonMembers(ctx, generated.ListWorkspaceNonMembersParams{
 		WorkspaceID: wsID,
-		Status:      countParams.Status,
-		Search:      countParams.Search,
+		Status:      f.Status,
+		Search:      f.Search,
 		SortField:   q.SortBy,
 		SortOrder:   sortOrder,
 		PageOffset:  offset,
@@ -294,14 +296,13 @@ func (s *pgRoleBindingStore) ListWorkspaceNonMembers(ctx context.Context, worksp
 func (s *pgRoleBindingStore) ListNamespaceNonMembers(ctx context.Context, namespaceID int64, q list.Query) (*list.Result[UserRow], error) {
 	offset, limit := list.PaginationToOffsetLimit(q.Pagination)
 	nsID := &namespaceID
+	f := list.Parse[memberFilters](q.Filters)
 
-	countParams := generated.CountNamespaceNonMembersParams{
+	count, err := s.Q().CountNamespaceNonMembers(ctx, generated.CountNamespaceNonMembersParams{
 		NamespaceID: nsID,
-		Status:      list.FilterStr(q.Filters, "status"),
-		Search:      list.FilterStr(q.Filters, "search"),
-	}
-
-	count, err := s.Q().CountNamespaceNonMembers(ctx, countParams)
+		Status:      f.Status,
+		Search:      f.Search,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("count namespace non-members: %w", err)
 	}
@@ -313,8 +314,8 @@ func (s *pgRoleBindingStore) ListNamespaceNonMembers(ctx context.Context, namesp
 
 	rows, err := s.Q().ListNamespaceNonMembers(ctx, generated.ListNamespaceNonMembersParams{
 		NamespaceID: nsID,
-		Status:      countParams.Status,
-		Search:      countParams.Search,
+		Status:      f.Status,
+		Search:      f.Search,
 		SortField:   q.SortBy,
 		SortOrder:   sortOrder,
 		PageOffset:  offset,

@@ -253,7 +253,7 @@ function UserWorkspacesCard({ userId }: { userId: string }) {
   } = useListState({ defaultSortBy: "joined_at", defaultSortOrder: "desc", defaultPageSize: 10 })
   const [statusFilter, setStatusFilter] = useState("all")
 
-  const params: ListParams = { page, pageSize, sortBy, sortOrder }
+  const params: ListParams = { page, page_size: pageSize, sort_by: sortBy, sort_order: sortOrder }
   if (search) params.search = search
   if (statusFilter !== "all") params.status = statusFilter
   const listQuery = useApiQuery({
@@ -476,7 +476,7 @@ function UserNamespacesCard({ userId }: { userId: string }) {
   } = useListState({ defaultSortBy: "joined_at", defaultSortOrder: "desc", defaultPageSize: 10 })
   const [statusFilter, setStatusFilter] = useState("all")
 
-  const params: ListParams = { page, pageSize, sortBy, sortOrder }
+  const params: ListParams = { page, page_size: pageSize, sort_by: sortBy, sort_order: sortOrder }
   if (search) params.search = search
   if (statusFilter !== "all") params.status = statusFilter
   const listQuery = useApiQuery({
@@ -708,7 +708,7 @@ function UserRoleBindingsCard({ userId }: { userId: string }) {
   } = useListState({ defaultSortBy: "created_at", defaultSortOrder: "desc", defaultPageSize: 10 })
   const [scopeFilter, setScopeFilter] = useState("all")
 
-  const params: ListParams = { page: 1, pageSize: 100, sortBy, sortOrder }
+  const params: ListParams = { page: 1, page_size: 100, sort_by: sortBy, sort_order: sortOrder }
   if (scopeFilter !== "all") params.scope = scopeFilter
   const listQuery = useApiQuery({
     queryKey: qk.sub(usersDef, {}, userId, "rolebindings", params),
@@ -969,7 +969,7 @@ function EditUserDialog({
   const checkUniqueness = async (field: "email" | "phone", value: string) => {
     if (!value) return
     try {
-      const data = await listUsers({ page: 1, pageSize: 1, [field]: value })
+      const data = await listUsers({ page: 1, page_size: 1, [field]: value })
       const exists = data.items?.some((u) => {
         if (u.metadata.id === user.metadata.id) return false
         return u.spec[field]?.toLowerCase() === value.toLowerCase()

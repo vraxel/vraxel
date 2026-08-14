@@ -298,18 +298,25 @@ func (s *pgWorkspaceStore) DeleteByIDs(ctx context.Context, ids []int64) (int64,
 	return int64(len(deletedIDs)), nil
 }
 
+type workspaceFilters struct {
+	AccessibleIds []int64 `filter:"accessible_ids"`
+	Status        *string `filter:"status"`
+	Name          *string `filter:"name"`
+	OwnerID       *int64  `filter:"owner_id"`
+	Search        *string `filter:"search"`
+}
+
 func (s *pgWorkspaceStore) List(ctx context.Context, q list.Query) (*list.Result[WorkspaceWithOwnerRow], error) {
 	offset, limit := list.PaginationToOffsetLimit(q.Pagination)
+	f := list.Parse[workspaceFilters](q.Filters)
 
-	countParams := generated.CountWorkspacesParams{
-		AccessibleIds: list.FilterInt64Slice(q.Filters, "accessible_ids"),
-		Status:        list.FilterStr(q.Filters, "status"),
-		Name:          list.FilterStr(q.Filters, "name"),
-		OwnerID:       list.FilterInt64(q.Filters, "owner_id"),
-		Search:        list.FilterStr(q.Filters, "search"),
-	}
-
-	count, err := s.Q().CountWorkspaces(ctx, countParams)
+	count, err := s.Q().CountWorkspaces(ctx, generated.CountWorkspacesParams{
+		AccessibleIds: f.AccessibleIds,
+		Status:        f.Status,
+		Name:          f.Name,
+		OwnerID:       f.OwnerID,
+		Search:        f.Search,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("count workspaces: %w", err)
 	}
@@ -320,11 +327,11 @@ func (s *pgWorkspaceStore) List(ctx context.Context, q list.Query) (*list.Result
 	}
 
 	rows, err := s.Q().ListWorkspaces(ctx, generated.ListWorkspacesParams{
-		AccessibleIds: countParams.AccessibleIds,
-		Status:        countParams.Status,
-		Name:          countParams.Name,
-		OwnerID:       countParams.OwnerID,
-		Search:        countParams.Search,
+		AccessibleIds: f.AccessibleIds,
+		Status:        f.Status,
+		Name:          f.Name,
+		OwnerID:       f.OwnerID,
+		Search:        f.Search,
 		SortField:     q.SortBy,
 		SortOrder:     sortOrder,
 		PageOffset:    offset,

@@ -171,7 +171,7 @@ function ScopedRoleBindingsCard({
       // Bug #134: hit the workspace/namespace-scoped verb so the permission
       // check lands at scope-level iam:users:get (which a project / workspace
       // member has) instead of platform-level.
-      const params: ListParams = { page: 1, pageSize: 100, sortBy, sortOrder }
+      const params: ListParams = { page: 1, page_size: 100, sort_by: sortBy, sort_order: sortOrder }
       return namespaceId
         ? listNamespaceUserRoleBindings(workspaceId, namespaceId, userId, params)
         : workspaceId
