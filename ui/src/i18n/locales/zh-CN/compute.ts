@@ -37,6 +37,9 @@ const compute = {
   // agent status
   "compute.agent.online": "在线",
   "compute.agent.offline": "离线",
+  "compute.agent.notInstalled": "未安装",
+  "compute.agent.notInstalledHint":
+    "这台主机只有档案，还没有安装 Agent，终端、文件管理等功能不可用。可在主机详情页安装。",
   "compute.agent.conflict": "身份冲突",
   "compute.agent.conflictHint":
     "有多个 agent 进程在使用同一身份，通常是从已接入主机克隆磁盘导致的。冲突期间该主机的所有连接都会被拒绝；请在克隆机上重置 /etc/machine-id 后重新接入。",

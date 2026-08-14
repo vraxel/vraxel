@@ -3,6 +3,7 @@ import { cn } from "@/shared/lib/utils"
 import { useTranslation } from "@/i18n"
 
 interface Props {
+  /** Undefined means no agent has ever been bound to this host. */
   status?: "online" | "offline"
   /** Set while two live agent processes claim this host's identity. */
   conflictAt?: string
@@ -12,7 +13,13 @@ interface Props {
 /**
  * The host's primary status.
  *
- * Conflict outranks online/offline: while it is set the gateway refuses
+ * Three states, not two. A host imported by hand has never had an agent,
+ * which is a different fact from an agent that is not answering: one is
+ * waiting for an install, the other for a machine to come back. Calling
+ * both "offline" sends the operator looking for a process that was never
+ * there.
+ *
+ * Conflict outranks all of them: while it is set the gateway refuses
  * every channel for this host, including the one that looks like the
  * original, so reporting "offline" would be true but useless -- the
  * operator needs to know the host is unmanageable and why.
@@ -24,6 +31,17 @@ export function AgentStatusBadge({ status, conflictAt, className }: Props) {
     return (
       <Badge variant="destructive" title={t("compute.agent.conflictHint")} className={className}>
         {t("compute.agent.conflict")}
+      </Badge>
+    )
+  }
+  if (!status) {
+    return (
+      <Badge
+        variant="outline"
+        title={t("compute.agent.notInstalledHint")}
+        className={cn("text-muted-foreground", className)}
+      >
+        {t("compute.agent.notInstalled")}
       </Badge>
     )
   }

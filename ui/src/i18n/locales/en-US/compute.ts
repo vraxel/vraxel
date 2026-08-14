@@ -36,6 +36,9 @@ const compute = {
   // agent status
   "compute.agent.online": "Online",
   "compute.agent.offline": "Offline",
+  "compute.agent.notInstalled": "Not installed",
+  "compute.agent.notInstalledHint":
+    "This host has a record but no agent, so the terminal and file manager are unavailable. Install one from the host page.",
   "compute.agent.conflict": "Identity contended",
   "compute.agent.conflictHint":
     "More than one agent process is claiming this identity, almost always a disk cloned from an onboarded host. Every channel for this host is refused while it lasts; reset /etc/machine-id on the copies and onboard them again.",
