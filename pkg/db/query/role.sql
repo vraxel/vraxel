@@ -91,6 +91,8 @@ ORDER BY
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'display_name' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN display_name END DESC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'scope' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN scope END ASC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'scope' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN scope END DESC,
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'builtin' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN builtin END ASC,
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'builtin' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN builtin END DESC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'created_at' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN created_at END ASC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'created_at' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN created_at END DESC,
     created_at DESC

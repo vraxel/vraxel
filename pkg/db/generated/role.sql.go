@@ -346,6 +346,8 @@ ORDER BY
     CASE WHEN $7::VARCHAR = 'display_name' AND $8::VARCHAR = 'desc' THEN display_name END DESC,
     CASE WHEN $7::VARCHAR = 'scope' AND $8::VARCHAR = 'asc' THEN scope END ASC,
     CASE WHEN $7::VARCHAR = 'scope' AND $8::VARCHAR = 'desc' THEN scope END DESC,
+    CASE WHEN $7::VARCHAR = 'builtin' AND $8::VARCHAR = 'asc' THEN builtin END ASC,
+    CASE WHEN $7::VARCHAR = 'builtin' AND $8::VARCHAR = 'desc' THEN builtin END DESC,
     CASE WHEN $7::VARCHAR = 'created_at' AND $8::VARCHAR = 'asc' THEN created_at END ASC,
     CASE WHEN $7::VARCHAR = 'created_at' AND $8::VARCHAR = 'desc' THEN created_at END DESC,
     created_at DESC

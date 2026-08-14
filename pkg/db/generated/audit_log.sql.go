@@ -223,6 +223,8 @@ ORDER BY
     CASE WHEN $15::VARCHAR = 'status_code' AND $16::VARCHAR = 'desc' THEN status_code END DESC,
     CASE WHEN $15::VARCHAR = 'duration_ms' AND $16::VARCHAR = 'asc' THEN duration_ms END ASC,
     CASE WHEN $15::VARCHAR = 'duration_ms' AND $16::VARCHAR = 'desc' THEN duration_ms END DESC,
+    CASE WHEN $15::VARCHAR = 'success' AND $16::VARCHAR = 'asc' THEN success END ASC,
+    CASE WHEN $15::VARCHAR = 'success' AND $16::VARCHAR = 'desc' THEN success END DESC,
     created_at DESC
 LIMIT $18::INT
 OFFSET $17::INT

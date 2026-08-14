@@ -185,6 +185,7 @@ export default function RoleListPage() {
     {
       key: "builtin",
       header: t("role.builtin"),
+      sortable: true,
       filter: [
         { value: "all", label: t("common.all") },
         { value: "true", label: t("role.builtin") },

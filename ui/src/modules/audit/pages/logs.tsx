@@ -221,6 +221,7 @@ export default function AuditLogListPage() {
     {
       key: "success",
       header: t("audit.success"),
+      sortable: true,
       filter: [
         { value: "all", label: t("common.all") },
         { value: "true", label: t("audit.success.true") },
