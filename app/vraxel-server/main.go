@@ -156,6 +156,7 @@ func buildRootHandler(
 	return handler.NewRootHandler(handler.RootHandlerConfig{
 		APIHandler:           apiHandler,
 		AgentProtocolHandler: apisResult.AgentProtocolHandler,
+		InstallScriptHandler: apisResult.InstallScriptHandler,
 		OIDCMux:              apis.NewOIDCMux(oidcProvider, auditWriter, apisResult, &cfg.OIDC, cfg.Server.ExternalURL),
 		OpenAPISpec:          localapis.OpenAPISpec,
 		FrontendFS:           distFS,

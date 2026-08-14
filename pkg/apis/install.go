@@ -44,6 +44,9 @@ type Result struct {
 	// ahead of the IAM APIHandler.
 	AgentProtocolHandler http.HandlerFunc
 
+	// InstallScriptHandler serves /install-agent.sh at the root.
+	InstallScriptHandler http.HandlerFunc
+
 	iamResult iam.ModuleResult
 }
 
@@ -89,6 +92,7 @@ func NewModules(ctx context.Context, database *db.DB, listenAddr string) Result 
 		Mux:                  mux,
 		Registrars:           moduleRegistrars(database),
 		AgentProtocolHandler: agentgwResult.ProtocolHandler,
+		InstallScriptHandler: agentgwResult.InstallScriptHandler,
 		iamResult:            iamResult,
 	}
 }

@@ -5,10 +5,17 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"sync"
 
 	agenttypes "vraxel.io/vraxel/lib/agent/types"
 	gwstore "vraxel.io/vraxel/pkg/apis/agentgw/store"
 )
+
+// InstallScriptPath is where the onboarding script is served. At the
+// root rather than under /api/agent/v1/ because an operator pastes this
+// URL into a root shell, and a path with an api version in it invites
+// them to think it is an API they should be calling.
+const InstallScriptPath = "/install-agent.sh"
 
 // AgentProtocolPathPrefix is the URL prefix routed to the agent protocol
 // handler. Defined off the wire contract so the server mount branch and
@@ -19,8 +26,10 @@ const AgentProtocolPathPrefix = agenttypes.ProtocolPathPrefix
 // the platform's IAM chain -- bearer credentials are validated inside each
 // route:
 //
-//   - POST /api/agent/v1/register   join token  -> agent token         (register.go)
-//   - GET  /api/agent/v1/channel     agent token -> WS control channel  (channel.go)
+//   - POST /api/agent/v1/register        join token  -> agent token        (register.go)
+//   - GET  /api/agent/v1/channel          agent token -> WS control channel (channel.go)
+//   - GET  /api/agent/v1/binary/{os}/{arch}   unauthenticated              (assets.go)
+//   - GET  /install-agent.sh                  unauthenticated              (assets.go)
 //
 // data-channel / bundles / jobs / scrape-targets and the install script
 // arrive with later slices; everything else 404s. This file is only the
@@ -39,10 +48,21 @@ type protocolHandler struct {
 	// is on the stack, and the deregistration path runs after the read loop
 	// unwinds.
 	ctx context.Context
+
+	// binaryDir is where the cross-compiled agent binaries are served
+	// from. shaCache memoises their digests per (size, mtime) so a
+	// fleet-wide install storm hashes a ~20MB file once rather than once
+	// per host.
+	binaryDir string
+	shaMu     sync.Mutex
+	shaCache  map[string]string
 }
 
-// NewProtocolHandler builds the /api/agent/v1/ handler.
-func NewProtocolHandler(ctx context.Context, stores gwstore.Stores, registrar HostRegistrar, signer *TokenSigner, sessionSigner *SessionTokenSigner, registry *Registry, runManager *RunManager) http.HandlerFunc {
+// NewProtocolHandler builds the two handlers the gateway exposes over
+// HTTP: the /api/agent/v1/ branch, and the install script that sits at
+// the root. They share one protocolHandler because the script has to
+// state the digests of the binaries the same instance serves.
+func NewProtocolHandler(ctx context.Context, stores gwstore.Stores, registrar HostRegistrar, signer *TokenSigner, sessionSigner *SessionTokenSigner, registry *Registry, runManager *RunManager) (protocol, installScript http.HandlerFunc) {
 	h := &protocolHandler{
 		agents:        stores.Agent,
 		joinTokens:    stores.JoinToken,
@@ -52,8 +72,9 @@ func NewProtocolHandler(ctx context.Context, stores gwstore.Stores, registrar Ho
 		registry:      registry,
 		runManager:    runManager,
 		ctx:           ctx,
+		binaryDir:     agentBinaryDir(),
 	}
-	return h.serve
+	return h.serve, h.handleInstallScript
 }
 
 func (h *protocolHandler) serve(w http.ResponseWriter, r *http.Request) {
@@ -63,6 +84,8 @@ func (h *protocolHandler) serve(w http.ResponseWriter, r *http.Request) {
 		h.handleRegister(w, r)
 	case rest == "channel":
 		h.handleChannel(w, r)
+	case strings.HasPrefix(rest, "binary/"):
+		h.handleBinary(w, r, strings.TrimPrefix(rest, "binary/"))
 	default:
 		http.NotFound(w, r)
 	}
