@@ -1,26 +1,19 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { Link, useParams } from "react-router"
 import { Pencil, Plus, Trash2 } from "lucide-react"
-import { useForm } from "react-hook-form"
-import { z } from "zod/v4"
-import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
 import { formatDateTime } from "@/shared/lib/format"
 import { Button } from "@/shared/ui/button"
-import { Input } from "@/shared/ui/input"
-import { Textarea } from "@/shared/ui/textarea"
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/ui/form"
 import { useTranslation } from "@/i18n"
 import { useListQuery } from "@/frameworks/list/use-list-query"
 import { NameCell } from "@/frameworks/list/name-cell"
 import { StatusFilter } from "@/frameworks/list/status-filter"
 import { ResourceListPage, type ColumnDef } from "@/frameworks/list/resource-list-page"
-import { FormDialog } from "@/frameworks/form/form-dialog"
 import { ConfirmDialog } from "@/shared/components/confirm-dialog"
 import { useQueryClient } from "@tanstack/react-query"
 import { useApiMutation } from "@/core/query/hooks"
 import { qk } from "@/core/query/keys"
-import { handleFormApiError, showApiError } from "@/core/api/client"
+import { showApiError } from "@/core/api/client"
 import { usePermission } from "@/core/permission/use-permission"
 import { buildPermScope, buildScopedPath } from "@/core/registry/nav-config"
 import type { ScopeRef } from "@/core/registry/resource"
@@ -28,6 +21,7 @@ import { hostsApi } from "@/modules/compute/api/hosts"
 import type { Host } from "@/modules/compute/api/types"
 import { hostsDef } from "@/modules/compute/defs"
 import { AgentStatusBadge } from "@/modules/compute/components/agent-status-badge"
+import { HostEditDialog } from "@/modules/compute/components/host-edit-dialog"
 import { useHostWatch } from "@/modules/compute/use-host-watch"
 
 export default function HostListPage() {
@@ -52,8 +46,6 @@ export default function HostListPage() {
     scope,
     filterKeys: ["agentStatus"],
   })
-  // Agents come and go without anyone touching this page, and a machine
-  // running the install script adds itself to this list.
   useHostWatch(scope)
 
   const deleteMutation = useApiMutation({
@@ -204,114 +196,5 @@ export default function HostListPage() {
         confirmText={t("common.delete")}
       />
     </ResourceListPage>
-  )
-}
-
-// ===== Host Edit Dialog =====
-
-interface HostEditFormValues {
-  displayName: string
-  description: string
-}
-
-function HostEditDialog({
-  host,
-  scope,
-  onClose,
-  onSuccess,
-}: {
-  host: Host | null
-  scope: ScopeRef
-  onClose: () => void
-  onSuccess: () => void
-}) {
-  const { t } = useTranslation()
-  const [loading, setLoading] = useState(false)
-
-  const schema = z.object({
-    displayName: z
-      .string()
-      .max(128, t("api.validation.maxLength", { max: 128 }))
-      .optional(),
-    description: z
-      .string()
-      .max(1000, t("api.validation.maxLength", { max: 1000 }))
-      .optional(),
-  })
-
-  const form = useForm<HostEditFormValues>({
-    resolver: zodResolver(schema) as never,
-    mode: "onBlur",
-    defaultValues: { displayName: "", description: "" },
-  })
-
-  useEffect(() => {
-    if (host) {
-      form.reset({
-        displayName: host.spec.displayName ?? "",
-        description: host.spec.description ?? "",
-      })
-    }
-  }, [host, form])
-
-  const onSubmit = async (values: HostEditFormValues) => {
-    if (!host) return
-    setLoading(true)
-    try {
-      await hostsApi.update(scope, host.metadata.id, {
-        spec: {
-          displayName: values.displayName,
-          description: values.description,
-        },
-      })
-      toast.success(t("action.updateSuccess"))
-      onClose()
-      onSuccess()
-    } catch (err) {
-      handleFormApiError(err, form, t, "host", "compute.host.title")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <FormDialog
-      open={!!host}
-      onOpenChange={(v) => {
-        if (!v) onClose()
-      }}
-      title={t("compute.host.edit")}
-      form={form}
-      onSubmit={onSubmit}
-      submitting={loading}
-      widthClass="sm:max-w-lg"
-    >
-      <FormField
-        control={form.control}
-        name="displayName"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>{t("common.displayName")}</FormLabel>
-            <FormControl>
-              <Input {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={form.control}
-        name="description"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>{t("common.description")}</FormLabel>
-            <FormControl>
-              <Textarea rows={3} {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-    </FormDialog>
   )
 }

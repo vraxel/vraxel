@@ -1,24 +1,41 @@
-import { Link, useParams } from "react-router"
-import { ArrowLeft, Trash2 } from "lucide-react"
+import { useState } from "react"
+import { Link, useNavigate, useParams } from "react-router"
+import { ArrowLeft, Pencil, Trash2 } from "lucide-react"
+import { toast } from "sonner"
 import { formatDateTime } from "@/shared/lib/format"
 import { Button } from "@/shared/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card"
 import { Skeleton } from "@/shared/ui/skeleton"
 import { useApiQuery } from "@/core/query/hooks"
 import { qk } from "@/core/query/keys"
+import { useQueryClient } from "@tanstack/react-query"
+import { showApiError } from "@/core/api/client"
 import { useTranslation } from "@/i18n"
+import { usePermission } from "@/core/permission/use-permission"
+import { buildPermScope, buildScopedPath } from "@/core/registry/nav-config"
+import type { ScopeRef } from "@/core/registry/resource"
 import { hostsApi } from "@/modules/compute/api/hosts"
 import { hostsDef } from "@/modules/compute/defs"
-import { buildScopedPath } from "@/core/registry/nav-config"
-import type { ScopeRef } from "@/core/registry/resource"
 import { AgentStatusBadge } from "@/modules/compute/components/agent-status-badge"
+import { HostEditDialog } from "@/modules/compute/components/host-edit-dialog"
 import { useHostWatch } from "@/modules/compute/use-host-watch"
+import { ConfirmDialog } from "@/shared/components/confirm-dialog"
 
 export default function HostDetailPage() {
   const { hostId, workspaceId, namespaceId } = useParams()
+  const navigate = useNavigate()
   const { t } = useTranslation()
+  const { hasPermission } = usePermission()
+  const qc = useQueryClient()
   const scope: ScopeRef = { ws: workspaceId, ns: namespaceId }
+  const permScope = buildPermScope(workspaceId, namespaceId)
   const listPath = buildScopedPath("hosts", workspaceId ?? null, namespaceId ?? null)
+
+  const canUpdate = hasPermission("compute:hosts:update", permScope)
+  const canDelete = hasPermission("compute:hosts:delete", permScope)
+
+  const [editOpen, setEditOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
   const query = useApiQuery({
     queryKey: qk.detail(hostsDef, scope, hostId ?? ""),
@@ -26,9 +43,19 @@ export default function HostDetailPage() {
     enabled: !!hostId,
   })
   const host = query.data ?? null
-  // The agent card is the whole reason this page is worth watching: it
-  // goes online / offline on its own schedule, not on the operator's.
   useHostWatch(scope)
+
+  const handleDelete = async () => {
+    if (!host) return
+    try {
+      await hostsApi.delete(scope, host.metadata.id)
+      qc.invalidateQueries({ queryKey: qk.resource(hostsDef) })
+      toast.success(t("action.deleteSuccess"))
+      navigate(listPath)
+    } catch (err) {
+      showApiError(err, t, "compute.host.title")
+    }
+  }
 
   if (query.isPending) {
     return (
@@ -63,16 +90,18 @@ export default function HostDetailPage() {
           <p className="text-muted-foreground mt-0.5 text-sm">{host.metadata.name}</p>
         </div>
         <div className="flex items-center gap-2">
-          {/* No "revoke agent token" here. Every registration already
-              bumps token_version, so re-running install-agent.sh rotates
-              the credential and leaves the host working -- which is what
-              an operator wants after a leak. A bare revoke would leave a
-              registered host permanently offline with no way back except
-              walking to the machine. */}
-          <Button variant="outline" size="sm">
-            <Trash2 className="size-4" />
-            {t("common.delete")}
-          </Button>
+          {canUpdate && (
+            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+              <Pencil className="size-4" />
+              {t("common.edit")}
+            </Button>
+          )}
+          {canDelete && (
+            <Button variant="outline" size="sm" onClick={() => setDeleteOpen(true)}>
+              <Trash2 className="size-4" />
+              {t("common.delete")}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -107,9 +136,6 @@ export default function HostDetailPage() {
               <Field label={t("common.createdBy")} value={host.spec.createdByName} />
               <Field label={t("common.created")} value={formatDateTime(host.metadata.createdAt)} />
             </dl>
-            {/* Everything above the description line is reported by the
-                agent, not entered by anyone. Saying so once removes the
-                question of why none of it is editable. */}
             <p className="text-muted-foreground mt-4 text-xs">{t("compute.host.reportedNote")}</p>
           </CardContent>
         </Card>
@@ -134,6 +160,24 @@ export default function HostDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      <HostEditDialog
+        host={editOpen ? host : null}
+        scope={scope}
+        onClose={() => setEditOpen(false)}
+        onSuccess={() =>
+          qc.invalidateQueries({ queryKey: qk.detail(hostsDef, scope, hostId ?? "") })
+        }
+      />
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title={t("common.delete")}
+        description={t("compute.host.deleteConfirm", { name: host.metadata.name })}
+        onConfirm={handleDelete}
+        confirmText={t("common.delete")}
+      />
     </div>
   )
 }
