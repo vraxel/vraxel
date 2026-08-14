@@ -29,7 +29,6 @@ const compute = {
   "compute.host.agentId": "Agent ID",
   "compute.host.connectedAt": "Connected at",
   "compute.host.lastSeenAt": "Last heartbeat",
-  "compute.host.revokeAgentToken": "Revoke agent token",
   "compute.host.reportedNote":
     "Everything above is reported by the agent and cannot be edited; only the display name and description are yours to change.",
 
@@ -42,17 +41,6 @@ const compute = {
   "compute.agent.conflict": "Identity contended",
   "compute.agent.conflictHint":
     "More than one agent process is claiming this identity, almost always a disk cloned from an onboarded host. Every channel for this host is refused while it lasts; reset /etc/machine-id on the copies and onboard them again.",
-
-  // join tokens
-  "compute.token.pending": "Pending tokens",
-  "compute.token.pendingHint":
-    "Join tokens handed out but not yet redeemed. The plaintext is shown once at creation; revoke here if one leaked.",
-  "compute.token.nonePending": "No pending tokens",
-  "compute.token.unnamed": "Unnamed token",
-  "compute.token.reserves": "Reserves host name",
-  "compute.token.uses": "{used} / {max} used",
-  "compute.token.expiresAt": "Expires",
-  "compute.token.revoke": "Revoke",
 
   // onboarding wizard
   "compute.onboard.title": "Add Host",

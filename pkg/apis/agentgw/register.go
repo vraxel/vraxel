@@ -90,11 +90,36 @@ func (h *protocolHandler) handleRegister(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// A known agent id means this machine has onboarded before; reuse its
-	// host row rather than creating a second one.
+	// Which host row this registration lands on, if one already exists.
+	// Two independent sources:
+	//
+	//   - the machine's own prior identity (host_agents.agent_id, itself
+	//     derived from /etc/machine-id): this machine has onboarded
+	//     before and must converge on the same row.
+	//   - a token bound to a host an operator recorded by hand, waiting
+	//     for its agent.
+	//
+	// Prior identity wins, and a token naming a different host is
+	// refused rather than honoured. Otherwise a bound token would be
+	// enough to detach a machine from the host it is already the agent
+	// for -- that host would keep a host_agents row pointing at an agent
+	// that has stopped reporting to it, and go dark with no error
+	// anywhere.
 	var existingHostID int64
 	if prevErr == nil {
 		existingHostID = prev.HostID
+	}
+	if target := token.TargetHostID; target != nil {
+		switch {
+		case existingHostID == 0:
+			existingHostID = *target
+		case existingHostID != *target:
+			logger.Warnf("agentgw register: agent %s is bound to host %d, token targets host %d",
+				agentID, existingHostID, *target)
+			h.undoRegistration(r.Context(), agentID, 0, false, token.ID)
+			http.Error(w, "this agent is already bound to another host", http.StatusConflict)
+			return
+		}
 	}
 
 	hostID, hostCreated, err := h.registrar.RegisterAgentHost(r.Context(), AgentHostSpec{
@@ -156,6 +181,14 @@ func (h *protocolHandler) handleRegister(w http.ResponseWriter, r *http.Request)
 		logger.Warnf("agentgw register: issue token for agent %s: %v", agentID, err)
 		http.Error(w, "issue agent token", http.StatusInternalServerError)
 		return
+	}
+
+	// Record which host this token brought in, so the operator's wizard
+	// can tell them. Best-effort: the registration has already succeeded
+	// and the agent is bound, so failing here costs a progress display,
+	// not an onboarding.
+	if err := h.joinTokens.BindTarget(r.Context(), token.ID, hostID); err != nil {
+		logger.Warnf("agentgw register: bind token %d to host %d: %v", token.ID, hostID, err)
 	}
 
 	logger.Infof("agentgw: agent %s registered as host %d (%s, %s/%s, ip=%s)",

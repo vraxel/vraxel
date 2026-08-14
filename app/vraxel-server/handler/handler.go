@@ -12,6 +12,7 @@ import (
 	"vraxel.io/vraxel/lib/audit"
 	"vraxel.io/vraxel/lib/oidc"
 	"vraxel.io/vraxel/lib/rest/filters"
+	"vraxel.io/vraxel/pkg/apis/agentgw"
 )
 
 // APIServerConfig holds the configuration for creating an API server handler.
@@ -48,6 +49,10 @@ type RootHandlerConfig struct {
 	// each route), so it is dispatched before the IAM APIHandler. Nil
 	// disables the surface.
 	AgentProtocolHandler http.HandlerFunc
+	// InstallScriptHandler serves GET /install-agent.sh, unauthenticated:
+	// it runs before any credential exists on the target machine and
+	// carries no secret of its own.
+	InstallScriptHandler http.HandlerFunc
 	OIDCMux              http.Handler
 	OpenAPISpec          []byte
 	FrontendFS           fs.FS
@@ -118,6 +123,11 @@ func (rt *rootRouter) route(w http.ResponseWriter, r *http.Request) bool {
 	// the IAM APIHandler, so it is matched before the /api/ block.
 	if rt.cfg.AgentProtocolHandler != nil && strings.HasPrefix(urlPath, "/api/agent/v1/") {
 		rt.cfg.AgentProtocolHandler.ServeHTTP(w, r)
+		return true
+	}
+
+	if rt.cfg.InstallScriptHandler != nil && urlPath == agentgw.InstallScriptPath {
+		rt.cfg.InstallScriptHandler.ServeHTTP(w, r)
 		return true
 	}
 

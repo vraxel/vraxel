@@ -5,10 +5,10 @@
 -- name: CreateHostAgentJoinToken :one
 INSERT INTO host_agent_join_tokens (
     name, token_hash, scope, workspace_id, namespace_id,
-    max_uses, expires_at, created_by
+    max_uses, expires_at, created_by, target_host_id
 )
 VALUES (@name, @token_hash, @scope, @workspace_id, @namespace_id,
-        @max_uses, @expires_at, @created_by)
+        @max_uses, @expires_at, @created_by, sqlc.narg('target_host_id'))
 RETURNING *;
 
 -- name: GetHostAgentJoinTokenByID :one
@@ -70,6 +70,30 @@ SELECT * FROM host_agent_join_tokens
 WHERE token_hash = @token_hash
   AND expires_at > now()
   AND used_count < max_uses;
+
+-- name: BindHostAgentJoinTokenTarget :exec
+-- Record which host a token actually onboarded, once it has.
+--
+-- Before redemption target_host_id is an operator's intent ("attach to
+-- this host"); after redemption it is the outcome. One column, one
+-- meaning throughout: the host this token concerns. The wizard reads it
+-- to learn which machine answered, which it cannot know any other way --
+-- /register's response goes to the agent, not to the browser.
+--
+-- Only fills a blank: a token minted against a specific host keeps
+-- naming that host, and this is a no-op for it.
+--
+-- And only for a single-use token. Intent and outcome have opposite
+-- cardinality: "attach to this one host" implies one use (which is what
+-- chk_join_token_bound_single_use encodes), while a token good for N
+-- machines has N outcomes and no single host to name. Without the
+-- max_uses guard, the first registration against a batch token would
+-- violate that CHECK -- silently, since the caller treats this as
+-- best-effort. Batch onboarding needs its own answer to "which hosts did
+-- this token bring in"; one column is not it.
+UPDATE host_agent_join_tokens
+SET target_host_id = @target_host_id
+WHERE id = @id AND target_host_id IS NULL AND max_uses = 1;
 
 -- name: RefundHostAgentJoinToken :exec
 -- Give a use back when registration failed after the claim. The token is

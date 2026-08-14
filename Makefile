@@ -11,7 +11,7 @@ LDFLAGS := -X '$(PKG_PREFIX)/lib/buildinfo.Version=$(APP_NAME)-$(VERSION)'
 CONFIG := $(if $(wildcard app/$(APP_NAME)/config.dev.yaml),app/$(APP_NAME)/config.dev.yaml,app/$(APP_NAME)/config.yaml)
 
 .DEFAULT_GOAL := help
-.PHONY: help dev build generate quick check fmt clean new-migration setup-hooks
+.PHONY: help dev build agent-binaries generate quick check fmt clean new-migration setup-hooks
 
 help: ## List available commands
 	@awk 'BEGIN{FS=":.*## "} /^[a-z][a-z-]*:.*## /{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -26,6 +26,17 @@ dev: ## Run vraxel-server (:9099) + vite (:5199) with HMR
 build: ## Build the frontend and link the release binary into bin/
 	cd ui && pnpm build
 	CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o bin/$(APP_NAME) $(PKG_PREFIX)/app/$(APP_NAME)
+
+# The binaries /api/agent/v1/binary/{os}/{arch} serves, and whose digests
+# install-agent.sh states. Static (CGO_ENABLED=0) because the target is
+# whatever minimal image the customer happens to run; the server hashes
+# whatever is in bin/ at request time, so rebuilding here is enough to
+# change what hosts install.
+agent-binaries: ## Cross-compile vr-agent into bin/ for the targets the server serves
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+	  go build -ldflags "$(LDFLAGS)" -o bin/vr-agent-linux-amd64 $(PKG_PREFIX)/app/vr-agent
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 \
+	  go build -ldflags "$(LDFLAGS)" -o bin/vr-agent-linux-arm64 $(PKG_PREFIX)/app/vr-agent
 
 # Refreshes the three committed artifact sets, in dependency order:
 #   pkg/db/query/*.sql          -> pkg/db/generated/            (sqlc)

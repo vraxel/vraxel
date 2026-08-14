@@ -1,5 +1,5 @@
 import { Link, useParams } from "react-router"
-import { ArrowLeft, RotateCcw, Trash2 } from "lucide-react"
+import { ArrowLeft, Trash2 } from "lucide-react"
 import { formatDateTime } from "@/shared/lib/format"
 import { Button } from "@/shared/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card"
@@ -59,14 +59,12 @@ export default function HostDetailPage() {
           <p className="text-muted-foreground mt-0.5 text-sm">{host.metadata.name}</p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Revoking bumps token_version, which invalidates every agent
-              token this machine holds and drops its channel. The recovery
-              path is re-onboarding, so it is a deliberate, separate action
-              rather than something folded into edit. */}
-          <Button variant="outline" size="sm">
-            <RotateCcw className="size-4" />
-            {t("compute.host.revokeAgentToken")}
-          </Button>
+          {/* No "revoke agent token" here. Every registration already
+              bumps token_version, so re-running install-agent.sh rotates
+              the credential and leaves the host working -- which is what
+              an operator wants after a leak. A bare revoke would leave a
+              registered host permanently offline with no way back except
+              walking to the machine. */}
           <Button variant="outline" size="sm">
             <Trash2 className="size-4" />
             {t("common.delete")}

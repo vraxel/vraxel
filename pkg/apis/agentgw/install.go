@@ -38,6 +38,12 @@ const agentStatusOnline = "online"
 
 // ModuleResult is what the assembly layer wires up.
 type ModuleResult struct {
+	// InstallScriptHandler serves GET /install-agent.sh. It sits at the
+	// root rather than under /api/agent/v1/ because an operator pastes
+	// the URL into a shell, and a path with an api version in it invites
+	// them to think it is one.
+	InstallScriptHandler http.HandlerFunc
+
 	// ProtocolHandler serves /api/agent/v1/*, mounted as a prefix branch
 	// in the server's HTTP handler.
 	ProtocolHandler http.HandlerFunc
@@ -114,14 +120,15 @@ func NewModule(ctx context.Context, database *db.DB, deps Deps) ModuleResult {
 	}
 	lease.Start(ctx)
 
-	handler := NewProtocolHandler(ctx, stores, deps.HostRegistrar,
+	handler, installScript := NewProtocolHandler(ctx, stores, deps.HostRegistrar,
 		NewTokenSigner(deps.EncryptionKey), NewSessionTokenSigner(deps.EncryptionKey),
 		registry, runManager)
 
 	return ModuleResult{
-		ProtocolHandler: handler,
-		Registry:        registry,
-		Dispatcher:      runManager,
+		ProtocolHandler:      handler,
+		InstallScriptHandler: installScript,
+		Registry:             registry,
+		Dispatcher:           runManager,
 	}
 }
 

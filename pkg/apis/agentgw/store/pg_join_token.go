@@ -23,14 +23,15 @@ func NewPGJoinTokenStore(d *db.DB) JoinTokenStore { return &pgJoinTokenStore{Sto
 
 func (s *pgJoinTokenStore) Create(ctx context.Context, in JoinTokenCreateInput) (*JoinTokenRow, error) {
 	row, err := s.Q().CreateHostAgentJoinToken(ctx, generated.CreateHostAgentJoinTokenParams{
-		Name:        in.Name,
-		TokenHash:   in.TokenHash,
-		Scope:       in.Scope,
-		WorkspaceID: in.WorkspaceID,
-		NamespaceID: in.NamespaceID,
-		MaxUses:     in.MaxUses,
-		ExpiresAt:   in.ExpiresAt,
-		CreatedBy:   in.CreatedBy,
+		Name:         in.Name,
+		TokenHash:    in.TokenHash,
+		Scope:        in.Scope,
+		WorkspaceID:  in.WorkspaceID,
+		NamespaceID:  in.NamespaceID,
+		MaxUses:      in.MaxUses,
+		ExpiresAt:    in.ExpiresAt,
+		CreatedBy:    in.CreatedBy,
+		TargetHostID: in.TargetHostID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create join token: %w", pgerrors.CheckPG(err))
@@ -51,18 +52,19 @@ func (s *pgJoinTokenStore) GetByID(ctx context.Context, id int64, sf scope.Filte
 		return nil, fmt.Errorf("get join token: %w", err)
 	}
 	return &JoinTokenRow{
-		ID:          row.ID,
-		Name:        row.Name,
-		TokenHash:   row.TokenHash,
-		Scope:       row.Scope,
-		WorkspaceID: row.WorkspaceID,
-		NamespaceID: row.NamespaceID,
-		MaxUses:     row.MaxUses,
-		UsedCount:   row.UsedCount,
-		ExpiresAt:   row.ExpiresAt,
-		CreatedBy:   row.CreatedBy,
-		CreatedAt:   row.CreatedAt,
-		CreatorName: row.CreatorName,
+		ID:           row.ID,
+		Name:         row.Name,
+		TokenHash:    row.TokenHash,
+		Scope:        row.Scope,
+		WorkspaceID:  row.WorkspaceID,
+		NamespaceID:  row.NamespaceID,
+		MaxUses:      row.MaxUses,
+		UsedCount:    row.UsedCount,
+		ExpiresAt:    row.ExpiresAt,
+		CreatedBy:    row.CreatedBy,
+		CreatedAt:    row.CreatedAt,
+		CreatorName:  row.CreatorName,
+		TargetHostID: row.TargetHostID,
 	}, nil
 }
 
@@ -100,18 +102,19 @@ func (s *pgJoinTokenStore) List(ctx context.Context, q list.Query) (*list.Result
 	items := make([]JoinTokenRow, len(rows))
 	for i := range rows {
 		items[i] = JoinTokenRow{
-			ID:          rows[i].ID,
-			Name:        rows[i].Name,
-			TokenHash:   rows[i].TokenHash,
-			Scope:       rows[i].Scope,
-			WorkspaceID: rows[i].WorkspaceID,
-			NamespaceID: rows[i].NamespaceID,
-			MaxUses:     rows[i].MaxUses,
-			UsedCount:   rows[i].UsedCount,
-			ExpiresAt:   rows[i].ExpiresAt,
-			CreatedBy:   rows[i].CreatedBy,
-			CreatedAt:   rows[i].CreatedAt,
-			CreatorName: rows[i].CreatorName,
+			ID:           rows[i].ID,
+			Name:         rows[i].Name,
+			TokenHash:    rows[i].TokenHash,
+			Scope:        rows[i].Scope,
+			WorkspaceID:  rows[i].WorkspaceID,
+			NamespaceID:  rows[i].NamespaceID,
+			MaxUses:      rows[i].MaxUses,
+			UsedCount:    rows[i].UsedCount,
+			ExpiresAt:    rows[i].ExpiresAt,
+			CreatedBy:    rows[i].CreatedBy,
+			CreatedAt:    rows[i].CreatedAt,
+			CreatorName:  rows[i].CreatorName,
+			TargetHostID: rows[i].TargetHostID,
 		}
 	}
 	return &list.Result[JoinTokenRow]{Items: items, TotalCount: count}, nil
@@ -164,19 +167,30 @@ func (s *pgJoinTokenStore) Consume(ctx context.Context, tokenHash []byte) (*Join
 	return joinTokenToDomain(&row, ""), nil
 }
 
+func (s *pgJoinTokenStore) BindTarget(ctx context.Context, id, hostID int64) error {
+	if err := s.Q().BindHostAgentJoinTokenTarget(ctx, generated.BindHostAgentJoinTokenTargetParams{
+		ID:           id,
+		TargetHostID: &hostID,
+	}); err != nil {
+		return fmt.Errorf("bind join token target: %w", err)
+	}
+	return nil
+}
+
 func joinTokenToDomain(r *generated.HostAgentJoinToken, creatorName string) *JoinTokenRow {
 	return &JoinTokenRow{
-		ID:          r.ID,
-		Name:        r.Name,
-		TokenHash:   r.TokenHash,
-		Scope:       r.Scope,
-		WorkspaceID: r.WorkspaceID,
-		NamespaceID: r.NamespaceID,
-		MaxUses:     r.MaxUses,
-		UsedCount:   r.UsedCount,
-		ExpiresAt:   r.ExpiresAt,
-		CreatedBy:   r.CreatedBy,
-		CreatedAt:   r.CreatedAt,
-		CreatorName: creatorName,
+		ID:           r.ID,
+		Name:         r.Name,
+		TokenHash:    r.TokenHash,
+		Scope:        r.Scope,
+		WorkspaceID:  r.WorkspaceID,
+		NamespaceID:  r.NamespaceID,
+		MaxUses:      r.MaxUses,
+		UsedCount:    r.UsedCount,
+		ExpiresAt:    r.ExpiresAt,
+		CreatedBy:    r.CreatedBy,
+		CreatedAt:    r.CreatedAt,
+		CreatorName:  creatorName,
+		TargetHostID: r.TargetHostID,
 	}
 }

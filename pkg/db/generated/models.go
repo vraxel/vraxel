@@ -85,17 +85,18 @@ type HostAgent struct {
 }
 
 type HostAgentJoinToken struct {
-	ID          int64     `json:"id"`
-	Name        string    `json:"name"`
-	TokenHash   []byte    `json:"token_hash"`
-	Scope       string    `json:"scope"`
-	WorkspaceID *int64    `json:"workspace_id"`
-	NamespaceID *int64    `json:"namespace_id"`
-	MaxUses     int32     `json:"max_uses"`
-	UsedCount   int32     `json:"used_count"`
-	ExpiresAt   time.Time `json:"expires_at"`
-	CreatedBy   *int64    `json:"created_by"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID           int64     `json:"id"`
+	Name         string    `json:"name"`
+	TokenHash    []byte    `json:"token_hash"`
+	Scope        string    `json:"scope"`
+	WorkspaceID  *int64    `json:"workspace_id"`
+	NamespaceID  *int64    `json:"namespace_id"`
+	MaxUses      int32     `json:"max_uses"`
+	UsedCount    int32     `json:"used_count"`
+	ExpiresAt    time.Time `json:"expires_at"`
+	CreatedBy    *int64    `json:"created_by"`
+	CreatedAt    time.Time `json:"created_at"`
+	TargetHostID *int64    `json:"target_host_id"`
 }
 
 type LoginThrottle struct {

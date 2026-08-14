@@ -3,8 +3,12 @@ import { cn } from "@/shared/lib/utils"
 import { useTranslation } from "@/i18n"
 
 interface Props {
-  /** Undefined means no agent has ever been bound to this host. */
-  status?: "online" | "offline"
+  /** "online" / "offline" as the server sends them, or undefined when no
+   *  agent has ever been bound to this host. Typed as a plain string
+   *  because that is what the wire carries (Go has no union to generate
+   *  from); host_agents.status is CHECK-constrained to the two values,
+   *  so the mapping below is exhaustive in practice. */
+  status?: string
   /** Set while two live agent processes claim this host's identity. */
   conflictAt?: string
   className?: string
