@@ -13,15 +13,30 @@ import (
 	"os"
 	"runtime"
 	"strings"
+
+	agenttypes "vraxel.io/vraxel/lib/agent/types"
 )
 
 // Static describes the machine's fixed specs, reported at registration.
 type Static struct {
 	MachineID string
-	Hostname  string
-	OS        string
-	Arch      string
-	CPUCores  int32
+	// ProductUUID is the SMBIOS/DMI system UUID: assigned by the
+	// hypervisor (or burned into the board), and therefore the one
+	// identifier a copied disk does NOT bring with it. Empty when the
+	// machine has none or reports a known-bogus one.
+	ProductUUID string
+	// MACs are the physical interfaces' addresses, in stable order.
+	// Corroboration and operator-facing evidence only -- see Fingerprint
+	// on the server for why they cannot claim a host row.
+	MACs []string
+	// UptimeSeconds lets the server date this boot against its own clock
+	// instead of trusting the machine's, which on a fresh VM is routinely
+	// years out until NTP lands.
+	UptimeSeconds int64
+	Hostname      string
+	OS            string
+	Arch          string
+	CPUCores      int32
 	// MemoryMB / DiskGB carry BINARY units: memTotalBytes()/1024^2 and
 	// diskTotalBytes()/1024^3, i.e. MiB / GiB. Named MB / GB (not MiB /
 	// GiB) on purpose -- that matches hosts.memory_mb / disk_gb, the rest
@@ -33,6 +48,16 @@ type Static struct {
 	DefaultRouteIP string
 }
 
+// Fingerprint is the identity subset of these facts, in wire form.
+func (s Static) Fingerprint() agenttypes.MachineFingerprint {
+	return agenttypes.MachineFingerprint{
+		MachineID:     s.MachineID,
+		ProductUUID:   s.ProductUUID,
+		MACs:          s.MACs,
+		UptimeSeconds: s.UptimeSeconds,
+	}
+}
+
 // Collect gathers everything /register needs.
 func Collect() Static {
 	host, err := os.Hostname()
@@ -42,6 +67,9 @@ func Collect() Static {
 	_, ip := DefaultRoute()
 	return Static{
 		MachineID:      MachineID(),
+		ProductUUID:    ProductUUID(),
+		MACs:           MACs(),
+		UptimeSeconds:  uptimeSeconds(),
 		Hostname:       host,
 		OS:             osRelease(),
 		Arch:           runtime.GOARCH,

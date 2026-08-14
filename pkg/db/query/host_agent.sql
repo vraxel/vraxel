@@ -1,33 +1,82 @@
 -- host_agents: the agent identity + control-channel session state.
 -- Owned by pkg/apis/agentgw/store. See docs/agent/design.md §4.1 / §6.1.
 
--- name: UpsertHostAgent :one
--- Registration is idempotent on agent_id: the agent derives its id
--- deterministically from the machine identity, so re-running the install
--- script rebinds the SAME row instead of creating a second host. Each
--- registration bumps token_version, which revokes every previously issued
--- agent token for this machine (design §4.1 "撤销").
-INSERT INTO host_agents (host_id, agent_id, version, status)
-VALUES (@host_id, @agent_id, @version, 'offline')
-ON CONFLICT (agent_id) DO UPDATE
-SET host_id       = EXCLUDED.host_id,
-    version       = EXCLUDED.version,
-    token_version = host_agents.token_version + 1,
-    updated_at    = now()
+-- name: FindHostAgentsByProductUUID :many
+-- Candidate rows for a machine claiming an SMBIOS UUID. Takes an array
+-- because one machine can spell its own UUID two ways (SMBIOS 2.6 byte
+-- order -- see sameProductUUID); the caller passes both spellings.
+--
+-- :many, not :one, because the value is not guaranteed unique in the
+-- wild: whitebox firmware ships batches with an identical UUID. Two rows
+-- back means this value identifies a production run rather than a
+-- machine, and the caller must refuse to claim on it. A UNIQUE index
+-- would instead refuse to ONBOARD such a batch at all.
+SELECT * FROM host_agents
+WHERE product_uuid <> '' AND product_uuid = ANY(@product_uuids::text[])
+ORDER BY host_id;
+
+-- name: FindHostAgentsByMachineID :many
+-- Everything built from one disk image. Not an identity lookup: this
+-- answers "which hosts came from the same template", which is what turns
+-- a clone from an ambiguity into a finding an operator can act on.
+SELECT * FROM host_agents
+WHERE machine_id <> '' AND machine_id = @machine_id
+ORDER BY host_id;
+
+-- name: RebindHostAgent :one
+-- A machine that already has a row, registering again: keep the agent_id,
+-- move it if the host changed, refresh the fingerprint, and bump
+-- token_version to revoke every token issued before now (design §4.1
+-- "撤销").
+--
+-- agent_id survives on purpose. It is allocated once and never derived,
+-- so a credential keeps naming the same row even when the row's host_id
+-- changes underneath it -- which is what lets an operator merge two hosts
+-- without knocking the agent off.
+UPDATE host_agents
+SET host_id         = @host_id,
+    version         = @version,
+    token_version   = token_version + 1,
+    product_uuid    = @product_uuid,
+    machine_id      = @machine_id,
+    macs            = @macs,
+    identity_source = @identity_source,
+    boot_at         = @boot_at,
+    updated_at      = now()
+WHERE agent_id = @agent_id
 RETURNING *;
--- host_id = EXCLUDED.host_id (last writer wins) matters only in a race:
--- two register requests for the SAME machine, both passing the pre-check
--- (GetByAgentID finds nothing) before either commits. Without it the
--- second request's DO UPDATE would keep the FIRST request's host_id while
--- the token it hands back claims the SECOND's, so authAgent's
--- host-mismatch check would 401 the persisted (last-written) credential
--- forever. With it, the row and the last-issued token agree, so the agent
--- works; the loser's host row is left orphaned (connectivity_mode=agent,
--- no host_agents), which an operator deletes. That residual needs a
--- genuine simultaneous double-install -- the sequential retry case is
--- already clean, since the retry's GetByAgentID hits the committed row and
--- takes the UpdateFacts path -- so it does not justify serialising every
--- registration behind an advisory lock.
+
+-- name: InsertHostAgent :one
+-- A machine with no row yet. agent_id is supplied by the caller as fresh
+-- randomness rather than derived from anything the machine reports.
+INSERT INTO host_agents (host_id, agent_id, version, status,
+                         product_uuid, machine_id, macs, identity_source, boot_at)
+VALUES (@host_id, @agent_id, @version, 'offline',
+        @product_uuid, @machine_id, @macs, @identity_source, @boot_at)
+RETURNING *;
+
+-- name: DeleteHostAgentByHostID :execrows
+-- Detaches whatever agent currently holds a host. Used when a join token
+-- bound to that host is redeemed by a DIFFERENT machine: host_agents is
+-- keyed by host_id, one host has one agent, and the operator minting a
+-- bound token for a host that already had one is saying "this machine is
+-- that host now".
+DELETE FROM host_agents WHERE host_id = @host_id;
+
+-- name: UpdateHostAgentFingerprint :execrows
+-- Refreshes the mutable half of the fingerprint on reconnect, for the one
+-- benign way it changes: the machine kept its hardware identity but reset
+-- /etc/machine-id, which is precisely what we tell the operator of a
+-- cloned host to do. Clearing conflict_at is part of the same statement
+-- because that reset is the fix for the conflict -- leaving the flag set
+-- would keep refusing the machine that just complied.
+UPDATE host_agents
+SET machine_id  = @machine_id,
+    macs        = @macs,
+    boot_at     = @boot_at,
+    conflict_at = NULL,
+    updated_at  = now()
+WHERE host_id = @host_id;
 
 -- name: GetHostAgentByAgentID :one
 SELECT * FROM host_agents WHERE agent_id = @agent_id;
@@ -76,6 +125,13 @@ RETURNING conflict_at IS NOT NULL
 -- every session token minted for the previous connection. Signing with a
 -- value read back separately would race a concurrent reconnect; returning
 -- it from the same statement is the only value that provably matches.
+--
+-- conflict_at is cleared here, and only here, on the admit path. The
+-- gateway refuses a contended identity for a cooldown window, so reaching
+-- this statement means the window lapsed and the session that got through
+-- was clean. Without the clear the column is write-only: the badge it
+-- drives outranks online/offline, so a host that resolved its conflict
+-- months ago would still be showing it.
 UPDATE host_agents
 SET status        = 'online',
     instance_id   = @instance_id,
@@ -83,6 +139,7 @@ SET status        = 'online',
     connected_at  = now(),
     last_seen_at  = now(),
     clock_skew_ms = @clock_skew_ms,
+    conflict_at   = NULL,
     updated_at    = now()
 WHERE host_id = @host_id
 RETURNING connected_at;

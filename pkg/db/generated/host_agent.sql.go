@@ -59,24 +59,134 @@ func (q *Queries) CheckHostAgentIdentity(ctx context.Context, arg CheckHostAgent
 	return contended, err
 }
 
-const getHostAgentByAgentID = `-- name: GetHostAgentByAgentID :one
-
-SELECT host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at, boot_nonce, prev_boot_nonce, conflict_at FROM host_agents WHERE agent_id = $1
+const deleteHostAgentByHostID = `-- name: DeleteHostAgentByHostID :execrows
+DELETE FROM host_agents WHERE host_id = $1
 `
 
-// host_id = EXCLUDED.host_id (last writer wins) matters only in a race:
-// two register requests for the SAME machine, both passing the pre-check
-// (GetByAgentID finds nothing) before either commits. Without it the
-// second request's DO UPDATE would keep the FIRST request's host_id while
-// the token it hands back claims the SECOND's, so authAgent's
-// host-mismatch check would 401 the persisted (last-written) credential
-// forever. With it, the row and the last-issued token agree, so the agent
-// works; the loser's host row is left orphaned (connectivity_mode=agent,
-// no host_agents), which an operator deletes. That residual needs a
-// genuine simultaneous double-install -- the sequential retry case is
-// already clean, since the retry's GetByAgentID hits the committed row and
-// takes the UpdateFacts path -- so it does not justify serialising every
-// registration behind an advisory lock.
+// Detaches whatever agent currently holds a host. Used when a join token
+// bound to that host is redeemed by a DIFFERENT machine: host_agents is
+// keyed by host_id, one host has one agent, and the operator minting a
+// bound token for a host that already had one is saying "this machine is
+// that host now".
+func (q *Queries) DeleteHostAgentByHostID(ctx context.Context, hostID int64) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteHostAgentByHostID, hostID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const findHostAgentsByMachineID = `-- name: FindHostAgentsByMachineID :many
+SELECT host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at, boot_nonce, prev_boot_nonce, conflict_at, product_uuid, macs, machine_id, identity_source, boot_at FROM host_agents
+WHERE machine_id <> '' AND machine_id = $1
+ORDER BY host_id
+`
+
+// Everything built from one disk image. Not an identity lookup: this
+// answers "which hosts came from the same template", which is what turns
+// a clone from an ambiguity into a finding an operator can act on.
+func (q *Queries) FindHostAgentsByMachineID(ctx context.Context, machineID string) ([]HostAgent, error) {
+	rows, err := q.db.Query(ctx, findHostAgentsByMachineID, machineID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []HostAgent{}
+	for rows.Next() {
+		var i HostAgent
+		if err := rows.Scan(
+			&i.HostID,
+			&i.AgentID,
+			&i.TokenVersion,
+			&i.Version,
+			&i.InstanceID,
+			&i.Status,
+			&i.ConnectedAt,
+			&i.LastSeenAt,
+			&i.ClockSkewMs,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.BootNonce,
+			&i.PrevBootNonce,
+			&i.ConflictAt,
+			&i.ProductUuid,
+			&i.Macs,
+			&i.MachineID,
+			&i.IdentitySource,
+			&i.BootAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const findHostAgentsByProductUUID = `-- name: FindHostAgentsByProductUUID :many
+
+SELECT host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at, boot_nonce, prev_boot_nonce, conflict_at, product_uuid, macs, machine_id, identity_source, boot_at FROM host_agents
+WHERE product_uuid <> '' AND product_uuid = ANY($1::text[])
+ORDER BY host_id
+`
+
+// host_agents: the agent identity + control-channel session state.
+// Owned by pkg/apis/agentgw/store. See docs/agent/design.md §4.1 / §6.1.
+// Candidate rows for a machine claiming an SMBIOS UUID. Takes an array
+// because one machine can spell its own UUID two ways (SMBIOS 2.6 byte
+// order -- see sameProductUUID); the caller passes both spellings.
+//
+// :many, not :one, because the value is not guaranteed unique in the
+// wild: whitebox firmware ships batches with an identical UUID. Two rows
+// back means this value identifies a production run rather than a
+// machine, and the caller must refuse to claim on it. A UNIQUE index
+// would instead refuse to ONBOARD such a batch at all.
+func (q *Queries) FindHostAgentsByProductUUID(ctx context.Context, productUuids []string) ([]HostAgent, error) {
+	rows, err := q.db.Query(ctx, findHostAgentsByProductUUID, productUuids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []HostAgent{}
+	for rows.Next() {
+		var i HostAgent
+		if err := rows.Scan(
+			&i.HostID,
+			&i.AgentID,
+			&i.TokenVersion,
+			&i.Version,
+			&i.InstanceID,
+			&i.Status,
+			&i.ConnectedAt,
+			&i.LastSeenAt,
+			&i.ClockSkewMs,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.BootNonce,
+			&i.PrevBootNonce,
+			&i.ConflictAt,
+			&i.ProductUuid,
+			&i.Macs,
+			&i.MachineID,
+			&i.IdentitySource,
+			&i.BootAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getHostAgentByAgentID = `-- name: GetHostAgentByAgentID :one
+SELECT host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at, boot_nonce, prev_boot_nonce, conflict_at, product_uuid, macs, machine_id, identity_source, boot_at FROM host_agents WHERE agent_id = $1
+`
+
 func (q *Queries) GetHostAgentByAgentID(ctx context.Context, agentID pgtype.UUID) (HostAgent, error) {
 	row := q.db.QueryRow(ctx, getHostAgentByAgentID, agentID)
 	var i HostAgent
@@ -95,12 +205,17 @@ func (q *Queries) GetHostAgentByAgentID(ctx context.Context, agentID pgtype.UUID
 		&i.BootNonce,
 		&i.PrevBootNonce,
 		&i.ConflictAt,
+		&i.ProductUuid,
+		&i.Macs,
+		&i.MachineID,
+		&i.IdentitySource,
+		&i.BootAt,
 	)
 	return i, err
 }
 
 const getHostAgentByHostID = `-- name: GetHostAgentByHostID :one
-SELECT host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at, boot_nonce, prev_boot_nonce, conflict_at FROM host_agents WHERE host_id = $1
+SELECT host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at, boot_nonce, prev_boot_nonce, conflict_at, product_uuid, macs, machine_id, identity_source, boot_at FROM host_agents WHERE host_id = $1
 `
 
 func (q *Queries) GetHostAgentByHostID(ctx context.Context, hostID int64) (HostAgent, error) {
@@ -121,6 +236,68 @@ func (q *Queries) GetHostAgentByHostID(ctx context.Context, hostID int64) (HostA
 		&i.BootNonce,
 		&i.PrevBootNonce,
 		&i.ConflictAt,
+		&i.ProductUuid,
+		&i.Macs,
+		&i.MachineID,
+		&i.IdentitySource,
+		&i.BootAt,
+	)
+	return i, err
+}
+
+const insertHostAgent = `-- name: InsertHostAgent :one
+INSERT INTO host_agents (host_id, agent_id, version, status,
+                         product_uuid, machine_id, macs, identity_source, boot_at)
+VALUES ($1, $2, $3, 'offline',
+        $4, $5, $6, $7, $8)
+RETURNING host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at, boot_nonce, prev_boot_nonce, conflict_at, product_uuid, macs, machine_id, identity_source, boot_at
+`
+
+type InsertHostAgentParams struct {
+	HostID         int64       `json:"host_id"`
+	AgentID        pgtype.UUID `json:"agent_id"`
+	Version        string      `json:"version"`
+	ProductUuid    string      `json:"product_uuid"`
+	MachineID      string      `json:"machine_id"`
+	Macs           []string    `json:"macs"`
+	IdentitySource string      `json:"identity_source"`
+	BootAt         *time.Time  `json:"boot_at"`
+}
+
+// A machine with no row yet. agent_id is supplied by the caller as fresh
+// randomness rather than derived from anything the machine reports.
+func (q *Queries) InsertHostAgent(ctx context.Context, arg InsertHostAgentParams) (HostAgent, error) {
+	row := q.db.QueryRow(ctx, insertHostAgent,
+		arg.HostID,
+		arg.AgentID,
+		arg.Version,
+		arg.ProductUuid,
+		arg.MachineID,
+		arg.Macs,
+		arg.IdentitySource,
+		arg.BootAt,
+	)
+	var i HostAgent
+	err := row.Scan(
+		&i.HostID,
+		&i.AgentID,
+		&i.TokenVersion,
+		&i.Version,
+		&i.InstanceID,
+		&i.Status,
+		&i.ConnectedAt,
+		&i.LastSeenAt,
+		&i.ClockSkewMs,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.BootNonce,
+		&i.PrevBootNonce,
+		&i.ConflictAt,
+		&i.ProductUuid,
+		&i.Macs,
+		&i.MachineID,
+		&i.IdentitySource,
+		&i.BootAt,
 	)
 	return i, err
 }
@@ -159,6 +336,7 @@ SET status        = 'online',
     connected_at  = now(),
     last_seen_at  = now(),
     clock_skew_ms = $3,
+    conflict_at   = NULL,
     updated_at    = now()
 WHERE host_id = $4
 RETURNING connected_at
@@ -179,6 +357,13 @@ type MarkHostAgentOnlineParams struct {
 // every session token minted for the previous connection. Signing with a
 // value read back separately would race a concurrent reconnect; returning
 // it from the same statement is the only value that provably matches.
+//
+// conflict_at is cleared here, and only here, on the admit path. The
+// gateway refuses a contended identity for a cooldown window, so reaching
+// this statement means the window lapsed and the session that got through
+// was clean. Without the clear the column is write-only: the badge it
+// drives outranks online/offline, so a host that resolved its conflict
+// months ago would still be showing it.
 func (q *Queries) MarkHostAgentOnline(ctx context.Context, arg MarkHostAgentOnlineParams) (*time.Time, error) {
 	row := q.db.QueryRow(ctx, markHostAgentOnline,
 		arg.InstanceID,
@@ -273,6 +458,77 @@ func (q *Queries) MarkStaleHostAgentsOffline(ctx context.Context, staleAfterSecs
 	return items, nil
 }
 
+const rebindHostAgent = `-- name: RebindHostAgent :one
+UPDATE host_agents
+SET host_id         = $1,
+    version         = $2,
+    token_version   = token_version + 1,
+    product_uuid    = $3,
+    machine_id      = $4,
+    macs            = $5,
+    identity_source = $6,
+    boot_at         = $7,
+    updated_at      = now()
+WHERE agent_id = $8
+RETURNING host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at, boot_nonce, prev_boot_nonce, conflict_at, product_uuid, macs, machine_id, identity_source, boot_at
+`
+
+type RebindHostAgentParams struct {
+	HostID         int64       `json:"host_id"`
+	Version        string      `json:"version"`
+	ProductUuid    string      `json:"product_uuid"`
+	MachineID      string      `json:"machine_id"`
+	Macs           []string    `json:"macs"`
+	IdentitySource string      `json:"identity_source"`
+	BootAt         *time.Time  `json:"boot_at"`
+	AgentID        pgtype.UUID `json:"agent_id"`
+}
+
+// A machine that already has a row, registering again: keep the agent_id,
+// move it if the host changed, refresh the fingerprint, and bump
+// token_version to revoke every token issued before now (design §4.1
+// "撤销").
+//
+// agent_id survives on purpose. It is allocated once and never derived,
+// so a credential keeps naming the same row even when the row's host_id
+// changes underneath it -- which is what lets an operator merge two hosts
+// without knocking the agent off.
+func (q *Queries) RebindHostAgent(ctx context.Context, arg RebindHostAgentParams) (HostAgent, error) {
+	row := q.db.QueryRow(ctx, rebindHostAgent,
+		arg.HostID,
+		arg.Version,
+		arg.ProductUuid,
+		arg.MachineID,
+		arg.Macs,
+		arg.IdentitySource,
+		arg.BootAt,
+		arg.AgentID,
+	)
+	var i HostAgent
+	err := row.Scan(
+		&i.HostID,
+		&i.AgentID,
+		&i.TokenVersion,
+		&i.Version,
+		&i.InstanceID,
+		&i.Status,
+		&i.ConnectedAt,
+		&i.LastSeenAt,
+		&i.ClockSkewMs,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.BootNonce,
+		&i.PrevBootNonce,
+		&i.ConflictAt,
+		&i.ProductUuid,
+		&i.Macs,
+		&i.MachineID,
+		&i.IdentitySource,
+		&i.BootAt,
+	)
+	return i, err
+}
+
 const touchHostAgent = `-- name: TouchHostAgent :execrows
 UPDATE host_agents
 SET last_seen_at  = now(),
@@ -311,49 +567,38 @@ func (q *Queries) TouchHostAgent(ctx context.Context, arg TouchHostAgentParams) 
 	return result.RowsAffected(), nil
 }
 
-const upsertHostAgent = `-- name: UpsertHostAgent :one
-
-INSERT INTO host_agents (host_id, agent_id, version, status)
-VALUES ($1, $2, $3, 'offline')
-ON CONFLICT (agent_id) DO UPDATE
-SET host_id       = EXCLUDED.host_id,
-    version       = EXCLUDED.version,
-    token_version = host_agents.token_version + 1,
-    updated_at    = now()
-RETURNING host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at, boot_nonce, prev_boot_nonce, conflict_at
+const updateHostAgentFingerprint = `-- name: UpdateHostAgentFingerprint :execrows
+UPDATE host_agents
+SET machine_id  = $1,
+    macs        = $2,
+    boot_at     = $3,
+    conflict_at = NULL,
+    updated_at  = now()
+WHERE host_id = $4
 `
 
-type UpsertHostAgentParams struct {
-	HostID  int64       `json:"host_id"`
-	AgentID pgtype.UUID `json:"agent_id"`
-	Version string      `json:"version"`
+type UpdateHostAgentFingerprintParams struct {
+	MachineID string     `json:"machine_id"`
+	Macs      []string   `json:"macs"`
+	BootAt    *time.Time `json:"boot_at"`
+	HostID    int64      `json:"host_id"`
 }
 
-// host_agents: the agent identity + control-channel session state.
-// Owned by pkg/apis/agentgw/store. See docs/agent/design.md §4.1 / §6.1.
-// Registration is idempotent on agent_id: the agent derives its id
-// deterministically from the machine identity, so re-running the install
-// script rebinds the SAME row instead of creating a second host. Each
-// registration bumps token_version, which revokes every previously issued
-// agent token for this machine (design §4.1 "撤销").
-func (q *Queries) UpsertHostAgent(ctx context.Context, arg UpsertHostAgentParams) (HostAgent, error) {
-	row := q.db.QueryRow(ctx, upsertHostAgent, arg.HostID, arg.AgentID, arg.Version)
-	var i HostAgent
-	err := row.Scan(
-		&i.HostID,
-		&i.AgentID,
-		&i.TokenVersion,
-		&i.Version,
-		&i.InstanceID,
-		&i.Status,
-		&i.ConnectedAt,
-		&i.LastSeenAt,
-		&i.ClockSkewMs,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.BootNonce,
-		&i.PrevBootNonce,
-		&i.ConflictAt,
+// Refreshes the mutable half of the fingerprint on reconnect, for the one
+// benign way it changes: the machine kept its hardware identity but reset
+// /etc/machine-id, which is precisely what we tell the operator of a
+// cloned host to do. Clearing conflict_at is part of the same statement
+// because that reset is the fix for the conflict -- leaving the flag set
+// would keep refusing the machine that just complied.
+func (q *Queries) UpdateHostAgentFingerprint(ctx context.Context, arg UpdateHostAgentFingerprintParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateHostAgentFingerprint,
+		arg.MachineID,
+		arg.Macs,
+		arg.BootAt,
+		arg.HostID,
 	)
-	return i, err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

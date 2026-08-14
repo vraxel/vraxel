@@ -87,7 +87,7 @@ func TestRegisterAgentHostReportsWhetherItCreated(t *testing.T) {
 			r := &agentHostRegistrar{store: tc.store}
 			hostID, created, err := r.RegisterAgentHost(context.Background(), agentgw.AgentHostSpec{
 				ExistingHostID: tc.existing,
-				AgentID:        "9b91082a-6555-5db2-bd8e-be12f80602f8",
+				NameSeed:       "9b91082a-6555-5db2-bd8e-be12f80602f8",
 				Hostname:       "node-1",
 				Scope:          scope.Platform,
 			})

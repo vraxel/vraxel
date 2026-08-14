@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 
 	"github.com/jackc/pgx/v5"
 	"vraxel.io/vraxel/pkg/db/generated"
@@ -153,4 +154,21 @@ func lockWithQueries(ctx context.Context, q *generated.Queries, key int64, mode 
 	default:
 		return false, fmt.Errorf("unknown AdvisoryLockMode: %d", mode)
 	}
+}
+
+// HashLockKey turns a natural key ("agentgw.bind:<uuid>") into the int64
+// an advisory lock takes.
+//
+// Advisory locks share ONE int64 key space across the entire database, so
+// every caller must namespace its own strings before hashing -- two
+// subsystems that both lock on "42" would silently serialise against each
+// other.
+//
+// A 64-bit collision between two namespaced keys means two unrelated
+// operations occasionally wait on one another. That costs latency, never
+// correctness, which is why a hash is acceptable here at all.
+func HashLockKey(key string) int64 {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(key))
+	return int64(h.Sum64())
 }

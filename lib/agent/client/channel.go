@@ -90,6 +90,13 @@ type Channel struct {
 	// uses to ack a dispatch.
 	OnFrame func(ctx context.Context, f agenttypes.Frame, send SendFunc)
 
+	// Fingerprint, if set, is sampled on every connect and sent with the
+	// hello. Sampled rather than captured because the one identity change
+	// we must notice -- an operator resetting /etc/machine-id to
+	// de-clone a host -- happens between reconnects, and a value read once
+	// at startup would keep reporting the pre-fix machine forever.
+	Fingerprint func() agenttypes.MachineFingerprint
+
 	// RunningJobs, if set, reports the jobs still executing so a reconnect
 	// hello tells the server not to re-dispatch them (design §4.4.5).
 	RunningJobs func() []int64
@@ -117,6 +124,18 @@ func (c *Channel) Send(f agenttypes.Frame) error {
 		return errors.New("control channel is not connected")
 	}
 	return (*send)(f)
+}
+
+// machineFingerprint samples the machine identity for this hello, or
+// returns the zero value when the embedder supplied no source. The zero
+// value is a valid answer: the server treats an absent fingerprint as
+// "unverifiable" and admits the agent, which is what keeps a build
+// without one from locking itself out.
+func (c *Channel) machineFingerprint() agenttypes.MachineFingerprint {
+	if c.Fingerprint == nil {
+		return agenttypes.MachineFingerprint{}
+	}
+	return c.Fingerprint()
 }
 
 // SendFunc writes a frame back over the current control-channel
@@ -223,6 +242,7 @@ func (c *Channel) session(ctx context.Context) error {
 		ClockUnixMs:  time.Now().UnixMilli(),
 		RunningJobs:  c.runningJobs(),
 		BootNonce:    bootNonce,
+		Fingerprint:  c.machineFingerprint(),
 	}); err != nil {
 		return fmt.Errorf("send hello: %w", err)
 	}

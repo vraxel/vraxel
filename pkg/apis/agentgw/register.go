@@ -11,6 +11,7 @@ import (
 	agenttypes "vraxel.io/vraxel/lib/agent/types"
 	apierrors "vraxel.io/vraxel/lib/api/errors"
 	"vraxel.io/vraxel/lib/logger"
+	gwstore "vraxel.io/vraxel/pkg/apis/agentgw/store"
 )
 
 // handleRegister exchanges a join token for a long-lived agent token,
@@ -47,30 +48,39 @@ func (h *protocolHandler) handleRegister(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	agentID := AgentIDForMachine(req.MachineID)
+	// Which machine is this? Decided from the fingerprint it reports, not
+	// from an id derived on the machine itself -- see identity.go for why
+	// only the hypervisor-assigned half of that fingerprint may claim an
+	// existing host.
+	now := time.Now()
+	fp := NewFingerprint(req.MachineID, req.Fingerprint, now)
+	candidates, err := h.findClaimCandidates(r.Context(), fp)
+	if err != nil {
+		logger.Warnf("agentgw register: look up identity candidates: %v", err)
+		http.Error(w, "lookup agent", http.StatusInternalServerError)
+		return
+	}
+	match := MatchMachine(fp, candidates, now.Add(-agentStaleAfter))
 
 	// Look the machine up BEFORE consuming the token. A rejected
 	// re-registration must not burn a use: a max_uses=1 token would be
 	// spent on a request that did nothing, and the operator would have to
 	// mint another one to retry.
-	prev, prevErr := h.agents.GetByAgentID(r.Context(), agentID)
-	switch {
-	case prevErr == nil && prev.Status == agentStatusOnline:
-		// The agent id is derived from the machine id the caller reports,
-		// so anyone holding a join token who also knows a target machine's
-		// /etc/machine-id could otherwise re-register as that host: the
-		// upsert bumps token_version (evicting the real agent) and hands
-		// the caller a token for a host whose job vars carry that host's
-		// secrets. A genuine reinstall stops the old agent first --
-		// install-agent.sh does -- so it never lands here.
-		logger.Warnf("agentgw register: refused re-registration of agent %s (host %d): its channel is live",
-			agentID, prev.HostID)
-		http.Error(w, "this machine already has a live agent; stop it before re-registering", http.StatusConflict)
-		return
-	case prevErr != nil:
-		if se := apierrors.FromDomain(prevErr, "agent"); se == nil || !apierrors.IsNotFound(se) {
-			logger.Warnf("agentgw register: lookup agent %s: %v", agentID, prevErr)
+	if match.AgentID != "" {
+		prev, err := h.agents.GetByAgentID(r.Context(), match.AgentID)
+		if err != nil {
+			logger.Warnf("agentgw register: lookup agent %s: %v", match.AgentID, err)
 			http.Error(w, "lookup agent", http.StatusInternalServerError)
+			return
+		}
+		if prev.Status == agentStatusOnline {
+			// Rebinding evicts the live agent (token_version moves) and
+			// hands the caller a credential for a host whose job vars carry
+			// that host's secrets. A genuine reinstall stops its agent first
+			// -- install-agent.sh does -- so it never lands here.
+			logger.Warnf("agentgw register: refused re-registration of agent %s (host %d): its channel is live",
+				match.AgentID, prev.HostID)
+			http.Error(w, "this machine already has a live agent; stop it before re-registering", http.StatusConflict)
 			return
 		}
 	}
@@ -93,9 +103,9 @@ func (h *protocolHandler) handleRegister(w http.ResponseWriter, r *http.Request)
 	// Which host row this registration lands on, if one already exists.
 	// Two independent sources:
 	//
-	//   - the machine's own prior identity (host_agents.agent_id, itself
-	//     derived from /etc/machine-id): this machine has onboarded
-	//     before and must converge on the same row.
+	//   - the machine's own prior identity, matched on its fingerprint:
+	//     this machine has onboarded before and must converge on the same
+	//     row.
 	//   - a token bound to a host an operator recorded by hand, waiting
 	//     for its agent.
 	//
@@ -105,18 +115,15 @@ func (h *protocolHandler) handleRegister(w http.ResponseWriter, r *http.Request)
 	// for -- that host would keep a host_agents row pointing at an agent
 	// that has stopped reporting to it, and go dark with no error
 	// anywhere.
-	var existingHostID int64
-	if prevErr == nil {
-		existingHostID = prev.HostID
-	}
+	existingHostID := match.HostID
 	if target := token.TargetHostID; target != nil {
 		switch {
 		case existingHostID == 0:
 			existingHostID = *target
 		case existingHostID != *target:
-			logger.Warnf("agentgw register: agent %s is bound to host %d, token targets host %d",
-				agentID, existingHostID, *target)
-			h.undoRegistration(r.Context(), agentID, 0, false, token.ID)
+			logger.Warnf("agentgw register: machine %s is bound to host %d, token targets host %d",
+				fp.NameSeed(), existingHostID, *target)
+			h.undoRegistration(r.Context(), fp.NameSeed(), 0, false, token.ID)
 			http.Error(w, "this agent is already bound to another host", http.StatusConflict)
 			return
 		}
@@ -124,7 +131,7 @@ func (h *protocolHandler) handleRegister(w http.ResponseWriter, r *http.Request)
 
 	hostID, hostCreated, err := h.registrar.RegisterAgentHost(r.Context(), AgentHostSpec{
 		ExistingHostID: existingHostID,
-		AgentID:        agentID,
+		NameSeed:       fp.NameSeed(),
 		Hostname:       req.Hostname,
 		OS:             req.OS,
 		Arch:           req.Arch,
@@ -141,8 +148,8 @@ func (h *protocolHandler) handleRegister(w http.ResponseWriter, r *http.Request)
 		CreatedBy: token.CreatedBy,
 	})
 	if err != nil {
-		logger.Warnf("agentgw register: register host for agent %s: %v", agentID, err)
-		h.undoRegistration(r.Context(), agentID, 0, false, token.ID)
+		logger.Warnf("agentgw register: register host for machine %s: %v", fp.NameSeed(), err)
+		h.undoRegistration(r.Context(), fp.NameSeed(), 0, false, token.ID)
 		// A rejected rebind is the caller's problem to fix (wrong token for
 		// that host), everything else is ours. Neither answer carries the
 		// underlying error: the peer holds nothing but a join token, and
@@ -155,9 +162,15 @@ func (h *protocolHandler) handleRegister(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	row, err := h.agents.Upsert(r.Context(), hostID, agentID, req.AgentVersion)
+	row, err := h.agents.Bind(r.Context(), gwstore.BindInput{
+		HostID:      hostID,
+		Version:     req.AgentVersion,
+		AgentID:     match.AgentID,
+		ClaimUUIDs:  match.ClaimUUIDs,
+		Fingerprint: fp.ToStore(match.Source),
+	})
 	if err != nil {
-		logger.Warnf("agentgw register: upsert agent %s: %v", agentID, err)
+		logger.Warnf("agentgw register: bind machine %s: %v", fp.NameSeed(), err)
 		// The three writes behind /register cannot share a transaction:
 		// hosts belongs to another module and reaching it through anything
 		// but the interface would drag the store layer across a module
@@ -166,19 +179,19 @@ func (h *protocolHandler) handleRegister(w http.ResponseWriter, r *http.Request)
 		// exists but is bound to nothing, and every retry with a fresh
 		// token creates yet another host, until all three candidate names
 		// are taken by its own orphans and registration fails outright.
-		h.undoRegistration(r.Context(), agentID, hostID, hostCreated, token.ID)
+		h.undoRegistration(r.Context(), fp.NameSeed(), hostID, hostCreated, token.ID)
 		http.Error(w, "persist agent", http.StatusInternalServerError)
 		return
 	}
 
 	agentToken, err := h.signer.Issue(AgentClaims{
-		AgentID:      agentID,
+		AgentID:      row.AgentID,
 		HostID:       hostID,
 		TokenVersion: row.TokenVersion,
 		IssuedAtUnix: time.Now().Unix(),
 	})
 	if err != nil {
-		logger.Warnf("agentgw register: issue token for agent %s: %v", agentID, err)
+		logger.Warnf("agentgw register: issue token for agent %s: %v", row.AgentID, err)
 		http.Error(w, "issue agent token", http.StatusInternalServerError)
 		return
 	}
@@ -191,10 +204,11 @@ func (h *protocolHandler) handleRegister(w http.ResponseWriter, r *http.Request)
 		logger.Warnf("agentgw register: bind token %d to host %d: %v", token.ID, hostID, err)
 	}
 
-	logger.Infof("agentgw: agent %s registered as host %d (%s, %s/%s, ip=%s)",
-		agentID, hostID, req.Hostname, req.OS, req.Arch, req.DefaultRouteIP)
+	logger.Infof("agentgw: agent %s registered as host %d (%s, %s/%s, ip=%s): %s",
+		row.AgentID, hostID, req.Hostname, req.OS, req.Arch, req.DefaultRouteIP, match.Why)
+	h.reportImageGroup(r.Context(), row, now)
 	writeJSON(w, http.StatusOK, agenttypes.RegisterResponse{
-		AgentID:    agentID,
+		AgentID:    row.AgentID,
 		HostID:     hostID,
 		AgentToken: agentToken,
 	})
@@ -216,10 +230,10 @@ func (h *protocolHandler) handleRegister(w http.ResponseWriter, r *http.Request)
 // response. A process killed mid-registration still leaves the residue
 // they clean up -- compensation is not atomicity -- but that window is
 // now a crash rather than any ordinary database error.
-func (h *protocolHandler) undoRegistration(ctx context.Context, agentID string, hostID int64, hostCreated bool, tokenID int64) {
+func (h *protocolHandler) undoRegistration(ctx context.Context, machine string, hostID int64, hostCreated bool, tokenID int64) {
 	if hostCreated && hostID > 0 {
 		if err := h.registrar.UnregisterAgentHost(ctx, hostID); err != nil {
-			logger.Warnf("agentgw register: roll back host %d for agent %s: %v", hostID, agentID, err)
+			logger.Warnf("agentgw register: roll back host %d for machine %s: %v", hostID, machine, err)
 		}
 	}
 	if err := h.joinTokens.Refund(ctx, tokenID); err != nil {

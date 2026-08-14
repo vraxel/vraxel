@@ -72,6 +72,17 @@ func (h *protocolHandler) handleChannel(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Is the machine holding this credential the one it was issued to?
+	// Asked before anything else observable happens, because admitting a
+	// copy marks the host online under a channel belonging to a different
+	// machine -- and then dispatches that host's jobs, carrying that
+	// host's secrets, onto it.
+	if !h.verifyMachine(sessCtx, row, hello) {
+		_ = conn.Close(ws.StatusPolicyViolation,
+			"this credential was issued to a different machine; re-onboard this host to get its own")
+		return
+	}
+
 	// Identity check before anything else observable happens. A contended
 	// agent id means two live processes are claiming it, and admitting
 	// either would mark the host online under a channel we cannot trust
@@ -374,4 +385,42 @@ func clockSkew(agentClockUnixMs int64) int64 {
 		return 0
 	}
 	return agentClockUnixMs - time.Now().UnixMilli()
+}
+
+// verifyMachine reports whether this connection may proceed, and records
+// a machine-id reset when it sees one.
+//
+// The refusal it can produce is the deterministic half of clone handling.
+// The boot-nonce check below it catches two live processes alternating on
+// one identity -- which requires them to overlap, and only ever says
+// "somebody is duplicated", never which one is the impostor. This says
+// exactly which, on the first connection, from evidence a copy cannot
+// forge by accident: the original keeps its host, the copy is told to
+// onboard as itself.
+func (h *protocolHandler) verifyMachine(ctx context.Context, row *gwstore.AgentRow, hello *agenttypes.Frame) bool {
+	fp := NewFingerprint("", hello.Fingerprint, time.Now())
+
+	switch VerifyMachine(row, fp) {
+	case VerdictForeignMachine:
+		// Logged, not silent: from the operator's side this looks like a
+		// host that will not come online, and the reason is on a machine
+		// they may not have thought to look at.
+		logger.Warnf("agentgw channel: refused agent %s (host %d): credential was issued to machine %s, caller is %s",
+			row.AgentID, row.HostID, row.ProductUUID, fp.ProductUUID)
+		return false
+	case VerdictMachineIDReset:
+		// The machine kept its hardware identity and changed its image
+		// identity: someone ran systemd-machine-id-setup, which is what we
+		// ask the operator of a cloned host to do. Record it so the host
+		// stops being grouped with the image it was cloned from, and so
+		// the conflict flag clears.
+		if err := h.agents.RefreshFingerprint(ctx, row.HostID, fp.ToStore(row.IdentitySource)); err != nil {
+			// Non-fatal: the machine is who it claims to be either way,
+			// and refusing it over a bookkeeping write would take a host
+			// offline for no safety gain.
+			logger.Warnf("agentgw channel: record machine-id reset for host %d: %v", row.HostID, err)
+		}
+		logger.Infof("agentgw channel: host %d reset its machine id (%s -> %s)", row.HostID, row.MachineID, fp.MachineID)
+	}
+	return true
 }

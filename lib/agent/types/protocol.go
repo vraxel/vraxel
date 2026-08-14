@@ -108,6 +108,14 @@ type Frame struct {
 	// a restart changes it once; only two live processes can make an old
 	// value reappear.
 	BootNonce string `json:"bootNonce,omitempty"`
+	// Fingerprint is re-presented on every connect, because a credential
+	// alone cannot say which machine is holding it. A copied agent.json
+	// carries a perfectly valid token; what it cannot carry is the
+	// hypervisor-assigned identity of the machine it was issued to. The
+	// server compares the two and refuses the mismatch, which makes the
+	// original the deterministic winner instead of whichever clone
+	// reconnected last.
+	Fingerprint MachineFingerprint `json:"fingerprint,omitzero"`
 
 	// --- hello + heartbeat ---
 	// ClockUnixMs is the agent's wall clock at send time. The server
@@ -300,6 +308,39 @@ type RegisterRequest struct {
 	// (design §5.13).
 	DefaultRouteIP string `json:"defaultRouteIp"`
 	AgentVersion   string `json:"agentVersion,omitempty"`
+
+	// --- machine fingerprint ---
+	//
+	// Reported, not decided: the agent sends what it can read and the
+	// server decides which host row that is. Deriving the identity on the
+	// machine (as UUIDv5 of the machine id once did) freezes the rule into
+	// every deployed binary, so correcting it means re-onboarding a fleet.
+	//
+	// MachineID above is part of this set -- it stays where it is because
+	// it predates the rest.
+	Fingerprint MachineFingerprint `json:"fingerprint,omitzero"`
+}
+
+// MachineFingerprint is the evidence a machine offers about which machine
+// it is. See the 20260814075808 migration for why the fields are split
+// into those a disk image carries and those it cannot.
+type MachineFingerprint struct {
+	// MachineID is /etc/machine-id. Carried here as well as at the top
+	// level of RegisterRequest (where it predates this struct) because
+	// the control channel needs it too: it is what distinguishes a
+	// machine that reset its image identity from one that is simply not
+	// the machine the credential names.
+	MachineID string `json:"machineId,omitempty"`
+	// ProductUUID is the SMBIOS system UUID. The only field that may
+	// claim an existing host row, because it is the only one a hypervisor
+	// re-issues when it copies a VM.
+	ProductUUID string `json:"productUuid,omitempty"`
+	// MACs corroborate and give an operator something to read; they never
+	// claim a row on their own.
+	MACs []string `json:"macs,omitempty"`
+	// UptimeSeconds at send time. The server converts it against its own
+	// clock; see hostinfo.uptimeSeconds.
+	UptimeSeconds int64 `json:"uptimeSeconds,omitempty"`
 }
 
 // RegisterResponse is what the agent persists to disk after a successful

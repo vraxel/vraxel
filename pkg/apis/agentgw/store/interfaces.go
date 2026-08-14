@@ -12,9 +12,30 @@ import (
 // AgentStore is the host_agents surface: identity upsert at register
 // time plus control-channel session bookkeeping.
 type AgentStore interface {
-	// Upsert binds agentID to hostID and bumps token_version, revoking
-	// every token issued to this agent before now.
-	Upsert(ctx context.Context, hostID int64, agentID, version string) (*AgentRow, error)
+	// Bind is the register-time write: it attaches a machine to a host
+	// and bumps token_version, revoking every token issued before now.
+	//
+	// It replaces an Upsert keyed on a deterministic agent_id. Identity
+	// is now decided by the caller from the machine's fingerprint, and
+	// agent_id is allocated once and never re-derived -- so this takes
+	// the id to rebind, or "" to allocate a fresh one.
+	Bind(ctx context.Context, in BindInput) (*AgentRow, error)
+	// FindByProductUUID returns the rows claiming any of these SMBIOS
+	// UUIDs. Plural in both directions: one machine can spell its UUID
+	// two ways, and one UUID can (on junk firmware) be shared by a whole
+	// batch of machines -- which the caller must detect rather than
+	// merge.
+	FindByProductUUID(ctx context.Context, productUUIDs []string) ([]AgentRow, error)
+	// FindByMachineID returns every row built from one disk image. Not
+	// an identity lookup: it answers "what else came from this
+	// template", which is what turns a clone into an operator-actionable
+	// finding instead of a silent collision.
+	FindByMachineID(ctx context.Context, machineID string) ([]AgentRow, error)
+	// RefreshFingerprint records the mutable half of a fingerprint seen
+	// on reconnect, and clears any conflict flag: the only change it
+	// accepts is a machine that kept its hardware identity and reset
+	// /etc/machine-id, which is the fix we ask cloned hosts to apply.
+	RefreshFingerprint(ctx context.Context, hostID int64, fp FingerprintInput) error
 	GetByAgentID(ctx context.Context, agentID string) (*AgentRow, error)
 	GetByHostID(ctx context.Context, hostID int64) (*AgentRow, error)
 

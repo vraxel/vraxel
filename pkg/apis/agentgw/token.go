@@ -10,8 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-
-	"github.com/google/uuid"
 )
 
 // --- join tokens ---
@@ -147,28 +145,16 @@ func (s *TokenSigner) sign(body string) []byte {
 }
 
 // --- agent identity ---
-
-// agentIDNamespace is the UUIDv5 namespace for the agent identities. A
-// fixed random UUID, generated once for this purpose.
-var agentIDNamespace = uuid.MustParse("6f1d4b2e-9c3a-5f77-8d21-0a5e6b74c910")
-
-// AgentIDForMachine derives a stable agent id from a machine identifier
-// (/etc/machine-id on Linux).
 //
-// This is what makes re-running install-agent.sh idempotent: the second
-// registration presents the same agent id, hits the ON CONFLICT
-// (agent_id) branch of UpsertHostAgent, and rebinds the existing host row
-// instead of creating a duplicate. Deriving it server-side (rather than
-// letting the agent pick a random uuid and persist it) also survives the
-// agent's state directory being wiped -- a reinstall onto the same
-// machine still resolves to the same host.
-func AgentIDForMachine(machineID string) string {
-	return uuid.NewSHA1(agentIDNamespace, []byte(machineID)).String()
-}
+// An agent id is allocated at first registration and never derived. It
+// used to be UUIDv5(/etc/machine-id), which made two clones of one disk
+// arrive as the same agent -- see identity.go, which now answers "which
+// machine is this" from evidence a disk image cannot carry.
 
 // NameSuffixForAgent returns a short deterministic disambiguator derived
-// from an agent id. The host registrar appends it when the machine's
-// hostname is already taken as a host name in the target scope.
+// from a per-machine constant. The host registrar appends it when the
+// machine's hostname is already taken as a host name in the target
+// scope.
 //
 // Deterministic rather than random so a re-registration that has lost its
 // host binding still converges on the same candidate name instead of

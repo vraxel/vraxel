@@ -46,8 +46,17 @@ type touchCall struct {
 	clockSkewMs int64
 }
 
-func (f *fakeAgentStore) Upsert(context.Context, int64, string, string) (*gwstore.AgentRow, error) {
+func (f *fakeAgentStore) Bind(context.Context, gwstore.BindInput) (*gwstore.AgentRow, error) {
 	return nil, nil
+}
+func (f *fakeAgentStore) FindByProductUUID(context.Context, []string) ([]gwstore.AgentRow, error) {
+	return nil, nil
+}
+func (f *fakeAgentStore) FindByMachineID(context.Context, string) ([]gwstore.AgentRow, error) {
+	return nil, nil
+}
+func (f *fakeAgentStore) RefreshFingerprint(context.Context, int64, gwstore.FingerprintInput) error {
+	return nil
 }
 func (f *fakeAgentStore) GetByAgentID(context.Context, string) (*gwstore.AgentRow, error) {
 	return nil, nil
