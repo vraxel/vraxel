@@ -132,3 +132,5 @@ REST 资源在 `pkg/apis/<module>/install.go` 通过 `rest.APIGroupInfo` 声明�
 **Cross-Module**: Go 包不得 import 另一模块的 REST handler；前端也不得为满足自己页面的数据需求去调另一模块的端点。模块 A 需要模块 B 的数据时，A 在自己包内建只读 proxy Storage（借用 A 自己的权限树 via `PermissionTargets`），返回 A 自己的 API 类型。这样操作者只需 A 的权限即可用 A 的页面。
 
 新增模块时按 `pkg/apis/ARCHITECTURE.md` 的 New Module Checklist 执行，完成后跑 `./scripts/check-layer-leak.sh` 应零告警。
+
+**Query Params**: URL query param 统一 snake_case（`page_size`、`sort_by`、`sort_order`、`agent_status`）。Go store 通过 `list.Parse[T]` + `filter:"snake_case"` struct tag 从 `Filters` map 读取，Go 字段名保持 PascalCase。新增 filter 参数：① store 的 filter struct 加字段 + `filter:"snake_case"` tag；② 前端 `filterKeys` 用 snake_case；③ `ListParams` 对象 key 用 snake_case。**禁止直接调 `list.FilterStr` 等手动函数**（新代码一律用 `list.Parse[T]`）。
