@@ -92,11 +92,13 @@ export default function HostListPage() {
     {
       key: "ip",
       header: t("compute.host.ip"),
+      sortable: true,
       cell: (h) => <span className="font-mono text-xs">{h.spec.reportedPrimaryIp || "-"}</span>,
     },
     {
       key: "os",
       header: t("compute.host.os"),
+      sortable: true,
       truncate: true,
       cell: (h) => (
         <div className="min-w-0">
@@ -108,6 +110,8 @@ export default function HostListPage() {
     {
       key: "spec",
       header: t("compute.host.spec"),
+      sortable: true,
+      sortKey: "cpu_cores",
       cell: (h) => (
         <span className="text-sm">
           {h.spec.cpuCores ?? 0} {t("compute.host.cores")} /{" "}
@@ -119,6 +123,7 @@ export default function HostListPage() {
       key: "createdAt",
       header: t("common.created"),
       sortable: true,
+      sortKey: "created_at",
       cell: (h) => (
         <span className="text-muted-foreground text-sm">
           {formatDateTime(h.metadata.createdAt)}

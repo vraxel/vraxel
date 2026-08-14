@@ -67,7 +67,11 @@ WHERE (sqlc.narg('scope')::VARCHAR IS NULL OR h.scope = sqlc.narg('scope'))
        OR h.display_name ILIKE '%' || sqlc.narg('search')::VARCHAR || '%'
        OR h.hostname ILIKE '%' || sqlc.narg('search')::VARCHAR || '%'
        OR h.reported_primary_ip ILIKE '%' || sqlc.narg('search')::VARCHAR || '%'
-       OR h.primary_ip_override ILIKE '%' || sqlc.narg('search')::VARCHAR || '%');
+       OR h.primary_ip_override ILIKE '%' || sqlc.narg('search')::VARCHAR || '%'
+       OR h.os ILIKE '%' || sqlc.narg('search')::VARCHAR || '%'
+       OR h.arch ILIKE '%' || sqlc.narg('search')::VARCHAR || '%'
+       OR CAST(h.cpu_cores AS TEXT) = sqlc.narg('search')::VARCHAR
+       OR CAST(h.memory_mb AS TEXT) = sqlc.narg('search')::VARCHAR);
 
 -- name: ListHosts :many
 SELECT h.*,
@@ -93,10 +97,20 @@ WHERE (sqlc.narg('scope')::VARCHAR IS NULL OR h.scope = sqlc.narg('scope'))
        OR h.display_name ILIKE '%' || sqlc.narg('search')::VARCHAR || '%'
        OR h.hostname ILIKE '%' || sqlc.narg('search')::VARCHAR || '%'
        OR h.reported_primary_ip ILIKE '%' || sqlc.narg('search')::VARCHAR || '%'
-       OR h.primary_ip_override ILIKE '%' || sqlc.narg('search')::VARCHAR || '%')
+       OR h.primary_ip_override ILIKE '%' || sqlc.narg('search')::VARCHAR || '%'
+       OR h.os ILIKE '%' || sqlc.narg('search')::VARCHAR || '%'
+       OR h.arch ILIKE '%' || sqlc.narg('search')::VARCHAR || '%'
+       OR CAST(h.cpu_cores AS TEXT) = sqlc.narg('search')::VARCHAR
+       OR CAST(h.memory_mb AS TEXT) = sqlc.narg('search')::VARCHAR)
 ORDER BY
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'name' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN h.name END ASC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'name' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN h.name END DESC,
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'ip' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN h.reported_primary_ip END ASC,
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'ip' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN h.reported_primary_ip END DESC,
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'os' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN h.os END ASC,
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'os' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN h.os END DESC,
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'cpu_cores' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN h.cpu_cores END ASC,
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'cpu_cores' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN h.cpu_cores END DESC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'created_at' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN h.created_at END ASC,
     h.created_at DESC
 LIMIT sqlc.arg('page_size')::INT
