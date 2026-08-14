@@ -21,10 +21,12 @@ import type { ListQuery, ListRow } from "./use-list-query"
 const SKELETON_WIDTHS = ["w-full", "w-3/4", "w-1/2", "w-5/6", "w-2/3"]
 
 export interface ColumnDef<T> {
-  /** Sort field name and react key. */
+  /** React key and default sort field. */
   key: string
   header: ReactNode
   sortable?: boolean
+  /** Overrides `key` as the value sent in sort_by. */
+  sortKey?: string
   /** When present the header shows a filter dropdown bound to `filterKey`. */
   filter?: FilterOption[]
   filterKey?: string
@@ -140,7 +142,7 @@ export function ResourceListPage<T extends ListRow>({
                 return col.filter ? (
                   <FilterTableHead
                     key={col.key}
-                    field={col.key}
+                    field={col.sortKey ?? col.key}
                     sortBy={query.sortBy}
                     sortOrder={query.sortOrder}
                     onSort={query.handleSort}
@@ -159,11 +161,11 @@ export function ResourceListPage<T extends ListRow>({
                       <button
                         type="button"
                         className="group/sort hover:text-foreground focus-visible:ring-ring/40 inline-flex cursor-pointer items-center rounded-sm transition-colors outline-none select-none focus-visible:ring-2"
-                        onClick={() => query.handleSort(col.key)}
+                        onClick={() => query.handleSort(col.sortKey ?? col.key)}
                       >
                         {col.header}
                         <SortIcon
-                          field={col.key}
+                          field={col.sortKey ?? col.key}
                           sortBy={query.sortBy}
                           sortOrder={query.sortOrder}
                         />

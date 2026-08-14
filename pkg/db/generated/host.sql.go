@@ -30,7 +30,11 @@ WHERE ($1::VARCHAR IS NULL OR h.scope = $1)
        OR h.display_name ILIKE '%' || $6::VARCHAR || '%'
        OR h.hostname ILIKE '%' || $6::VARCHAR || '%'
        OR h.reported_primary_ip ILIKE '%' || $6::VARCHAR || '%'
-       OR h.primary_ip_override ILIKE '%' || $6::VARCHAR || '%')
+       OR h.primary_ip_override ILIKE '%' || $6::VARCHAR || '%'
+       OR h.os ILIKE '%' || $6::VARCHAR || '%'
+       OR h.arch ILIKE '%' || $6::VARCHAR || '%'
+       OR CAST(h.cpu_cores AS TEXT) = $6::VARCHAR
+       OR CAST(h.memory_mb AS TEXT) = $6::VARCHAR)
 `
 
 type CountHostsParams struct {
@@ -304,10 +308,20 @@ WHERE ($1::VARCHAR IS NULL OR h.scope = $1)
        OR h.display_name ILIKE '%' || $6::VARCHAR || '%'
        OR h.hostname ILIKE '%' || $6::VARCHAR || '%'
        OR h.reported_primary_ip ILIKE '%' || $6::VARCHAR || '%'
-       OR h.primary_ip_override ILIKE '%' || $6::VARCHAR || '%')
+       OR h.primary_ip_override ILIKE '%' || $6::VARCHAR || '%'
+       OR h.os ILIKE '%' || $6::VARCHAR || '%'
+       OR h.arch ILIKE '%' || $6::VARCHAR || '%'
+       OR CAST(h.cpu_cores AS TEXT) = $6::VARCHAR
+       OR CAST(h.memory_mb AS TEXT) = $6::VARCHAR)
 ORDER BY
     CASE WHEN $7::VARCHAR = 'name' AND $8::VARCHAR = 'asc' THEN h.name END ASC,
     CASE WHEN $7::VARCHAR = 'name' AND $8::VARCHAR = 'desc' THEN h.name END DESC,
+    CASE WHEN $7::VARCHAR = 'ip' AND $8::VARCHAR = 'asc' THEN h.reported_primary_ip END ASC,
+    CASE WHEN $7::VARCHAR = 'ip' AND $8::VARCHAR = 'desc' THEN h.reported_primary_ip END DESC,
+    CASE WHEN $7::VARCHAR = 'os' AND $8::VARCHAR = 'asc' THEN h.os END ASC,
+    CASE WHEN $7::VARCHAR = 'os' AND $8::VARCHAR = 'desc' THEN h.os END DESC,
+    CASE WHEN $7::VARCHAR = 'cpu_cores' AND $8::VARCHAR = 'asc' THEN h.cpu_cores END ASC,
+    CASE WHEN $7::VARCHAR = 'cpu_cores' AND $8::VARCHAR = 'desc' THEN h.cpu_cores END DESC,
     CASE WHEN $7::VARCHAR = 'created_at' AND $8::VARCHAR = 'asc' THEN h.created_at END ASC,
     h.created_at DESC
 LIMIT $10::INT
