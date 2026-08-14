@@ -26,6 +26,13 @@ const compute = {
 
   "compute.host.edit": "编辑主机",
   "compute.host.deleteConfirm": "确定要删除主机「{name}」吗？此操作不可撤销。",
+  "compute.host.deleteAgentWarning":
+    "这台主机已接入 Agent。删除档案不会停止机器上的 Agent，它会一直用已失效的凭证重连。请先在机器上卸载（systemctl disable --now vr-agent），或删除后重新接入。",
+
+  "compute.host.installAgent": "安装 Agent",
+  "compute.host.reinstallAgent": "重装 Agent",
+  "compute.host.installAgentHint":
+    "在这台主机上执行下面的命令。首次安装、重装升级、以及凭证失效后的重新接入，都是同一条命令。",
 
   // host detail
   "compute.host.basicInfo": "基本信息",

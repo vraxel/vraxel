@@ -156,7 +156,7 @@ func (c *Channel) Run(ctx context.Context) {
 		// all the way off and keep the process alive to notice a fix.
 		if errors.Is(err, ErrUnauthorized) {
 			c.Log.Warnf("control channel: the server rejected this agent's token; " +
-				"re-onboard the host with `install-agent.sh --force-register` to recover")
+				"mint a join token in vraxel and re-run the install command on this host to recover")
 			backoff = reconnectMax
 		}
 		c.Log.Infof("control channel: reconnecting in %s", backoff)

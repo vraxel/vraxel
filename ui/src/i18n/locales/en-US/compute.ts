@@ -26,6 +26,13 @@ const compute = {
   "compute.host.edit": "Edit host",
   "compute.host.deleteConfirm":
     'Are you sure you want to delete host "{name}"? This action cannot be undone.',
+  "compute.host.deleteAgentWarning":
+    "This host has an agent. Deleting the record does not stop it: the machine keeps dialling in with a credential nothing will honour again. Uninstall it there first (systemctl disable --now vr-agent), or onboard the machine again afterwards.",
+
+  "compute.host.installAgent": "Install agent",
+  "compute.host.reinstallAgent": "Reinstall agent",
+  "compute.host.installAgentHint":
+    "Run the command below on this host. First install, reinstall to upgrade, and recovery after a credential stops working are all the same command.",
 
   // host detail
   "compute.host.basicInfo": "Basic information",

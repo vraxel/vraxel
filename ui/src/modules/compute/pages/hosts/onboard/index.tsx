@@ -8,6 +8,7 @@ import { useWorkspaceStore } from "@/core/scope/workspace-store"
 import { buildScopedPath } from "@/core/registry/nav-config"
 import { WizardStepper, type WizardStep } from "@/modules/compute/components/wizard-stepper"
 import { AgentInstallPanel } from "@/modules/compute/components/agent-install-panel"
+import { buildInstallCommand } from "@/modules/compute/install-command"
 import { joinTokensApi } from "@/modules/compute/api/join-tokens"
 import { hostsApi } from "@/modules/compute/api/hosts"
 import type { Host } from "@/modules/compute/api/types"
@@ -301,24 +302,4 @@ export default function HostOnboardPage() {
       </div>
     </div>
   )
-}
-
-// buildInstallCommand renders the one-liner an operator pastes.
-//
-// The address comes from the server (server.externalUrl), not from
-// window.location.origin. The browser's origin is where the OPERATOR
-// reached the UI; this command runs on a different machine, which needs
-// to know where to reach the SERVER. They coincide in a plain production
-// deployment and nowhere else -- a dev browser sees the vite port, a
-// tunnelled one sees localhost, an admin-VLAN one sees a name the fleet
-// cannot resolve -- and every one of those pastes into a host as a
-// command pointing the agent back at itself.
-//
-// No fallback to the origin when serverUrl is empty: externalUrl always
-// has a value (lib/config defaults it), so an empty one means something
-// is badly wrong, and a visibly broken command beats a silently wrong
-// one.
-function buildInstallCommand(serverUrl: string, token: string): string {
-  const base = serverUrl.replace(/\/+$/, "")
-  return `curl -fsSL ${base}/install-agent.sh | sh -s -- \\\n  --server ${base} \\\n  --token ${token}`
 }

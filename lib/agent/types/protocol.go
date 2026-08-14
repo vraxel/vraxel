@@ -45,8 +45,10 @@ const (
 	// FrameTypeProbeConfig replaces the host's whole probe set
 	// (design §5.6).
 	FrameTypeProbeConfig = "probe.config"
-	// FrameTypeAgentUpgrade tells the agent to replace its own binary.
-	FrameTypeAgentUpgrade = "agent.upgrade"
+	// Upgrading the agent is install-agent.sh's job, not a frame's: the
+	// script already stops, replaces and re-registers atomically, and a
+	// second mechanism for the same thing is a second thing to keep
+	// correct.
 
 	// agent -> server
 	FrameTypeHello     = "hello"
@@ -138,9 +140,6 @@ type Frame struct {
 	Probes      []ProbeSpec  `json:"probes,omitempty"`
 	ProbeStates []ProbeState `json:"probeStates,omitempty"`
 
-	// --- agent.upgrade ---
-	Upgrade *AgentUpgrade `json:"upgrade,omitempty"`
-
 	// --- agent.status ---
 	Status string `json:"status,omitempty"`
 
@@ -153,16 +152,6 @@ type Frame struct {
 	// --- error ---
 	Code    string `json:"code,omitempty"`
 	Message string `json:"message,omitempty"`
-}
-
-// AgentUpgrade is the agent.upgrade payload.
-//
-// It names a version and its digest, not a URL: the agent builds the
-// download URL from its own server address and BinaryPath, so a frame
-// cannot point the agent's self-replacement at an attacker's host.
-type AgentUpgrade struct {
-	Version string `json:"version"`
-	SHA256  string `json:"sha256"`
 }
 
 // JobDispatch is the job.dispatch payload: one (play, host) execution
@@ -234,10 +223,9 @@ type TokenRenewResponse struct {
 	AgentToken string `json:"agentToken"`
 }
 
-// BinaryPath returns the download path for an agent binary. The agent
-// builds its upgrade URL from this rather than from a URL in the
-// upgrade frame: the binary it replaces itself with must come from the
-// server it is enrolled with, never from an address a frame names.
+// BinaryPath returns the download path for an agent binary, which is
+// where install-agent.sh fetches it from -- always the server the host
+// is being enrolled with, never an address supplied to it.
 func BinaryPath(goos, goarch string) string {
 	return ProtocolPathPrefix + "binary/" + goos + "/" + goarch
 }
