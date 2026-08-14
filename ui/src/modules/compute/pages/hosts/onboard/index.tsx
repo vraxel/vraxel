@@ -142,7 +142,7 @@ export default function HostOnboardPage() {
         { ws: workspaceId, ns: namespaceId },
         { metadata: { name }, spec: { targetHostId } },
       )
-      setCommand(buildInstallCommand(token.spec.token ?? ""))
+      setCommand(buildInstallCommand(token.spec.serverUrl ?? "", token.spec.token ?? ""))
       setTokenId(token.metadata.id)
       return true
     } catch {
@@ -303,10 +303,22 @@ export default function HostOnboardPage() {
   )
 }
 
-// buildInstallCommand renders the one-liner an operator pastes. The
-// server origin is taken from the browser, so a deployment behind a
-// different external URL still produces a command that resolves.
-function buildInstallCommand(token: string): string {
-  const origin = window.location.origin
-  return `curl -fsSL ${origin}/install-agent.sh | sh -s -- \\\n  --server ${origin} \\\n  --token ${token}`
+// buildInstallCommand renders the one-liner an operator pastes.
+//
+// The address comes from the server (server.externalUrl), not from
+// window.location.origin. The browser's origin is where the OPERATOR
+// reached the UI; this command runs on a different machine, which needs
+// to know where to reach the SERVER. They coincide in a plain production
+// deployment and nowhere else -- a dev browser sees the vite port, a
+// tunnelled one sees localhost, an admin-VLAN one sees a name the fleet
+// cannot resolve -- and every one of those pastes into a host as a
+// command pointing the agent back at itself.
+//
+// No fallback to the origin when serverUrl is empty: externalUrl always
+// has a value (lib/config defaults it), so an empty one means something
+// is badly wrong, and a visibly broken command beats a silently wrong
+// one.
+function buildInstallCommand(serverUrl: string, token: string): string {
+  const base = serverUrl.replace(/\/+$/, "")
+  return `curl -fsSL ${base}/install-agent.sh | sh -s -- \\\n  --server ${base} \\\n  --token ${token}`
 }

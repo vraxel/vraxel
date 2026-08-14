@@ -109,6 +109,17 @@ export interface AgentJoinTokenSpec {
    * Token is the plaintext, present only in a create response.
    */
   token?: string;
+  /**
+   * ServerURL is the address the AGENT should call home to, taken from
+   * server.externalUrl. Present only in a create response.
+   * It is not the address the operator reached this API at. Those two
+   * coincide in a plain production deployment and nowhere else: a
+   * browser on a dev machine sees the vite port, a browser behind an
+   * SSH tunnel sees localhost, a browser on an admin VLAN sees a name
+   * the fleet cannot resolve. Pasting any of them into a host produces
+   * a command that quietly points the agent at itself.
+   */
+  serverUrl?: string;
   createdByName?: string;
 }
 /**

@@ -90,7 +90,7 @@ func NewModules(ctx context.Context, database *db.DB, listenAddr string) Result 
 
 	return Result{
 		Mux:                  mux,
-		Registrars:           moduleRegistrars(database),
+		Registrars:           moduleRegistrars(database, config.Get().Server.ExternalURL),
 		AgentProtocolHandler: agentgwResult.ProtocolHandler,
 		InstallScriptHandler: agentgwResult.InstallScriptHandler,
 		iamResult:            iamResult,
@@ -100,11 +100,11 @@ func NewModules(ctx context.Context, database *db.DB, listenAddr string) Result 
 // moduleRegistrars is the single list of modules. Both the running
 // server and openapi-gen go through it, so a module cannot be wired
 // into one and forgotten in the other.
-func moduleRegistrars(database *db.DB) []func(*apiserver.Server) {
+func moduleRegistrars(database *db.DB, serverURL string) []func(*apiserver.Server) {
 	return []func(*apiserver.Server){
 		iam.Registrar(database),
 		audit.Registrar(database),
-		compute.Registrar(database),
+		compute.Registrar(database, serverURL),
 	}
 }
 
@@ -112,7 +112,9 @@ func moduleRegistrars(database *db.DB) []func(*apiserver.Server) {
 // database. Registration builds no queries, so the resulting server has
 // the real route table and nothing else -- the input openapi-gen needs
 // to describe exactly the endpoints that exist.
-func Registrars() []func(*apiserver.Server) { return moduleRegistrars(nil) }
+// The empty serverURL is correct here: openapi-gen describes routes and
+// schemas, and no response body is produced.
+func Registrars() []func(*apiserver.Server) { return moduleRegistrars(nil, "") }
 
 // NewAuthorizer creates a fully-wired Authorizer from API group definitions.
 // Subscribes RBAC invalidation on the shared multiplexer -- the LAST
