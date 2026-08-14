@@ -100,7 +100,9 @@ export function openReconnectingSocket(
       handlers.onStatusChange?.("open")
       handlers.onOpen?.(ws)
     }
-    ws.onmessage = (event) => { if (!closed) handlers.onMessage(event) }
+    ws.onmessage = (event) => {
+      if (!closed) handlers.onMessage(event)
+    }
     ws.onclose = () => {
       // Browsers dispatch close asynchronously, so a socket replaced by a
       // reconnect can deliver its close after the replacement exists. Ignore
@@ -112,19 +114,37 @@ export function openReconnectingSocket(
       handlers.onClose?.()
       if (retryTimer) return
       attempt += 1
-      retryTimer = setTimeout(() => { retryTimer = null; connect() }, backoffDelay(attempt, baseDelayMs, maxDelayMs))
+      retryTimer = setTimeout(
+        () => {
+          retryTimer = null
+          connect()
+        },
+        backoffDelay(attempt, baseDelayMs, maxDelayMs),
+      )
     }
     // onerror always precedes onclose, so letting close drive the retry keeps
     // a single path.
-    ws.onerror = () => { try { ws.close() } catch { /* already closing */ } }
+    ws.onerror = () => {
+      try {
+        ws.close()
+      } catch {
+        /* already closing */
+      }
+    }
   }
 
   connect()
 
   return () => {
     closed = true
-    if (retryTimer) { clearTimeout(retryTimer); retryTimer = null }
-    if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+    if (retryTimer) {
+      clearTimeout(retryTimer)
+      retryTimer = null
+    }
+    if (
+      socket &&
+      (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)
+    ) {
       socket.close()
     }
     socket = null

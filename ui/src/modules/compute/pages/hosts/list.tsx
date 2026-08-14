@@ -229,8 +229,14 @@ function HostEditDialog({
   const [loading, setLoading] = useState(false)
 
   const schema = z.object({
-    displayName: z.string().max(128, t("api.validation.maxLength", { max: 128 })).optional(),
-    description: z.string().max(1000, t("api.validation.maxLength", { max: 1000 })).optional(),
+    displayName: z
+      .string()
+      .max(128, t("api.validation.maxLength", { max: 128 }))
+      .optional(),
+    description: z
+      .string()
+      .max(1000, t("api.validation.maxLength", { max: 1000 }))
+      .optional(),
   })
 
   const form = useForm<HostEditFormValues>({

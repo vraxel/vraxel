@@ -167,7 +167,9 @@ describe("openReconnectingSocket", () => {
     const order: string[] = []
     openReconnectingSocket(() => "ws://x/1", {
       onMessage: () => {},
-      onClose: () => { order.push(`close:${FakeWebSocket.instances.length}`) },
+      onClose: () => {
+        order.push(`close:${FakeWebSocket.instances.length}`)
+      },
     })
     latest().drop()
     // onClose saw the world before the reconnect created socket #2.

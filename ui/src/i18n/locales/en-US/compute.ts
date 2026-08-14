@@ -25,7 +25,7 @@ const compute = {
 
   "compute.host.edit": "Edit host",
   "compute.host.deleteConfirm":
-    "Are you sure you want to delete host \"{name}\"? This action cannot be undone.",
+    'Are you sure you want to delete host "{name}"? This action cannot be undone.',
 
   // host detail
   "compute.host.basicInfo": "Basic information",
