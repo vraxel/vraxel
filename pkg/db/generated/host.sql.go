@@ -15,6 +15,8 @@ import (
 const countHosts = `-- name: CountHosts :one
 SELECT count(*)
 FROM hosts h
+LEFT JOIN workspaces w ON w.id = h.workspace_id
+LEFT JOIN namespaces ns ON ns.id = h.namespace_id
 LEFT JOIN host_agents a ON a.host_id = h.id
 WHERE ($1::VARCHAR IS NULL OR h.scope = $1)
   AND ($2::BIGINT IS NULL OR h.workspace_id = $2)
@@ -34,7 +36,11 @@ WHERE ($1::VARCHAR IS NULL OR h.scope = $1)
        OR h.os ILIKE '%' || $6::VARCHAR || '%'
        OR h.arch ILIKE '%' || $6::VARCHAR || '%'
        OR CAST(h.cpu_cores AS TEXT) = $6::VARCHAR
-       OR CAST(h.memory_mb AS TEXT) = $6::VARCHAR)
+       OR CAST(h.memory_mb AS TEXT) = $6::VARCHAR
+       OR COALESCE(w.name, '') ILIKE '%' || $6::VARCHAR || '%'
+       OR COALESCE(w.display_name, '') ILIKE '%' || $6::VARCHAR || '%'
+       OR COALESCE(ns.name, '') ILIKE '%' || $6::VARCHAR || '%'
+       OR COALESCE(ns.display_name, '') ILIKE '%' || $6::VARCHAR || '%')
 `
 
 type CountHostsParams struct {
@@ -161,6 +167,8 @@ func (q *Queries) DeleteHost(ctx context.Context, arg DeleteHostParams) (DeleteH
 const getHostByID = `-- name: GetHostByID :one
 SELECT h.id, h.name, h.display_name, h.description, h.hostname, h.os, h.arch, h.cpu_cores, h.memory_mb, h.disk_gb, h.scope, h.workspace_id, h.namespace_id, h.status, h.status_message, h.ssh_port, h.agent_port, h.monitor_status, h.monitor_message, h.log_agent_status, h.log_agent_message, h.origin, h.connectivity_mode, h.reported_ips, h.reported_primary_ip, h.primary_ip_override, h.created_by, h.created_at, h.updated_at,
     COALESCE(NULLIF(u.display_name, ''), u.username, '') AS creator_name,
+    COALESCE(NULLIF(w.display_name, ''), w.name, '') AS workspace_name,
+    COALESCE(NULLIF(ns.display_name, ''), ns.name, '') AS namespace_name,
     a.agent_id       AS agent_id,
     a.status         AS agent_status,
     a.version        AS agent_version,
@@ -169,6 +177,8 @@ SELECT h.id, h.name, h.display_name, h.description, h.hostname, h.os, h.arch, h.
     a.conflict_at    AS agent_conflict_at
 FROM hosts h
 LEFT JOIN users u ON u.id = h.created_by
+LEFT JOIN workspaces w ON w.id = h.workspace_id
+LEFT JOIN namespaces ns ON ns.id = h.namespace_id
 LEFT JOIN host_agents a ON a.host_id = h.id
 WHERE h.id = $1
   AND ($2::BIGINT IS NULL OR h.workspace_id IS NOT DISTINCT FROM $2::BIGINT)
@@ -212,6 +222,8 @@ type GetHostByIDRow struct {
 	CreatedAt         time.Time   `json:"created_at"`
 	UpdatedAt         time.Time   `json:"updated_at"`
 	CreatorName       string      `json:"creator_name"`
+	WorkspaceName     string      `json:"workspace_name"`
+	NamespaceName     string      `json:"namespace_name"`
 	AgentID           pgtype.UUID `json:"agent_id"`
 	AgentStatus       *string     `json:"agent_status"`
 	AgentVersion      *string     `json:"agent_version"`
@@ -254,6 +266,8 @@ func (q *Queries) GetHostByID(ctx context.Context, arg GetHostByIDParams) (GetHo
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.CreatorName,
+		&i.WorkspaceName,
+		&i.NamespaceName,
 		&i.AgentID,
 		&i.AgentStatus,
 		&i.AgentVersion,
@@ -287,6 +301,8 @@ func (q *Queries) HostScopeByID(ctx context.Context, id int64) (HostScopeByIDRow
 const listHosts = `-- name: ListHosts :many
 SELECT h.id, h.name, h.display_name, h.description, h.hostname, h.os, h.arch, h.cpu_cores, h.memory_mb, h.disk_gb, h.scope, h.workspace_id, h.namespace_id, h.status, h.status_message, h.ssh_port, h.agent_port, h.monitor_status, h.monitor_message, h.log_agent_status, h.log_agent_message, h.origin, h.connectivity_mode, h.reported_ips, h.reported_primary_ip, h.primary_ip_override, h.created_by, h.created_at, h.updated_at,
     COALESCE(NULLIF(u.display_name, ''), u.username, '') AS creator_name,
+    COALESCE(NULLIF(w.display_name, ''), w.name, '') AS workspace_name,
+    COALESCE(NULLIF(ns.display_name, ''), ns.name, '') AS namespace_name,
     a.agent_id       AS agent_id,
     a.status         AS agent_status,
     a.version        AS agent_version,
@@ -295,6 +311,8 @@ SELECT h.id, h.name, h.display_name, h.description, h.hostname, h.os, h.arch, h.
     a.conflict_at    AS agent_conflict_at
 FROM hosts h
 LEFT JOIN users u ON u.id = h.created_by
+LEFT JOIN workspaces w ON w.id = h.workspace_id
+LEFT JOIN namespaces ns ON ns.id = h.namespace_id
 LEFT JOIN host_agents a ON a.host_id = h.id
 WHERE ($1::VARCHAR IS NULL OR h.scope = $1)
   AND ($2::BIGINT IS NULL OR h.workspace_id = $2)
@@ -312,7 +330,11 @@ WHERE ($1::VARCHAR IS NULL OR h.scope = $1)
        OR h.os ILIKE '%' || $6::VARCHAR || '%'
        OR h.arch ILIKE '%' || $6::VARCHAR || '%'
        OR CAST(h.cpu_cores AS TEXT) = $6::VARCHAR
-       OR CAST(h.memory_mb AS TEXT) = $6::VARCHAR)
+       OR CAST(h.memory_mb AS TEXT) = $6::VARCHAR
+       OR COALESCE(w.name, '') ILIKE '%' || $6::VARCHAR || '%'
+       OR COALESCE(w.display_name, '') ILIKE '%' || $6::VARCHAR || '%'
+       OR COALESCE(ns.name, '') ILIKE '%' || $6::VARCHAR || '%'
+       OR COALESCE(ns.display_name, '') ILIKE '%' || $6::VARCHAR || '%')
 ORDER BY
     CASE WHEN $7::VARCHAR = 'name' AND $8::VARCHAR = 'asc' THEN h.name END ASC,
     CASE WHEN $7::VARCHAR = 'name' AND $8::VARCHAR = 'desc' THEN h.name END DESC,
@@ -322,6 +344,8 @@ ORDER BY
     CASE WHEN $7::VARCHAR = 'os' AND $8::VARCHAR = 'desc' THEN h.os END DESC,
     CASE WHEN $7::VARCHAR = 'cpu_cores' AND $8::VARCHAR = 'asc' THEN h.cpu_cores END ASC,
     CASE WHEN $7::VARCHAR = 'cpu_cores' AND $8::VARCHAR = 'desc' THEN h.cpu_cores END DESC,
+    CASE WHEN $7::VARCHAR = 'organization' AND $8::VARCHAR = 'asc' THEN COALESCE(NULLIF(w.display_name, ''), w.name, '') END ASC,
+    CASE WHEN $7::VARCHAR = 'organization' AND $8::VARCHAR = 'desc' THEN COALESCE(NULLIF(w.display_name, ''), w.name, '') END DESC,
     CASE WHEN $7::VARCHAR = 'created_at' AND $8::VARCHAR = 'asc' THEN h.created_at END ASC,
     h.created_at DESC
 LIMIT $10::INT
@@ -372,6 +396,8 @@ type ListHostsRow struct {
 	CreatedAt         time.Time   `json:"created_at"`
 	UpdatedAt         time.Time   `json:"updated_at"`
 	CreatorName       string      `json:"creator_name"`
+	WorkspaceName     string      `json:"workspace_name"`
+	NamespaceName     string      `json:"namespace_name"`
 	AgentID           pgtype.UUID `json:"agent_id"`
 	AgentStatus       *string     `json:"agent_status"`
 	AgentVersion      *string     `json:"agent_version"`
@@ -431,6 +457,8 @@ func (q *Queries) ListHosts(ctx context.Context, arg ListHostsParams) ([]ListHos
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.CreatorName,
+			&i.WorkspaceName,
+			&i.NamespaceName,
 			&i.AgentID,
 			&i.AgentStatus,
 			&i.AgentVersion,

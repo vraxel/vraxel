@@ -5158,6 +5158,9 @@
           "namespaceId": {
             "type": "string"
           },
+          "namespaceName": {
+            "type": "string"
+          },
           "origin": {
             "type": "string"
           },
@@ -5175,6 +5178,9 @@
             "format": "int32"
           },
           "workspaceId": {
+            "type": "string"
+          },
+          "workspaceName": {
             "type": "string"
           }
         }

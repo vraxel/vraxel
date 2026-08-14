@@ -177,6 +177,8 @@ func hostToAPI(r *modstore.HostRow) Host {
 			IP:                r.PrimaryIPOverride,
 			SSHPort:           r.SSHPort,
 			Scope:             r.Scope,
+			WorkspaceName:     r.WorkspaceName,
+			NamespaceName:     r.NamespaceName,
 			CreatedByName:     r.CreatorName,
 			AgentID:           r.AgentID,
 			AgentConnectedAt:  r.AgentConnectedAt,

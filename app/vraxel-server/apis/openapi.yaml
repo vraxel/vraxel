@@ -3195,6 +3195,8 @@ components:
           format: int64
         namespaceId:
           type: string
+        namespaceName:
+          type: string
         origin:
           type: string
         os:
@@ -3207,6 +3209,8 @@ components:
           type: integer
           format: int32
         workspaceId:
+          type: string
+        workspaceName:
           type: string
     Namespace:
       type: object

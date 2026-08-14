@@ -51,6 +51,8 @@ type HostRow struct {
 	PrimaryIPOverride string
 	CreatedBy         *int64
 	CreatorName       string
+	WorkspaceName     string
+	NamespaceName     string
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
 
@@ -278,6 +280,7 @@ func listRowToDomain(r *generated.ListHostsRow) HostRow {
 		SSHPort: r.SshPort, Origin: r.Origin, ConnectivityMode: r.ConnectivityMode,
 		ReportedPrimaryIP: r.ReportedPrimaryIp, PrimaryIPOverride: r.PrimaryIpOverride,
 		CreatedBy: r.CreatedBy, CreatorName: r.CreatorName,
+		WorkspaceName: r.WorkspaceName, NamespaceName: r.NamespaceName,
 		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 		AgentID:          uuidString(r.AgentID),
 		AgentStatus:      r.AgentStatus,
@@ -297,6 +300,7 @@ func getRowToDomain(r *generated.GetHostByIDRow) HostRow {
 		SSHPort: r.SshPort, Origin: r.Origin, ConnectivityMode: r.ConnectivityMode,
 		ReportedPrimaryIP: r.ReportedPrimaryIp, PrimaryIPOverride: r.PrimaryIpOverride,
 		CreatedBy: r.CreatedBy, CreatorName: r.CreatorName,
+		WorkspaceName: r.WorkspaceName, NamespaceName: r.NamespaceName,
 		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 		AgentID:          uuidString(r.AgentID),
 		AgentStatus:      r.AgentStatus,
