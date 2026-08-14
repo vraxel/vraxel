@@ -80,19 +80,6 @@ EOF
     SERVER_TRIMMED="${SERVER%/}"
     DOWNLOAD_URL="${SERVER_TRIMMED}/api/agent/v1/binary/linux/${ARCH}"
 
-    echo "==> downloading vr-agent (linux/${ARCH}) from ${DOWNLOAD_URL}"
-    TMP_BIN="$(mktemp)"
-    trap 'rm -f "$TMP_BIN"' EXIT
-    if command -v curl >/dev/null 2>&1; then
-        curl -fsSL "$DOWNLOAD_URL" -o "$TMP_BIN"
-    elif command -v wget >/dev/null 2>&1; then
-        wget -q -O "$TMP_BIN" "$DOWNLOAD_URL"
-    else
-        echo "neither curl nor wget is available" >&2
-        exit 1
-    fi
-    [ -s "$TMP_BIN" ] || { echo "downloaded binary is empty" >&2; exit 1; }
-
     # The server substitutes the expected digest below when it serves this
     # script. Verifying it matters because the binary that follows runs as
     # root on every managed host, and plenty of deployments front vraxel with
@@ -108,26 +95,65 @@ EOF
         arm64) EXPECTED_SHA="$SHA_arm64" ;;
         *)     EXPECTED_SHA="" ;;
     esac
+
+    # Checked BEFORE the download, and fatal.
+    #
+    # The digest and the binary come from the same file on the server, so a
+    # placeholder that survived substitution means there is no binary to
+    # fetch either -- the download would return 404 and `curl -f` would
+    # discard the server's explanation along with the body. Saying it here
+    # turns "curl: (22) error 404" into the actual problem.
+    #
+    # Fatal rather than a warning: the alternative is installing an
+    # unverified binary that runs as root on this host.
     case "$EXPECTED_SHA" in
         ""|__VRAXEL_AGENT_SHA256_*)
-            echo "==> WARNING: this server did not publish a checksum for linux/${ARCH}; skipping verification" >&2
-            ;;
-        *)
-            if command -v sha256sum >/dev/null 2>&1; then
-                ACTUAL_SHA="$(sha256sum "$TMP_BIN" | cut -d' ' -f1)"
-            elif command -v shasum >/dev/null 2>&1; then
-                ACTUAL_SHA="$(shasum -a 256 "$TMP_BIN" | cut -d' ' -f1)"
-            else
-                echo "neither sha256sum nor shasum is available; cannot verify the download" >&2
-                exit 1
-            fi
-            [ "$ACTUAL_SHA" = "$EXPECTED_SHA" ] || {
-                echo "binary checksum mismatch: got ${ACTUAL_SHA}, expected ${EXPECTED_SHA}" >&2
-                exit 1
-            }
-            echo "==> checksum verified"
+            echo "this server has no vr-agent binary for linux/${ARCH}." >&2
+            echo "build it there with \`make agent-binaries\`, or point VRAXEL_AGENT_BINARY_DIR at a directory holding vr-agent-linux-${ARCH}." >&2
+            exit 1
             ;;
     esac
+
+    echo "==> downloading vr-agent (linux/${ARCH}) from ${DOWNLOAD_URL}"
+    TMP_BIN="$(mktemp)"
+    trap 'rm -f "$TMP_BIN"' EXIT
+    if command -v curl >/dev/null 2>&1; then
+        # Deliberately not -f: it turns an HTTP error into a bare exit
+        # status and throws away the body, which is where the server says
+        # what is wrong. Taking the status from -w instead keeps the body
+        # in $TMP_BIN, so a failure can be quoted back. One request, so a
+        # transient fault cannot be retried into printing a 9MB binary.
+        HTTP_CODE="$(curl -sSL -w '%{http_code}' -o "$TMP_BIN" "$DOWNLOAD_URL")" || HTTP_CODE="000"
+        if [ "$HTTP_CODE" != "200" ]; then
+            echo "download failed from ${DOWNLOAD_URL} (HTTP ${HTTP_CODE}):" >&2
+            head -c 400 "$TMP_BIN" >&2
+            echo >&2
+            exit 1
+        fi
+    elif command -v wget >/dev/null 2>&1; then
+        wget -q -O "$TMP_BIN" "$DOWNLOAD_URL" || {
+            echo "download failed from ${DOWNLOAD_URL}" >&2
+            exit 1
+        }
+    else
+        echo "neither curl nor wget is available" >&2
+        exit 1
+    fi
+    [ -s "$TMP_BIN" ] || { echo "downloaded binary is empty" >&2; exit 1; }
+
+    if command -v sha256sum >/dev/null 2>&1; then
+        ACTUAL_SHA="$(sha256sum "$TMP_BIN" | cut -d' ' -f1)"
+    elif command -v shasum >/dev/null 2>&1; then
+        ACTUAL_SHA="$(shasum -a 256 "$TMP_BIN" | cut -d' ' -f1)"
+    else
+        echo "neither sha256sum nor shasum is available; cannot verify the download" >&2
+        exit 1
+    fi
+    [ "$ACTUAL_SHA" = "$EXPECTED_SHA" ] || {
+        echo "binary checksum mismatch: got ${ACTUAL_SHA}, expected ${EXPECTED_SHA}" >&2
+        exit 1
+    }
+    echo "==> checksum verified"
 
     # The binary MUST NOT be executed from /tmp. Under the SELinux policy
     # Rocky 8 ships enabled by default, files created in /tmp carry
