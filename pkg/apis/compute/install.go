@@ -10,6 +10,7 @@ import (
 	"vraxel.io/vraxel/lib/apiserver"
 	"vraxel.io/vraxel/lib/pgnotify"
 	"vraxel.io/vraxel/lib/statushub"
+	ws "vraxel.io/vraxel/lib/websocket"
 	"vraxel.io/vraxel/pkg/apis/agentgw"
 	modstore "vraxel.io/vraxel/pkg/apis/compute/store"
 	"vraxel.io/vraxel/pkg/db"
@@ -53,7 +54,7 @@ func NewAgentHostRegistrar(d *db.DB) agentgw.HostRegistrar {
 // hub is the watch stream from NewModule. It is required: the /watch
 // route binds it at registration, so a caller with nothing to stream
 // passes an unattached hub rather than nil.
-func Registrar(database *db.DB, serverURL string, hub *statushub.Hub) func(*apiserver.Server) {
+func Registrar(database *db.DB, serverURL string, hub *statushub.Hub, terminals *ws.SessionManager, dialer *AgentDialerHolder) func(*apiserver.Server) {
 	hosts := modstore.NewPGHostStore(database)
 	// host_agents belongs to the gateway; the merge reaches it through
 	// the same top-level factory the join-token store uses, so no
@@ -66,7 +67,7 @@ func Registrar(database *db.DB, serverURL string, hub *statushub.Hub) func(*apis
 	// cross-module data path in the tree works.
 	tokens := agentgw.NewJoinTokenStore(database)
 	return func(s *apiserver.Server) {
-		apiserver.Register(s, HostsDef(hosts, agentHosts, agents, hub))
+		apiserver.Register(s, HostsDef(hosts, agentHosts, agents, hub, terminals, dialer))
 		apiserver.Register(s, AgentJoinTokensDef(tokens, hosts, serverURL))
 	}
 }

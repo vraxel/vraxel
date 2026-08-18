@@ -355,6 +355,21 @@ paths:
       responses:
         "200":
           description: OK
+  /api/compute/v1/hosts/{hostId}/terminal:
+    get:
+      summary: terminal Host
+      operationId: terminalHosts
+      tags:
+        - Host
+      parameters:
+        - name: hostId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
   /api/compute/v1/hosts/watch:
     get:
       summary: watch Host
@@ -669,6 +684,26 @@ paths:
           application/json:
             schema:
               type: object
+      responses:
+        "200":
+          description: OK
+  /api/compute/v1/workspaces/{workspaceId}/hosts/{hostId}/terminal:
+    get:
+      summary: terminal Host
+      operationId: terminalWorkspacesHosts
+      tags:
+        - Host
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: hostId
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
         "200":
           description: OK
@@ -1047,6 +1082,31 @@ paths:
           application/json:
             schema:
               type: object
+      responses:
+        "200":
+          description: OK
+  /api/compute/v1/workspaces/{workspaceId}/namespaces/{namespaceId}/hosts/{hostId}/terminal:
+    get:
+      summary: terminal Host
+      operationId: terminalWorkspacesNamespacesHosts
+      tags:
+        - Host
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: namespaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: hostId
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
         "200":
           description: OK

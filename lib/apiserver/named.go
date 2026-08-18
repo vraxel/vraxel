@@ -264,7 +264,7 @@ func registerNamedScoped[T any](s *Server, def NamedDef[T], reg *resourceReg, lv
 		m.PermCodes = a.Permission
 		m.StatusCode = a.StatusCode
 		m.Sensitive = a.Sensitive || def.Sensitive
-		m.Interactive = a.Name == "exec" || a.Name == "console"
+		m.Interactive = a.Interactive
 		s.handle(pattern, m, a.handler(s, m))
 	}
 }

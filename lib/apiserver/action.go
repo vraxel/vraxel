@@ -26,6 +26,17 @@ type ActionDef struct {
 	// (password-carrying actions). Declarative replacement for v1's
 	// hardcoded verb list in audit.go.
 	Sensitive bool
+	// Interactive marks a WebSocket action that opens a shell or console
+	// on something. It is the ONLY way a GET route reaches the audit log
+	// (see auditable), so an action that hands a user a shell and does
+	// not set this leaves no trace of who opened it.
+	//
+	// Declared per action rather than inferred from its name. Matching
+	// names ("exec", "console") made the audit decision hinge on a string
+	// two files away from the action: a route named anything else was
+	// silently unaudited, and the failure is invisible precisely because
+	// nothing appears in the log.
+	Interactive bool
 	// Permission lists the codes checked by the route's authz link.
 	// Required; Register panics when empty (v1 parity).
 	Permission []string
@@ -44,6 +55,10 @@ func WithStatus(code int) actionOpt { return func(a *ActionDef) { a.StatusCode =
 
 // MarkSensitive suppresses audit body capture for this action.
 func MarkSensitive() actionOpt { return func(a *ActionDef) { a.Sensitive = true } }
+
+// MarkInteractive audits this WebSocket action's upgrade. Required on any
+// route that opens a shell or console; see ActionDef.Interactive.
+func MarkInteractive() actionOpt { return func(a *ActionDef) { a.Interactive = true } }
 
 // Action constructs a typed JSON action: the request body is decoded
 // into Req, the response is serialized through the v1-compatible
