@@ -192,15 +192,29 @@ func (s *pgAgentStore) RefreshFingerprint(ctx context.Context, hostID int64, fp 
 }
 
 func (s *pgAgentStore) RecordForeignMachine(ctx context.Context, hostID int64, callerProductUUID string) error {
-	if err := s.Q().RecordHostAgentForeignMachine(ctx, generated.RecordHostAgentForeignMachineParams{
+	changed, err := s.Q().RecordHostAgentForeignMachine(ctx, generated.RecordHostAgentForeignMachineParams{
 		ForeignMachineUuid: callerProductUUID,
 		HostID:             hostID,
-	}); err != nil {
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		// The binding was deleted or merged away between the refusal and
+		// this write. There is no row left to annotate and nobody to tell.
+		return nil
+	}
+	if err != nil {
 		return fmt.Errorf("record foreign machine for host %d: %w", hostID, err)
 	}
-	// Drives a banner the host page shows above everything else, so the
-	// watchers need waking the same way a conflict does.
-	s.notifyHost(ctx, hostID)
+	// Only on a real transition. The agent retries forever, and the UI
+	// reads the timestamp as a boolean, so announcing every attempt would
+	// have every open browser refetch the host list about twice a minute
+	// per stuck host to redraw the same banner.
+	//
+	// Pointer because sqlc types every RETURNING expression as nullable;
+	// IS NULL / IS DISTINCT FROM cannot produce one. Nil is read as "tell
+	// them": a redundant refetch is cheaper than a banner nobody sees.
+	if changed == nil || *changed {
+		s.notifyHost(ctx, hostID)
+	}
 	return nil
 }
 

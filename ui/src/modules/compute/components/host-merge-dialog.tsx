@@ -113,6 +113,12 @@ export function HostMergeDialog({
                     <AgentStatusBadge
                       status={s.spec.agentStatus}
                       conflictAt={s.spec.agentConflictAt}
+                      // The candidate being refused for belonging to
+                      // another machine is usually WHY these two rows
+                      // split, which makes it the most relevant thing on
+                      // this screen. Badged plain "offline" it is hidden
+                      // at the exact moment it decides the answer.
+                      foreignMachineAt={s.spec.agentForeignMachineAt}
                     />
                   </div>
                   <p className="text-muted-foreground truncate font-mono text-xs">
