@@ -17,9 +17,17 @@ func TestLoginEnvDropsServiceVariables(t *testing.T) {
 	t.Setenv("JOURNAL_STREAM", "8:12345")
 	t.Setenv("INVOCATION_ID", "deadbeef")
 	t.Setenv("LISTEN_FDS", "1")
+	// Gate sd_notify's watchdog ping. A program started here that kept
+	// petting it would be petting the AGENT's watchdog, and systemd would
+	// stop restarting a hung agent.
+	t.Setenv("WATCHDOG_USEC", "30000000")
+	t.Setenv("WATCHDOG_PID", "1234")
 
 	env := loginEnv(nil)
-	for _, banned := range []string{"NOTIFY_SOCKET=", "JOURNAL_STREAM=", "INVOCATION_ID=", "LISTEN_FDS="} {
+	for _, banned := range []string{
+		"NOTIFY_SOCKET=", "JOURNAL_STREAM=", "INVOCATION_ID=", "LISTEN_FDS=",
+		"WATCHDOG_USEC=", "WATCHDOG_PID=",
+	} {
 		if slices.ContainsFunc(env, func(kv string) bool { return strings.HasPrefix(kv, banned) }) {
 			t.Errorf("%s reached the shell; it belongs to the agent's unit", banned)
 		}
@@ -82,5 +90,53 @@ func TestLoginEnvForcesTerm(t *testing.T) {
 func TestLoginEnvIsSelfContained(t *testing.T) {
 	if got := len(loginEnv(nil)); got < len(os.Environ())-len(serviceEnvPrefixes) {
 		t.Fatalf("env shrank unexpectedly: %d entries", got)
+	}
+}
+
+// TestStartDirPrefersTheCallersChoice keeps StreamOpen.Dir authoritative:
+// a file browser opening a shell in a directory means that directory.
+func TestStartDirPrefersTheCallersChoice(t *testing.T) {
+	me := &user.User{HomeDir: "/root"}
+	if got := startDir("/var/log", me); got != "/var/log" {
+		t.Fatalf("startDir = %q, want the requested /var/log", got)
+	}
+}
+
+// TestStartDirDefaultsToHome is the reported bug. An empty Dir makes the
+// shell inherit the agent's working directory -- the install path its
+// unit names -- so a terminal opened in /opt/vraxel rather than in the
+// operator's home.
+func TestStartDirDefaultsToHome(t *testing.T) {
+	if got := startDir("", &user.User{HomeDir: "/root"}); got != "/root" {
+		t.Fatalf("startDir = %q, want /root", got)
+	}
+}
+
+// TestStartDirWithoutAPasswdEntry covers the container case: no home to
+// go to, so the shell has to start anyway rather than fail on a bad path.
+func TestStartDirWithoutAPasswdEntry(t *testing.T) {
+	if got := startDir("", nil); got != "" {
+		t.Fatalf("startDir = %q, want empty so exec inherits", got)
+	}
+}
+
+// TestShellArgv0MarksALogin pins the other half of the report. Without
+// the '-' the shell is not a login shell, /etc/profile never runs, and
+// PATH is whatever the service manager handed the agent.
+func TestShellArgv0MarksALogin(t *testing.T) {
+	if got := shellArgv0(nil, "/bin/bash"); got != "-bash" {
+		t.Fatalf("argv0 = %q, want -bash", got)
+	}
+	if got := shellArgv0(nil, "/bin/sh"); got != "-sh" {
+		t.Fatalf("argv0 = %q, want -sh", got)
+	}
+}
+
+// TestShellArgv0LeavesAnExplicitCommandAlone keeps the login treatment
+// off callers that named something: they asked for that program, and
+// handing it a '-' argv[0] would tell it something untrue about itself.
+func TestShellArgv0LeavesAnExplicitCommandAlone(t *testing.T) {
+	if got := shellArgv0([]string{"/usr/bin/top", "-b"}, "/usr/bin/top"); got != "/usr/bin/top" {
+		t.Fatalf("argv0 = %q, want the command path untouched", got)
 	}
 }

@@ -58,8 +58,44 @@ var serviceEnvPrefixes = []string{
 	"LISTEN_FDNAMES=",
 	"JOURNAL_STREAM=",
 	"INVOCATION_ID=",
+	// Same mechanism as NOTIFY_SOCKET, one step further: sd_notify's
+	// watchdog ping is addressed by NOTIFY_SOCKET but gated on these. A
+	// program started from the terminal would keep petting the AGENT's
+	// watchdog, so systemd would stop restarting a hung agent. Nothing
+	// sets WatchdogSec= on the unit today; the list is here so that the
+	// day someone does is not the day this breaks.
+	"WATCHDOG_USEC=",
+	"WATCHDOG_PID=",
 	"MANAGERPID=",
 	"SYSTEMD_EXEC_PID=",
+}
+
+// startDir is where the shell starts: what the caller asked for, or the
+// user's home. Empty is what makes the shell inherit the AGENT's working
+// directory, which is the install path its unit file names -- never
+// somewhere anyone means to be standing.
+func startDir(requested string, me *user.User) string {
+	if requested != "" {
+		return requested
+	}
+	if me == nil {
+		return ""
+	}
+	return me.HomeDir
+}
+
+// shellArgv0 is argv[0] for the process. A leading '-' is the only signal
+// a shell has that it is a login shell, and it is what makes /etc/profile
+// and ~/.profile run -- where PATH gets the entries every other tool on
+// the machine assumes.
+//
+// Only when we chose the shell. A caller that named a command asked for
+// that command, not for a login.
+func shellArgv0(requestedCommand []string, path string) string {
+	if len(requestedCommand) > 0 {
+		return path
+	}
+	return "-" + filepath.Base(path)
 }
 
 // loginEnv is the environment a login session gets: what the system set,
@@ -127,24 +163,9 @@ func (c *Channel) servePTY(ctx context.Context, stream net.Conn, open agenttypes
 			"the terminal will start in the agent's directory", err)
 	}
 
-	cmd.Dir = open.Dir
-	if cmd.Dir == "" && me != nil {
-		// Where a login puts you. Without this the shell inherits the
-		// AGENT's working directory, which is wherever its unit file says
-		// -- an install path nobody means to be standing in.
-		cmd.Dir = me.HomeDir
-	}
+	cmd.Dir = startDir(open.Dir, me)
 	cmd.Env = loginEnv(me)
-
-	// A login shell, the way sshd starts one: argv[0] prefixed with '-'.
-	// That is the only signal a shell has, and it is what makes
-	// /etc/profile and ~/.profile run -- which is where PATH gets the
-	// entries every other tool on the machine assumes. Only for the
-	// default shell: a caller that named a command asked for that
-	// command, not for a login.
-	if len(open.Command) == 0 {
-		cmd.Args[0] = "-" + filepath.Base(argv[0])
-	}
+	cmd.Args[0] = shellArgv0(open.Command, argv[0])
 
 	size := &pty.Winsize{Cols: open.Cols, Rows: open.Rows}
 	if size.Cols == 0 {
