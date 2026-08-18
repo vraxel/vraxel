@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Link, useParams } from "react-router"
-import { EllipsisVertical, Pencil, Plus, Trash2 } from "lucide-react"
+import { EllipsisVertical, Pencil, Plus, SquareTerminal, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { formatDateTime } from "@/shared/lib/format"
 import { Button } from "@/shared/ui/button"
@@ -28,6 +28,7 @@ import type { Host } from "@/modules/compute/api/types"
 import { hostsDef } from "@/modules/compute/defs"
 import { AgentStatusBadge } from "@/modules/compute/components/agent-status-badge"
 import { HostEditDialog } from "@/modules/compute/components/host-edit-dialog"
+import { HostTerminalDialog } from "@/modules/compute/components/host-terminal-dialog"
 import { useHostWatch } from "@/modules/compute/use-host-watch"
 
 export default function HostListPage() {
@@ -40,11 +41,13 @@ export default function HostListPage() {
 
   const canUpdate = hasPermission("compute:hosts:update", permScope)
   const canDelete = hasPermission("compute:hosts:delete", permScope)
+  const canOpenTerminal = hasPermission("compute:hosts:terminal", permScope)
 
   const qc = useQueryClient()
 
   const [editTarget, setEditTarget] = useState<Host | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Host | null>(null)
+  const [terminalTarget, setTerminalTarget] = useState<Host | null>(null)
 
   const query = useListQuery<Host>({
     def: hostsDef,
@@ -209,7 +212,7 @@ export default function HostListPage() {
         </Button>
       }
       rowActions={
-        canUpdate || canDelete
+        canUpdate || canDelete || canOpenTerminal
           ? (h) => (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -218,6 +221,18 @@ export default function HostListPage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  {canOpenTerminal && (
+                    <DropdownMenuItem
+                      // A terminal needs a live agent to carry it, and the
+                      // list already knows which hosts have one.
+                      disabled={h.spec.agentStatus !== "online"}
+                      onClick={() => setTerminalTarget(h)}
+                    >
+                      <SquareTerminal className="mr-2 h-4 w-4" />
+                      {t("compute.host.terminal.open")}
+                    </DropdownMenuItem>
+                  )}
+                  {canOpenTerminal && (canUpdate || canDelete) && <DropdownMenuSeparator />}
                   {canUpdate && (
                     <DropdownMenuItem onClick={() => setEditTarget(h)}>
                       <Pencil className="mr-2 h-4 w-4" />
@@ -240,6 +255,15 @@ export default function HostListPage() {
           : undefined
       }
     >
+      {terminalTarget && (
+        <HostTerminalDialog
+          host={terminalTarget}
+          scope={scope}
+          open
+          onOpenChange={(o) => !o && setTerminalTarget(null)}
+        />
+      )}
+
       <HostEditDialog
         host={editTarget}
         scope={scope}

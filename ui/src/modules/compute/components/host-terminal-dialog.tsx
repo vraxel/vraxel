@@ -137,7 +137,13 @@ export function HostTerminalDialog({
             break
           case "error":
             setStatus("error")
-            setErrorMessage(parsed.message ?? "")
+            // Into the terminal, not the badge: a Badge is
+            // whitespace-nowrap + overflow-hidden, so "could not open a
+            // terminal on this host" would be clipped to a few words and
+            // the operator would never learn what went wrong.
+            terminal?.write(
+              `\r\n\x1b[31m${parsed.message ?? translate("compute.host.terminal.failed")}\x1b[0m\r\n`,
+            )
             break
           case "timeout":
             setStatus("closed")
@@ -216,7 +222,7 @@ export function HostTerminalDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="flex h-[80vh] max-w-5xl flex-col gap-3 sm:max-w-5xl"
+        className="flex h-[80vh] w-[80vw] flex-col gap-3 sm:max-w-[80vw]"
         // Every other dialog here has a DialogDescription; a terminal has
         // nothing to say that the title and the status badge do not. Told
         // explicitly so Radix stops warning about the missing element on
