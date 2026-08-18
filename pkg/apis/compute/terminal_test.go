@@ -1,12 +1,17 @@
 package compute
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
 	"testing"
 
 	agenttypes "vraxel.io/vraxel/lib/agent/types"
 	"vraxel.io/vraxel/lib/apiserver"
 	ws "vraxel.io/vraxel/lib/websocket"
+	"vraxel.io/vraxel/pkg/apis/agentgw"
 )
 
 // terminalAction finds the terminal action on the hosts resource.
@@ -147,5 +152,39 @@ func TestValidTerminalSizeRejectsUint16Wrap(t *testing.T) {
 				t.Fatalf("validTerminalSize(%d, %d) = %v, want %v", tc.cols, tc.rows, got, tc.want)
 			}
 		})
+	}
+}
+
+// TestOpenFailureReasonSeparatesTheCauses pins that the five ways a
+// terminal fails to open reach the operator as five different sentences.
+// They call for different actions -- install an agent, wait, retry,
+// report a bug -- and one shared message makes the screen useless for
+// telling them apart, which is exactly the state this replaced.
+func TestOpenFailureReasonSeparatesTheCauses(t *testing.T) {
+	reasons := map[string]string{
+		"offline":   openFailureReason(agentgw.ErrHostUnreachable),
+		"elsewhere": openFailureReason(fmt.Errorf("wrapped: %w", agentgw.ErrHostOnAnotherInstance)),
+		"timed out": openFailureReason(context.DeadlineExceeded),
+		"agent said no": openFailureReason(&agentgw.StreamRejected{
+			Code: agenttypes.StreamErrTargetNotAllowed, Message: "not loopback",
+		}),
+		"anything else": openFailureReason(errors.New("tunnel broke")),
+	}
+
+	seen := map[string]string{}
+	for name, msg := range reasons {
+		if msg == "" {
+			t.Fatalf("%s produced an empty message", name)
+		}
+		if other, dup := seen[msg]; dup {
+			t.Fatalf("%s and %s both say %q; the operator cannot tell them apart", name, other, msg)
+		}
+		seen[msg] = name
+	}
+
+	// The agent's own words have to survive: "not loopback" is the only
+	// thing that says which rule the request broke.
+	if !strings.Contains(reasons["agent said no"], "not loopback") {
+		t.Fatalf("the agent's reason was dropped: %q", reasons["agent said no"])
 	}
 }
