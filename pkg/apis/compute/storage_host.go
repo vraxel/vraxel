@@ -9,6 +9,7 @@ import (
 	"vraxel.io/vraxel/lib/list"
 	"vraxel.io/vraxel/lib/oidc"
 	"vraxel.io/vraxel/lib/statushub"
+	ws "vraxel.io/vraxel/lib/websocket"
 	"vraxel.io/vraxel/pkg/apis/agentgw"
 	modstore "vraxel.io/vraxel/pkg/apis/compute/store"
 	"vraxel.io/vraxel/pkg/apis/shared/scope"
@@ -26,7 +27,7 @@ type hostOps struct {
 // fields, so a partial update of it is the same request as a full one,
 // and a host is deleted one at a time because deleting it detaches a
 // machine that is probably still running.
-func HostsDef(store modstore.HostStore, agentHosts modstore.AgentHostStore, agents agentgw.AgentStore, hub *statushub.Hub) apiserver.ResourceDef[Host] {
+func HostsDef(store modstore.HostStore, agentHosts modstore.AgentHostStore, agents agentgw.AgentStore, hub *statushub.Hub, terminals *ws.SessionManager, dialer *AgentDialerHolder) apiserver.ResourceDef[Host] {
 	o := hostOps{store: store}
 	m := hostMergeOps{hosts: store, agentHosts: agentHosts, agents: agents}
 	return apiserver.ResourceDef[Host]{
@@ -56,6 +57,16 @@ func HostsDef(store modstore.HostStore, agentHosts modstore.AgentHostStore, agen
 			// one. It is also the heaviest thing the action does: whoever
 			// may merge may already delete either side by hand.
 			apiserver.Action("merge", http.MethodPost, []string{"compute:hosts:delete"}, m.merge),
+			// A code of its own, NOT compute:hosts:get. watch may borrow
+			// list because it shows exactly what listing shows; a terminal
+			// runs arbitrary commands as root on the machine, which is not
+			// something "may read this host's details" should carry.
+			//
+			// MarkInteractive is what puts the upgrade in the audit log --
+			// a GET reaches it no other way, and an unaudited root shell is
+			// the one thing here that must never be silent.
+			apiserver.WSAction("terminal", []string{"compute:hosts:terminal"},
+				NewTerminalHandler(store, terminals, dialer), apiserver.MarkInteractive()),
 		},
 	}
 }

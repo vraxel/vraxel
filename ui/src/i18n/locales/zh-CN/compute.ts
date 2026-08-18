@@ -149,6 +149,15 @@ const compute = {
   "compute.onboard.install.reportedHint": "以上规格信息由 agent 上报。",
   "compute.onboard.install.viewHost": "查看主机",
   "compute.onboard.install.mintFailed": "创建接入令牌失败，请重试",
+
+  // host terminal
+  "compute.host.terminal.open": "打开终端",
+  "compute.host.terminal.connecting": "连接中…",
+  "compute.host.terminal.connected": "已连接",
+  "compute.host.terminal.closed": "会话已结束",
+  "compute.host.terminal.failed": "无法建立终端连接",
+  "compute.host.terminal.idle": "会话空闲超时，已断开",
+  "compute.host.terminal.needsAgent": "该主机尚未接入 agent，无法打开终端",
 } satisfies Messages
 
 export default compute
