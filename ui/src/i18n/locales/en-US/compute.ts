@@ -156,6 +156,15 @@ const compute = {
   "compute.onboard.install.reportedHint": "The details above are reported by the agent.",
   "compute.onboard.install.viewHost": "View Host",
   "compute.onboard.install.mintFailed": "Could not create the join token; try again",
+
+  // host terminal
+  "compute.host.terminal.open": "Open Terminal",
+  "compute.host.terminal.connecting": "Connecting...",
+  "compute.host.terminal.connected": "Connected",
+  "compute.host.terminal.closed": "Session ended",
+  "compute.host.terminal.failed": "Could not open the terminal",
+  "compute.host.terminal.idle": "Session closed after being idle",
+  "compute.host.terminal.needsAgent": "This host has no agent, so it has no terminal",
 }
 
 export default compute

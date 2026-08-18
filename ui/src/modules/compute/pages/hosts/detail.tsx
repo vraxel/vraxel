@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Link, useNavigate, useParams } from "react-router"
-import { ArrowLeft, Pencil, PlugZap, Trash2 } from "lucide-react"
+import { ArrowLeft, Pencil, PlugZap, SquareTerminal, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { formatDateTime } from "@/shared/lib/format"
 import { Button } from "@/shared/ui/button"
@@ -20,6 +20,7 @@ import { AgentStatusBadge } from "@/modules/compute/components/agent-status-badg
 import { HostEditDialog } from "@/modules/compute/components/host-edit-dialog"
 import { AgentInstallDialog } from "@/modules/compute/components/agent-install-dialog"
 import { HostMergeDialog } from "@/modules/compute/components/host-merge-dialog"
+import { HostTerminalDialog } from "@/modules/compute/components/host-terminal-dialog"
 import { useHostWatch } from "@/modules/compute/use-host-watch"
 import { ConfirmDialog } from "@/shared/components/confirm-dialog"
 
@@ -35,6 +36,7 @@ export default function HostDetailPage() {
 
   const canUpdate = hasPermission("compute:hosts:update", permScope)
   const canDelete = hasPermission("compute:hosts:delete", permScope)
+  const canOpenTerminal = hasPermission("compute:hosts:terminal", permScope)
   // Installing an agent means minting a join token, which the API gates
   // on compute:hosts:create -- a token is the power to bring a machine
   // into this scope.
@@ -44,6 +46,7 @@ export default function HostDetailPage() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [installOpen, setInstallOpen] = useState(false)
   const [mergeOpen, setMergeOpen] = useState(false)
+  const [terminalOpen, setTerminalOpen] = useState(false)
 
   const query = useApiQuery({
     queryKey: qk.detail(hostsDef, scope, hostId ?? ""),
@@ -98,6 +101,25 @@ export default function HostDetailPage() {
           <p className="text-muted-foreground mt-0.5 text-sm">{host.metadata.name}</p>
         </div>
         <div className="flex items-center gap-2">
+          {canOpenTerminal && (
+            <Button
+              variant="outline"
+              size="sm"
+              // A terminal needs a live agent to carry it. Disabled rather
+              // than hidden: the button is where an operator expects it,
+              // and its tooltip says what is missing.
+              disabled={host.spec.agentStatus !== "online"}
+              title={
+                host.spec.agentStatus === "online"
+                  ? undefined
+                  : t("compute.host.terminal.needsAgent")
+              }
+              onClick={() => setTerminalOpen(true)}
+            >
+              <SquareTerminal className="size-4" />
+              {t("compute.host.terminal.open")}
+            </Button>
+          )}
           {canInstallAgent && (
             <Button variant="outline" size="sm" onClick={() => setInstallOpen(true)}>
               <PlugZap className="size-4" />
@@ -224,6 +246,13 @@ export default function HostDetailPage() {
         scope={scope}
         onClose={() => setMergeOpen(false)}
         onMerged={() => navigate(listPath)}
+      />
+
+      <HostTerminalDialog
+        host={host}
+        scope={scope}
+        open={terminalOpen}
+        onOpenChange={setTerminalOpen}
       />
 
       <ConfirmDialog
