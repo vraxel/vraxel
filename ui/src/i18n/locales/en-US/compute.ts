@@ -165,6 +165,11 @@ const compute = {
   "compute.host.terminal.failed": "Could not open the terminal",
   "compute.host.terminal.idle": "Session closed after being idle",
   "compute.host.terminal.needsAgent": "This host has no agent, so it has no terminal",
+
+  // agent identity refusal
+  "compute.agent.foreignMachine": "Credential belongs to another machine",
+  "compute.agent.foreignMachineHint":
+    "A machine is presenting this host's credential but is not the one it was issued to, which is why this host stays offline. If this machine's hardware identity changed (VM recreated, board replaced), re-run the install command on it to re-onboard. If it is a clone, onboard it as its own host.",
 }
 
 export default compute

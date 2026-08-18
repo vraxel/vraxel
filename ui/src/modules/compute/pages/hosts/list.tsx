@@ -87,7 +87,11 @@ export default function HostListPage() {
           displayName={h.spec.displayName}
           name={h.metadata.name}
           trailing={
-            <AgentStatusBadge status={h.spec.agentStatus} conflictAt={h.spec.agentConflictAt} />
+            <AgentStatusBadge
+              status={h.spec.agentStatus}
+              conflictAt={h.spec.agentConflictAt}
+              foreignMachineAt={h.spec.agentForeignMachineAt}
+            />
           }
         />
       ),

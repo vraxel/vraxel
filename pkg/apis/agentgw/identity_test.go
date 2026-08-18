@@ -1,6 +1,7 @@
 package agentgw
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -327,5 +328,67 @@ func TestClassifyImageGroupIgnoresLoneHost(t *testing.T) {
 
 	if got, others := ClassifyImageGroup(&self, []gwstore.AgentRow{self}, time.Now().Add(-time.Minute)); got != RelationNone || others != nil {
 		t.Fatalf("relation = %v, others = %+v; want RelationNone and nil", got, others)
+	}
+}
+
+// TestForeignMachineIsRecordedNotJustLogged pins the operability half of
+// the refusal.
+//
+// Refusing is correct and was never in doubt. What was missing is that
+// the refusal existed only as a server log line, so the operator saw a
+// host that would not come online and nothing telling them why or that
+// the fix is to re-run the install on that machine. The agent retries
+// forever in the meantime -- observed as eleven minutes of silence before
+// anyone read the log.
+func TestForeignMachineIsRecordedNotJustLogged(t *testing.T) {
+	store := &fakeAgentStore{}
+	h := &protocolHandler{agents: store}
+	r := row(7, "agent-12", uuidNode12, sharedMachineID, nil)
+
+	admitted := h.verifyMachine(context.Background(), &r, &agenttypes.Frame{
+		Fingerprint: agenttypes.MachineFingerprint{
+			ProductUUID: uuidNode15,
+			MachineID:   sharedMachineID,
+		},
+	})
+	if admitted {
+		t.Fatal("a machine that is not the one the credential names was admitted")
+	}
+
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	if len(store.foreign) != 1 {
+		t.Fatalf("refusals recorded = %d, want 1; the host page has nothing to show", len(store.foreign))
+	}
+	if store.foreign[0].hostID != 7 {
+		t.Fatalf("recorded against host %d, want 7", store.foreign[0].hostID)
+	}
+	// The caller's uuid is the operator's answer to "which machine is
+	// this"; the row's own product_uuid only says which one it should be.
+	if store.foreign[0].uuid != uuidNode15 {
+		t.Fatalf("recorded uuid = %q, want the caller's %q", store.foreign[0].uuid, uuidNode15)
+	}
+}
+
+// TestAdmittedMachineRecordsNothing keeps the write on the refusal path
+// only: a host that is fine must not accumulate rows that drive a banner.
+func TestAdmittedMachineRecordsNothing(t *testing.T) {
+	store := &fakeAgentStore{}
+	h := &protocolHandler{agents: store}
+	r := row(7, "agent-12", uuidNode12, sharedMachineID, nil)
+
+	if !h.verifyMachine(context.Background(), &r, &agenttypes.Frame{
+		Fingerprint: agenttypes.MachineFingerprint{
+			ProductUUID: uuidNode12,
+			MachineID:   sharedMachineID,
+		},
+	}) {
+		t.Fatal("the machine the credential names was refused")
+	}
+
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	if len(store.foreign) != 0 {
+		t.Fatalf("a legitimate machine recorded %d refusals", len(store.foreign))
 	}
 }

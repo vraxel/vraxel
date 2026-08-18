@@ -20,6 +20,13 @@ import (
 // fakeAgentStore records the host_agents writes the registry performs so
 // a test can assert the durable side of a session's lifecycle without a
 // database.
+// foreignCall records one refused machine, so a test can assert the
+// refusal was written down and not merely logged.
+type foreignCall struct {
+	hostID int64
+	uuid   string
+}
+
 type fakeAgentStore struct {
 	mu      sync.Mutex
 	online  []onlineCall
@@ -27,6 +34,7 @@ type fakeAgentStore struct {
 	touched []touchCall
 	orphans []time.Duration
 	stale   []time.Duration
+	foreign []foreignCall
 	// touchLost makes Touch report that the row belongs to somebody else,
 	// which is what drives the re-claim path.
 	touchLost bool
@@ -68,6 +76,13 @@ func (f *fakeAgentStore) RefreshFingerprint(context.Context, int64, gwstore.Fing
 	return nil
 }
 func (f *fakeAgentStore) MoveBinding(context.Context, int64, int64) error { return nil }
+
+func (f *fakeAgentStore) RecordForeignMachine(_ context.Context, hostID int64, uuid string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.foreign = append(f.foreign, foreignCall{hostID: hostID, uuid: uuid})
+	return nil
+}
 func (f *fakeAgentStore) GetByAgentID(context.Context, string) (*gwstore.AgentRow, error) {
 	return nil, nil
 }

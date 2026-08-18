@@ -408,11 +408,18 @@ func (h *protocolHandler) verifyMachine(ctx context.Context, row *gwstore.AgentR
 
 	switch VerifyMachine(row, fp) {
 	case VerdictForeignMachine:
-		// Logged, not silent: from the operator's side this looks like a
-		// host that will not come online, and the reason is on a machine
-		// they may not have thought to look at.
 		logger.Warnf("agentgw channel: refused agent %s (host %d): credential was issued to machine %s, caller is %s",
 			row.AgentID, row.HostID, row.ProductUUID, fp.ProductUUID)
+		// Also recorded on the row. From the operator's side this is a host
+		// that will not come online, and the reason is on a machine they
+		// may not have thought to look at -- a log line only helps someone
+		// who already suspects where to look, and the agent will retry
+		// forever in the meantime.
+		if err := h.agents.RecordForeignMachine(ctx, row.HostID, fp.ProductUUID); err != nil {
+			// Non-fatal: the refusal itself is the safety property, and
+			// failing to write the explanation is no reason to change it.
+			logger.Warnf("agentgw channel: record foreign machine for host %d: %v", row.HostID, err)
+		}
 		return false
 	case VerdictMachineIDReset:
 		// The machine kept its hardware identity and changed its image

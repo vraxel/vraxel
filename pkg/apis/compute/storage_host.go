@@ -187,28 +187,29 @@ func hostToAPI(r *modstore.HostRow) Host {
 	h := Host{
 		Metadata: apiObjectMeta(r.ID, r.Name, &createdAt, &updatedAt),
 		Spec: HostSpec{
-			DisplayName:       r.DisplayName,
-			Description:       r.Description,
-			Hostname:          r.Hostname,
-			OS:                r.OS,
-			Arch:              r.Arch,
-			CPUCores:          r.CPUCores,
-			MemoryMB:          r.MemoryMB,
-			DiskGB:            r.DiskGB,
-			ReportedPrimaryIP: r.ReportedPrimaryIP,
-			Origin:            r.Origin,
-			ConnectivityMode:  r.ConnectivityMode,
-			IP:                r.PrimaryIPOverride,
-			SSHPort:           r.SSHPort,
-			Scope:             r.Scope,
-			WorkspaceName:     r.WorkspaceName,
-			NamespaceName:     r.NamespaceName,
-			CreatedByName:     r.CreatorName,
-			AgentID:           r.AgentID,
-			AgentConnectedAt:  r.AgentConnectedAt,
-			AgentLastSeenAt:   r.AgentLastSeenAt,
-			AgentConflictAt:   r.AgentConflictAt,
-			ImageGroupSize:    r.ImageGroupSize,
+			DisplayName:           r.DisplayName,
+			Description:           r.Description,
+			Hostname:              r.Hostname,
+			OS:                    r.OS,
+			Arch:                  r.Arch,
+			CPUCores:              r.CPUCores,
+			MemoryMB:              r.MemoryMB,
+			DiskGB:                r.DiskGB,
+			ReportedPrimaryIP:     r.ReportedPrimaryIP,
+			Origin:                r.Origin,
+			ConnectivityMode:      r.ConnectivityMode,
+			IP:                    r.PrimaryIPOverride,
+			SSHPort:               r.SSHPort,
+			Scope:                 r.Scope,
+			WorkspaceName:         r.WorkspaceName,
+			NamespaceName:         r.NamespaceName,
+			CreatedByName:         r.CreatorName,
+			AgentID:               r.AgentID,
+			AgentConnectedAt:      r.AgentConnectedAt,
+			AgentLastSeenAt:       r.AgentLastSeenAt,
+			AgentConflictAt:       r.AgentConflictAt,
+			AgentForeignMachineAt: r.AgentForeignMachineAt,
+			ImageGroupSize:        r.ImageGroupSize,
 		},
 	}
 	if r.WorkspaceID != nil {
@@ -225,6 +226,9 @@ func hostToAPI(r *modstore.HostRow) Host {
 	}
 	if r.AgentVersion != nil {
 		h.Spec.AgentVersion = *r.AgentVersion
+	}
+	if r.AgentForeignMachineUuid != nil {
+		h.Spec.AgentForeignMachineUuid = *r.AgentForeignMachineUuid
 	}
 	return h
 }

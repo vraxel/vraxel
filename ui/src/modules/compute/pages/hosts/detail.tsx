@@ -96,6 +96,7 @@ export default function HostDetailPage() {
             <AgentStatusBadge
               status={host.spec.agentStatus}
               conflictAt={host.spec.agentConflictAt}
+              foreignMachineAt={host.spec.agentForeignMachineAt}
             />
           </div>
           <p className="text-muted-foreground mt-0.5 text-sm">{host.metadata.name}</p>
@@ -166,6 +167,22 @@ export default function HostDetailPage() {
         <div className="border-destructive/25 bg-destructive/10 mb-6 rounded-lg border p-3 text-sm">
           <p className="font-medium">{t("compute.agent.conflict")}</p>
           <p className="text-muted-foreground mt-1 text-xs">{t("compute.agent.conflictHint")}</p>
+        </div>
+      )}
+
+      {/* Ranked above online/offline for the same reason the conflict
+          banner is: the host reads offline, and this is the reason. */}
+      {host.spec.agentForeignMachineAt && (
+        <div className="border-destructive/25 bg-destructive/10 mb-6 rounded-lg border p-3 text-sm">
+          <p className="font-medium">{t("compute.agent.foreignMachine")}</p>
+          <p className="text-muted-foreground mt-1 text-xs">
+            {t("compute.agent.foreignMachineHint")}
+          </p>
+          {host.spec.agentForeignMachineUuid && (
+            <p className="text-muted-foreground mt-1 font-mono text-xs">
+              {host.spec.agentForeignMachineUuid}
+            </p>
+          )}
         </div>
       )}
 

@@ -158,6 +158,11 @@ const compute = {
   "compute.host.terminal.failed": "无法建立终端连接",
   "compute.host.terminal.idle": "会话空闲超时，已断开",
   "compute.host.terminal.needsAgent": "该主机尚未接入 agent，无法打开终端",
+
+  // agent identity refusal
+  "compute.agent.foreignMachine": "凭证属于另一台机器",
+  "compute.agent.foreignMachineHint":
+    "一台机器正在用这台主机的凭证连接，但它不是当初签发凭证的那台。所以这台主机会一直显示离线。如果是这台机器换了硬件身份（虚拟机重建、主板更换），在它上面重跑安装命令即可重新纳管；如果它是一份克隆，把它作为独立主机接入。",
 } satisfies Messages
 
 export default compute

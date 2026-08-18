@@ -72,6 +72,17 @@ export interface HostSpec {
    */
   agentConflictAt?: string;
   /**
+   * AgentForeignMachineAt is set while a machine keeps presenting this
+   * host's credential without being the machine it was issued to, and
+   * AgentForeignMachineUuid is that machine's SMBIOS UUID.
+   * The host reads offline the whole time, and the reason is on a
+   * machine nobody thought to look at -- so it is carried here rather
+   * than left in a server log. Clears the moment a legitimate session
+   * gets through.
+   */
+  agentForeignMachineAt?: string;
+  agentForeignMachineUuid?: string;
+  /**
    * ImageGroupSize is how many hosts were built from this host's disk
    * image, this one included. Above 1 means somebody cloned a machine
    * without resetting /etc/machine-id: the hosts are distinct and

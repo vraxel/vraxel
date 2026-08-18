@@ -11,6 +11,9 @@ interface Props {
   status?: string
   /** Set while two live agent processes claim this host's identity. */
   conflictAt?: string
+  /** Set while a machine keeps presenting this host's credential without
+   *  being the machine it was issued to. */
+  foreignMachineAt?: string
   className?: string
 }
 
@@ -27,10 +30,26 @@ interface Props {
  * every channel for this host, including the one that looks like the
  * original, so reporting "offline" would be true but useless -- the
  * operator needs to know the host is unmanageable and why.
+ *
+ * A refused foreign machine ranks with it, for the same reason: the host
+ * is offline because every channel it opens is being turned away, and
+ * "offline" alone sends the operator to look at a machine that is in fact
+ * running and dialling in.
  */
-export function AgentStatusBadge({ status, conflictAt, className }: Props) {
+export function AgentStatusBadge({ status, conflictAt, foreignMachineAt, className }: Props) {
   const { t } = useTranslation()
 
+  if (foreignMachineAt) {
+    return (
+      <Badge
+        variant="destructive"
+        title={t("compute.agent.foreignMachineHint")}
+        className={className}
+      >
+        {t("compute.agent.foreignMachine")}
+      </Badge>
+    )
+  }
   if (conflictAt) {
     return (
       <Badge variant="destructive" title={t("compute.agent.conflictHint")} className={className}>

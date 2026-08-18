@@ -56,12 +56,14 @@ type HostRow struct {
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
 
-	AgentID          string
-	AgentStatus      *string
-	AgentVersion     *string
-	AgentConnectedAt *time.Time
-	AgentLastSeenAt  *time.Time
-	AgentConflictAt  *time.Time
+	AgentID                 string
+	AgentStatus             *string
+	AgentVersion            *string
+	AgentConnectedAt        *time.Time
+	AgentLastSeenAt         *time.Time
+	AgentConflictAt         *time.Time
+	AgentForeignMachineAt   *time.Time
+	AgentForeignMachineUuid *string
 	// ImageGroupSize counts the hosts built from this host's disk image,
 	// this one included.
 	ImageGroupSize int64
@@ -285,13 +287,15 @@ func listRowToDomain(r *generated.ListHostsRow) HostRow {
 		CreatedBy: r.CreatedBy, CreatorName: r.CreatorName,
 		WorkspaceName: r.WorkspaceName, NamespaceName: r.NamespaceName,
 		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
-		AgentID:          uuidString(r.AgentID),
-		AgentStatus:      r.AgentStatus,
-		AgentVersion:     r.AgentVersion,
-		AgentConnectedAt: r.AgentConnectedAt,
-		AgentLastSeenAt:  r.AgentLastSeenAt,
-		AgentConflictAt:  r.AgentConflictAt,
-		ImageGroupSize:   r.ImageGroupSize,
+		AgentID:                 uuidString(r.AgentID),
+		AgentStatus:             r.AgentStatus,
+		AgentVersion:            r.AgentVersion,
+		AgentConnectedAt:        r.AgentConnectedAt,
+		AgentLastSeenAt:         r.AgentLastSeenAt,
+		AgentConflictAt:         r.AgentConflictAt,
+		AgentForeignMachineAt:   r.AgentForeignMachineAt,
+		AgentForeignMachineUuid: r.AgentForeignMachineUuid,
+		ImageGroupSize:          r.ImageGroupSize,
 	}
 }
 
@@ -306,12 +310,14 @@ func getRowToDomain(r *generated.GetHostByIDRow) HostRow {
 		CreatedBy: r.CreatedBy, CreatorName: r.CreatorName,
 		WorkspaceName: r.WorkspaceName, NamespaceName: r.NamespaceName,
 		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
-		AgentID:          uuidString(r.AgentID),
-		AgentStatus:      r.AgentStatus,
-		AgentVersion:     r.AgentVersion,
-		AgentConnectedAt: r.AgentConnectedAt,
-		AgentLastSeenAt:  r.AgentLastSeenAt,
-		AgentConflictAt:  r.AgentConflictAt,
-		ImageGroupSize:   r.ImageGroupSize,
+		AgentID:                 uuidString(r.AgentID),
+		AgentStatus:             r.AgentStatus,
+		AgentVersion:            r.AgentVersion,
+		AgentConnectedAt:        r.AgentConnectedAt,
+		AgentLastSeenAt:         r.AgentLastSeenAt,
+		AgentConflictAt:         r.AgentConflictAt,
+		AgentForeignMachineAt:   r.AgentForeignMachineAt,
+		AgentForeignMachineUuid: r.AgentForeignMachineUuid,
+		ImageGroupSize:          r.ImageGroupSize,
 	}
 }
