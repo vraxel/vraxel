@@ -11,6 +11,7 @@ import (
 
 	agenttypes "vraxel.io/vraxel/lib/agent/types"
 	"vraxel.io/vraxel/lib/agentdialer"
+	apierrors "vraxel.io/vraxel/lib/api/errors"
 	"vraxel.io/vraxel/lib/logger"
 	"vraxel.io/vraxel/lib/oidc"
 	"vraxel.io/vraxel/lib/rest"
@@ -176,7 +177,16 @@ func lookupTerminalHost(
 	nsID, _ := parseScopeID(params["namespaceId"])
 	host, err := hosts.GetByID(ctx, hostID, scope.FromIDs(wsID, nsID))
 	if err != nil {
-		sendStatus(ctx, conn, "error", "host not found")
+		// Only a genuinely missing row is "not found". Reporting a database
+		// outage that way sends an operator looking for a deleted record
+		// while the real fault is Postgres, and says nothing in the log to
+		// correct them.
+		if apierrors.IsNotFound(apierrors.FromDomain(err, "host")) {
+			sendStatus(ctx, conn, "error", "host not found")
+			return nil, 0, false
+		}
+		logger.Warnf("terminal: look up host %d: %v", hostID, err)
+		sendStatus(ctx, conn, "error", "could not look up this host")
 		return nil, 0, false
 	}
 	return host, hostID, true
@@ -273,7 +283,13 @@ func pumpBrowserToAgent(
 				if err != nil {
 					continue
 				}
-				if resize.Cols > 0 && resize.Rows > 0 {
+				// Bounded before the uint16 conversion, not after: cols=65536
+				// truncates to 0, and the agent hands a resize straight to
+				// pty.Setsize with no defaulting of its own, leaving a real
+				// machine's PTY at zero columns. The opening size is checked
+				// the same way -- it is the same value arriving by another
+				// route, and only one of the two used to be guarded.
+				if validTerminalSize(resize.Cols, resize.Rows) {
 					_ = agenttypes.WriteJSONMessage(stream, agenttypes.MsgResize, agenttypes.PTYResize{
 						Cols: uint16(resize.Cols), Rows: uint16(resize.Rows),
 					})
@@ -340,15 +356,29 @@ func sendStatus(ctx context.Context, conn *ws.Conn, status, message string) {
 	_ = conn.WriteBinary(ctx, msg)
 }
 
+// Terminal dimension bounds. Generous enough for any real window, and
+// closed at both ends because these numbers become a uint16 on the wire
+// and then an ioctl on a managed machine.
+const (
+	minTerminalCols, maxTerminalCols = 10, 1000
+	minTerminalRows, maxTerminalRows = 5, 500
+)
+
+func validTerminalSize(cols, rows int) bool {
+	return cols >= minTerminalCols && cols <= maxTerminalCols &&
+		rows >= minTerminalRows && rows <= maxTerminalRows
+}
+
 // parseTerminalSize reads the browser's window size, falling back to the
-// library defaults. The bounds reject absurd dimensions: they reach a PTY
-// on a managed machine.
+// library defaults per dimension. Out of range falls back rather than
+// clamping: a client asking for 100000 columns is malfunctioning, and
+// honouring half of its request hides that better than ignoring it.
 func parseTerminalSize(colsStr, rowsStr string) (cols, rows int) {
 	cols, rows = ws.DefaultCols, ws.DefaultRows
-	if c, err := strconv.Atoi(colsStr); err == nil && c >= 10 && c <= 1000 {
+	if c, err := strconv.Atoi(colsStr); err == nil && c >= minTerminalCols && c <= maxTerminalCols {
 		cols = c
 	}
-	if r, err := strconv.Atoi(rowsStr); err == nil && r >= 5 && r <= 500 {
+	if r, err := strconv.Atoi(rowsStr); err == nil && r >= minTerminalRows && r <= maxTerminalRows {
 		rows = r
 	}
 	return cols, rows

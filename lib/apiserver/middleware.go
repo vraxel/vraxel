@@ -127,7 +127,33 @@ func (s *Server) auditMiddleware(m *routeMeta, next http.Handler) http.Handler {
 		sw := &statusWriter{ResponseWriter: w, code: http.StatusOK}
 		start := time.Now()
 
+		// An interactive handler does not return until the operator closes
+		// the shell, so logging after it would mean an open root session is
+		// absent from audit_logs for as long as it lasts -- and absent
+		// FOREVER if this process is killed or redeployed while it runs.
+		// The access is granted at the upgrade, so that is the moment to
+		// record; nothing later can change the outcome (the status is 101
+		// and stays 101). A failed upgrade falls through to the write below,
+		// which is where a 401 or 404 gets recorded.
+		if m.Interactive {
+			sw.onHeader = func(code int) {
+				if code != http.StatusSwitchingProtocols {
+					return
+				}
+				sw.onHeader = nil
+				event := s.buildAuditEvent(m, r, code, time.Since(start))
+				event.Detail = bodyDetail
+				s.auditLog.Log(event)
+			}
+		}
+
 		next.ServeHTTP(sw, r)
+
+		// Already recorded at the upgrade; a second row would double-count
+		// every session an auditor counts.
+		if m.Interactive && sw.code == http.StatusSwitchingProtocols {
+			return
+		}
 
 		event := s.buildAuditEvent(m, r, sw.code, time.Since(start))
 		event.Detail = bodyDetail
@@ -252,11 +278,18 @@ type statusWriter struct {
 	http.ResponseWriter
 	code int
 	buf  bytes.Buffer
+	// onHeader fires as soon as the status is written, before the handler
+	// gets to run its body. The audit link uses it for routes whose
+	// handler does not return until the user is finished.
+	onHeader func(code int)
 }
 
 func (sw *statusWriter) WriteHeader(code int) {
 	sw.code = code
 	sw.ResponseWriter.WriteHeader(code)
+	if sw.onHeader != nil {
+		sw.onHeader(code)
+	}
 }
 
 func (sw *statusWriter) Write(b []byte) (int, error) {

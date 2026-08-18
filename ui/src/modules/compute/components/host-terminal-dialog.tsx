@@ -217,6 +217,11 @@ export function HostTerminalDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="flex h-[80vh] max-w-5xl flex-col gap-3 sm:max-w-5xl"
+        // Every other dialog here has a DialogDescription; a terminal has
+        // nothing to say that the title and the status badge do not. Told
+        // explicitly so Radix stops warning about the missing element on
+        // every open, rather than pointing at one that is not there.
+        aria-describedby={undefined}
         // Escape belongs to whatever is running in the shell -- leaving vim's
         // insert mode, quitting less. Closing the dialog on it would kill the
         // session instead. The X button is the way out.

@@ -121,3 +121,31 @@ func TestAgentDialerHolderStartsEmpty(t *testing.T) {
 		t.Fatal("a nil holder returned a dialer")
 	}
 }
+
+// TestValidTerminalSizeRejectsUint16Wrap pins the resize bound. The value
+// crosses the wire as a uint16 and lands in pty.Setsize on a managed
+// machine, where nothing checks it -- so 65536 silently becomes a
+// zero-column PTY and an unusable shell. The opening size was always
+// bounded; this is the same value arriving by the other route.
+func TestValidTerminalSizeRejectsUint16Wrap(t *testing.T) {
+	tests := []struct {
+		name       string
+		cols, rows int
+		want       bool
+	}{
+		{"ordinary", 120, 40, true},
+		{"at the bounds", maxTerminalCols, maxTerminalRows, true},
+		{"wraps to zero columns", 65536, 40, false},
+		{"wraps to zero rows", 120, 65536, false},
+		{"zero", 0, 0, false},
+		{"negative", -1, -1, false},
+		{"below the floor", 9, 4, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := validTerminalSize(tc.cols, tc.rows); got != tc.want {
+				t.Fatalf("validTerminalSize(%d, %d) = %v, want %v", tc.cols, tc.rows, got, tc.want)
+			}
+		})
+	}
+}
