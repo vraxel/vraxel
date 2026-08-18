@@ -193,14 +193,41 @@ export function HostTerminalDialog({
       if (onWindowResize) window.removeEventListener("resize", onWindowResize)
       resizeObserver?.disconnect()
       disposables.forEach((d) => d.dispose())
-      if (socket && socket.readyState !== WebSocket.CLOSED) socket.close()
+      if (socket) {
+        // Detach before closing: our own close would otherwise come back
+        // through onclose and be recorded as the session ending, which is
+        // the state the next open would start from.
+        socket.onmessage = null
+        socket.onclose = null
+        socket.onerror = null
+        if (socket.readyState !== WebSocket.CLOSED) socket.close()
+      }
       terminal?.dispose()
+      // This component stays mounted between openings, so its state
+      // outlives the session it describes. Left alone, reopening shows the
+      // previous session's badge -- "Session ended", or last time's error --
+      // over a terminal that is in fact connecting, for as long as it takes
+      // the agent to bring its data channel up.
+      setStatus("connecting")
+      setErrorMessage("")
     }
   }, [open, hostId, scopeWs, scopeNs])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[80vh] max-w-5xl flex-col gap-3 sm:max-w-5xl">
+      <DialogContent
+        className="flex h-[80vh] max-w-5xl flex-col gap-3 sm:max-w-5xl"
+        // Escape belongs to whatever is running in the shell -- leaving vim's
+        // insert mode, quitting less. Closing the dialog on it would kill the
+        // session instead. The X button is the way out.
+        onEscapeKeyDown={(e) => e.preventDefault()}
+        // Nothing in here is focusable when the dialog opens except the close
+        // button (xterm's textarea does not exist until the next frame), so
+        // the default autofocus lands there -- and Enter, the most natural
+        // key to press at a terminal, would close the dialog. The terminal
+        // takes focus itself once the session connects.
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <DialogHeader className="flex-row items-center gap-3 space-y-0">
           <DialogTitle className="truncate">{host.metadata.name}</DialogTitle>
           <StatusBadge status={status} message={errorMessage} />
