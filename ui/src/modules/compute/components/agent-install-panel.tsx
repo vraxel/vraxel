@@ -12,8 +12,14 @@ interface Props {
   /** Null while the token is still being minted. */
   command: string | null
   /** Scope-aware base path for the host list, e.g.
-   *  /compute/workspaces/3/hosts. The joined host's link hangs off it. */
-  hostsPath: string
+   *  /compute/workspaces/3/hosts. The joined host's link hangs off it.
+   *
+   *  Omitted by a caller that is already showing the host -- the reinstall
+   *  dialog opens FROM the host's own page, where a link to it navigates
+   *  to the URL already on screen and reads as a button that does
+   *  nothing. Having somewhere to go is the condition, so the absence of
+   *  a path is what says there is nowhere. */
+  hostsPath?: string
   /** Name of the host this token is bound to, when it is bound to one. */
   boundHostName?: string
   /** Set once an agent has redeemed the token. */
@@ -126,11 +132,13 @@ export function AgentInstallPanel({
             <p className="text-muted-foreground text-xs">
               {t("compute.onboard.install.reportedHint")}
             </p>
-            <Button asChild size="sm" variant="outline">
-              <Link to={`${hostsPath}/${registeredHost.metadata.id}`}>
-                {t("compute.onboard.install.viewHost")}
-              </Link>
-            </Button>
+            {hostsPath && (
+              <Button asChild size="sm" variant="outline">
+                <Link to={`${hostsPath}/${registeredHost.metadata.id}`}>
+                  {t("compute.onboard.install.viewHost")}
+                </Link>
+              </Button>
+            )}
           </div>
         ) : (
           <div className="flex items-center gap-3">

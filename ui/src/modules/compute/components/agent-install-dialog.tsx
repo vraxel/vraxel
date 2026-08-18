@@ -8,7 +8,6 @@ import {
   DialogTitle,
 } from "@/shared/ui/dialog"
 import { useTranslation } from "@/i18n"
-import { buildScopedPath } from "@/core/registry/nav-config"
 import type { ScopeRef } from "@/core/registry/resource"
 import { joinTokensApi } from "@/modules/compute/api/join-tokens"
 import type { Host } from "@/modules/compute/api/types"
@@ -98,7 +97,6 @@ export function AgentInstallDialog({
         </DialogHeader>
         <AgentInstallPanel
           command={command}
-          hostsPath={buildScopedPath("hosts", ws ?? null, ns ?? null)}
           boundHostName={host?.metadata.name}
           registeredHost={rejoined ? host : null}
           attaching
