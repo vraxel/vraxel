@@ -126,12 +126,14 @@ RETURNING conflict_at IS NOT NULL
 -- value read back separately would race a concurrent reconnect; returning
 -- it from the same statement is the only value that provably matches.
 --
--- conflict_at is cleared here, and only here, on the admit path. The
--- gateway refuses a contended identity for a cooldown window, so reaching
--- this statement means the window lapsed and the session that got through
--- was clean. Without the clear the column is write-only: the badge it
--- drives outranks online/offline, so a host that resolved its conflict
--- months ago would still be showing it.
+-- conflict_at and foreign_machine_at are cleared here, and only here, on
+-- the admit path. The gateway refuses a contended identity for a cooldown
+-- window, so reaching this statement means the window lapsed and the
+-- session that got through was clean; and it refuses a machine that is not
+-- the one the credential names, so reaching it means the machine proved it
+-- is. Without the clear either column is write-only: the badges they drive
+-- outrank online/offline, so a host that resolved the problem months ago
+-- would still be showing it.
 UPDATE host_agents
 SET status        = 'online',
     instance_id   = @instance_id,
@@ -140,6 +142,8 @@ SET status        = 'online',
     last_seen_at  = now(),
     clock_skew_ms = @clock_skew_ms,
     conflict_at   = NULL,
+    foreign_machine_at   = NULL,
+    foreign_machine_uuid = '',
     updated_at    = now()
 WHERE host_id = @host_id
 RETURNING connected_at;
@@ -232,3 +236,22 @@ SET host_id    = @to_host_id,
     updated_at = now()
 WHERE host_id = @from_host_id
 RETURNING *;
+
+-- name: RecordHostAgentForeignMachine :exec
+-- Records that a machine presented this host's credential and was refused
+-- for not being the machine it was issued to.
+--
+-- Written on every refused attempt rather than only the first: the agent
+-- retries forever, and the timestamp is what tells an operator whether
+-- this is happening NOW or is a resolved episode still on screen. The
+-- caller's uuid is stored because the row's own product_uuid answers only
+-- the other half of "which machine is this".
+--
+-- Deliberately does NOT touch status. The host is offline because no
+-- channel is up, which the stale sweep already records; overwriting it
+-- here would race the sweep for no gain.
+UPDATE host_agents
+SET foreign_machine_at   = now(),
+    foreign_machine_uuid = @foreign_machine_uuid,
+    updated_at           = now()
+WHERE host_id = @host_id;

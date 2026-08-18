@@ -30,6 +30,12 @@ type AgentRow struct {
 	// ConflictAt is when two live processes were last caught claiming
 	// this identity. Nil once a clean session gets through.
 	ConflictAt *time.Time
+	// ForeignMachineAt is when a machine last presented this host's
+	// credential and was refused for not being the machine it was issued
+	// to; ForeignMachineUuid is that machine's SMBIOS UUID. Both clear
+	// when a legitimate session gets through.
+	ForeignMachineAt   *time.Time
+	ForeignMachineUuid string
 
 	// --- machine fingerprint ---
 	// What the machine holding this row last reported about itself. See

@@ -173,6 +173,8 @@ SELECT h.id, h.name, h.display_name, h.description, h.hostname, h.os, h.arch, h.
     a.connected_at   AS agent_connected_at,
     a.last_seen_at   AS agent_last_seen_at,
     a.conflict_at    AS agent_conflict_at,
+    a.foreign_machine_at   AS agent_foreign_machine_at,
+    a.foreign_machine_uuid AS agent_foreign_machine_uuid,
     -- How many hosts were built from this host's disk image, this one
     -- included. 1 (or 0 for an agentless record) is the ordinary answer.
     --
@@ -200,45 +202,47 @@ type GetHostByIDParams struct {
 }
 
 type GetHostByIDRow struct {
-	ID                int64       `json:"id"`
-	Name              string      `json:"name"`
-	DisplayName       string      `json:"display_name"`
-	Description       string      `json:"description"`
-	Hostname          string      `json:"hostname"`
-	Os                string      `json:"os"`
-	Arch              string      `json:"arch"`
-	CpuCores          int32       `json:"cpu_cores"`
-	MemoryMb          int64       `json:"memory_mb"`
-	DiskGb            int64       `json:"disk_gb"`
-	Scope             string      `json:"scope"`
-	WorkspaceID       *int64      `json:"workspace_id"`
-	NamespaceID       *int64      `json:"namespace_id"`
-	Status            string      `json:"status"`
-	StatusMessage     string      `json:"status_message"`
-	SshPort           int32       `json:"ssh_port"`
-	AgentPort         int32       `json:"agent_port"`
-	MonitorStatus     string      `json:"monitor_status"`
-	MonitorMessage    string      `json:"monitor_message"`
-	LogAgentStatus    string      `json:"log_agent_status"`
-	LogAgentMessage   string      `json:"log_agent_message"`
-	Origin            string      `json:"origin"`
-	ConnectivityMode  string      `json:"connectivity_mode"`
-	ReportedIps       []string    `json:"reported_ips"`
-	ReportedPrimaryIp string      `json:"reported_primary_ip"`
-	PrimaryIpOverride string      `json:"primary_ip_override"`
-	CreatedBy         *int64      `json:"created_by"`
-	CreatedAt         time.Time   `json:"created_at"`
-	UpdatedAt         time.Time   `json:"updated_at"`
-	CreatorName       string      `json:"creator_name"`
-	WorkspaceName     string      `json:"workspace_name"`
-	NamespaceName     string      `json:"namespace_name"`
-	AgentID           pgtype.UUID `json:"agent_id"`
-	AgentStatus       *string     `json:"agent_status"`
-	AgentVersion      *string     `json:"agent_version"`
-	AgentConnectedAt  *time.Time  `json:"agent_connected_at"`
-	AgentLastSeenAt   *time.Time  `json:"agent_last_seen_at"`
-	AgentConflictAt   *time.Time  `json:"agent_conflict_at"`
-	ImageGroupSize    int64       `json:"image_group_size"`
+	ID                      int64       `json:"id"`
+	Name                    string      `json:"name"`
+	DisplayName             string      `json:"display_name"`
+	Description             string      `json:"description"`
+	Hostname                string      `json:"hostname"`
+	Os                      string      `json:"os"`
+	Arch                    string      `json:"arch"`
+	CpuCores                int32       `json:"cpu_cores"`
+	MemoryMb                int64       `json:"memory_mb"`
+	DiskGb                  int64       `json:"disk_gb"`
+	Scope                   string      `json:"scope"`
+	WorkspaceID             *int64      `json:"workspace_id"`
+	NamespaceID             *int64      `json:"namespace_id"`
+	Status                  string      `json:"status"`
+	StatusMessage           string      `json:"status_message"`
+	SshPort                 int32       `json:"ssh_port"`
+	AgentPort               int32       `json:"agent_port"`
+	MonitorStatus           string      `json:"monitor_status"`
+	MonitorMessage          string      `json:"monitor_message"`
+	LogAgentStatus          string      `json:"log_agent_status"`
+	LogAgentMessage         string      `json:"log_agent_message"`
+	Origin                  string      `json:"origin"`
+	ConnectivityMode        string      `json:"connectivity_mode"`
+	ReportedIps             []string    `json:"reported_ips"`
+	ReportedPrimaryIp       string      `json:"reported_primary_ip"`
+	PrimaryIpOverride       string      `json:"primary_ip_override"`
+	CreatedBy               *int64      `json:"created_by"`
+	CreatedAt               time.Time   `json:"created_at"`
+	UpdatedAt               time.Time   `json:"updated_at"`
+	CreatorName             string      `json:"creator_name"`
+	WorkspaceName           string      `json:"workspace_name"`
+	NamespaceName           string      `json:"namespace_name"`
+	AgentID                 pgtype.UUID `json:"agent_id"`
+	AgentStatus             *string     `json:"agent_status"`
+	AgentVersion            *string     `json:"agent_version"`
+	AgentConnectedAt        *time.Time  `json:"agent_connected_at"`
+	AgentLastSeenAt         *time.Time  `json:"agent_last_seen_at"`
+	AgentConflictAt         *time.Time  `json:"agent_conflict_at"`
+	AgentForeignMachineAt   *time.Time  `json:"agent_foreign_machine_at"`
+	AgentForeignMachineUuid *string     `json:"agent_foreign_machine_uuid"`
+	ImageGroupSize          int64       `json:"image_group_size"`
 }
 
 func (q *Queries) GetHostByID(ctx context.Context, arg GetHostByIDParams) (GetHostByIDRow, error) {
@@ -283,6 +287,8 @@ func (q *Queries) GetHostByID(ctx context.Context, arg GetHostByIDParams) (GetHo
 		&i.AgentConnectedAt,
 		&i.AgentLastSeenAt,
 		&i.AgentConflictAt,
+		&i.AgentForeignMachineAt,
+		&i.AgentForeignMachineUuid,
 		&i.ImageGroupSize,
 	)
 	return i, err
@@ -319,6 +325,8 @@ SELECT h.id, h.name, h.display_name, h.description, h.hostname, h.os, h.arch, h.
     a.connected_at   AS agent_connected_at,
     a.last_seen_at   AS agent_last_seen_at,
     a.conflict_at    AS agent_conflict_at,
+    a.foreign_machine_at   AS agent_foreign_machine_at,
+    a.foreign_machine_uuid AS agent_foreign_machine_uuid,
     -- How many hosts were built from this host's disk image, this one
     -- included. 1 (or 0 for an agentless record) is the ordinary answer.
     --
@@ -392,45 +400,47 @@ type ListHostsParams struct {
 }
 
 type ListHostsRow struct {
-	ID                int64       `json:"id"`
-	Name              string      `json:"name"`
-	DisplayName       string      `json:"display_name"`
-	Description       string      `json:"description"`
-	Hostname          string      `json:"hostname"`
-	Os                string      `json:"os"`
-	Arch              string      `json:"arch"`
-	CpuCores          int32       `json:"cpu_cores"`
-	MemoryMb          int64       `json:"memory_mb"`
-	DiskGb            int64       `json:"disk_gb"`
-	Scope             string      `json:"scope"`
-	WorkspaceID       *int64      `json:"workspace_id"`
-	NamespaceID       *int64      `json:"namespace_id"`
-	Status            string      `json:"status"`
-	StatusMessage     string      `json:"status_message"`
-	SshPort           int32       `json:"ssh_port"`
-	AgentPort         int32       `json:"agent_port"`
-	MonitorStatus     string      `json:"monitor_status"`
-	MonitorMessage    string      `json:"monitor_message"`
-	LogAgentStatus    string      `json:"log_agent_status"`
-	LogAgentMessage   string      `json:"log_agent_message"`
-	Origin            string      `json:"origin"`
-	ConnectivityMode  string      `json:"connectivity_mode"`
-	ReportedIps       []string    `json:"reported_ips"`
-	ReportedPrimaryIp string      `json:"reported_primary_ip"`
-	PrimaryIpOverride string      `json:"primary_ip_override"`
-	CreatedBy         *int64      `json:"created_by"`
-	CreatedAt         time.Time   `json:"created_at"`
-	UpdatedAt         time.Time   `json:"updated_at"`
-	CreatorName       string      `json:"creator_name"`
-	WorkspaceName     string      `json:"workspace_name"`
-	NamespaceName     string      `json:"namespace_name"`
-	AgentID           pgtype.UUID `json:"agent_id"`
-	AgentStatus       *string     `json:"agent_status"`
-	AgentVersion      *string     `json:"agent_version"`
-	AgentConnectedAt  *time.Time  `json:"agent_connected_at"`
-	AgentLastSeenAt   *time.Time  `json:"agent_last_seen_at"`
-	AgentConflictAt   *time.Time  `json:"agent_conflict_at"`
-	ImageGroupSize    int64       `json:"image_group_size"`
+	ID                      int64       `json:"id"`
+	Name                    string      `json:"name"`
+	DisplayName             string      `json:"display_name"`
+	Description             string      `json:"description"`
+	Hostname                string      `json:"hostname"`
+	Os                      string      `json:"os"`
+	Arch                    string      `json:"arch"`
+	CpuCores                int32       `json:"cpu_cores"`
+	MemoryMb                int64       `json:"memory_mb"`
+	DiskGb                  int64       `json:"disk_gb"`
+	Scope                   string      `json:"scope"`
+	WorkspaceID             *int64      `json:"workspace_id"`
+	NamespaceID             *int64      `json:"namespace_id"`
+	Status                  string      `json:"status"`
+	StatusMessage           string      `json:"status_message"`
+	SshPort                 int32       `json:"ssh_port"`
+	AgentPort               int32       `json:"agent_port"`
+	MonitorStatus           string      `json:"monitor_status"`
+	MonitorMessage          string      `json:"monitor_message"`
+	LogAgentStatus          string      `json:"log_agent_status"`
+	LogAgentMessage         string      `json:"log_agent_message"`
+	Origin                  string      `json:"origin"`
+	ConnectivityMode        string      `json:"connectivity_mode"`
+	ReportedIps             []string    `json:"reported_ips"`
+	ReportedPrimaryIp       string      `json:"reported_primary_ip"`
+	PrimaryIpOverride       string      `json:"primary_ip_override"`
+	CreatedBy               *int64      `json:"created_by"`
+	CreatedAt               time.Time   `json:"created_at"`
+	UpdatedAt               time.Time   `json:"updated_at"`
+	CreatorName             string      `json:"creator_name"`
+	WorkspaceName           string      `json:"workspace_name"`
+	NamespaceName           string      `json:"namespace_name"`
+	AgentID                 pgtype.UUID `json:"agent_id"`
+	AgentStatus             *string     `json:"agent_status"`
+	AgentVersion            *string     `json:"agent_version"`
+	AgentConnectedAt        *time.Time  `json:"agent_connected_at"`
+	AgentLastSeenAt         *time.Time  `json:"agent_last_seen_at"`
+	AgentConflictAt         *time.Time  `json:"agent_conflict_at"`
+	AgentForeignMachineAt   *time.Time  `json:"agent_foreign_machine_at"`
+	AgentForeignMachineUuid *string     `json:"agent_foreign_machine_uuid"`
+	ImageGroupSize          int64       `json:"image_group_size"`
 }
 
 func (q *Queries) ListHosts(ctx context.Context, arg ListHostsParams) ([]ListHostsRow, error) {
@@ -492,6 +502,8 @@ func (q *Queries) ListHosts(ctx context.Context, arg ListHostsParams) ([]ListHos
 			&i.AgentConnectedAt,
 			&i.AgentLastSeenAt,
 			&i.AgentConflictAt,
+			&i.AgentForeignMachineAt,
+			&i.AgentForeignMachineUuid,
 			&i.ImageGroupSize,
 		); err != nil {
 			return nil, err

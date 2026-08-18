@@ -191,6 +191,19 @@ func (s *pgAgentStore) RefreshFingerprint(ctx context.Context, hostID int64, fp 
 	return nil
 }
 
+func (s *pgAgentStore) RecordForeignMachine(ctx context.Context, hostID int64, callerProductUUID string) error {
+	if err := s.Q().RecordHostAgentForeignMachine(ctx, generated.RecordHostAgentForeignMachineParams{
+		ForeignMachineUuid: callerProductUUID,
+		HostID:             hostID,
+	}); err != nil {
+		return fmt.Errorf("record foreign machine for host %d: %w", hostID, err)
+	}
+	// Drives a banner the host page shows above everything else, so the
+	// watchers need waking the same way a conflict does.
+	s.notifyHost(ctx, hostID)
+	return nil
+}
+
 func (s *pgAgentStore) MoveBinding(ctx context.Context, fromHostID, toHostID int64) error {
 	if err := s.DB.WithTx(ctx, func(ctx context.Context, q *generated.Queries) error {
 		// host_agents is keyed BY host_id, so the destination cannot hold a
@@ -411,18 +424,20 @@ func parseAgentUUID(agentID string) (pgtype.UUID, error) {
 
 func agentToDomain(r *generated.HostAgent) *AgentRow {
 	return &AgentRow{
-		HostID:       r.HostID,
-		AgentID:      uuid.UUID(r.AgentID.Bytes).String(),
-		TokenVersion: r.TokenVersion,
-		Version:      r.Version,
-		InstanceID:   r.InstanceID,
-		Status:       r.Status,
-		ConnectedAt:  r.ConnectedAt,
-		LastSeenAt:   r.LastSeenAt,
-		ClockSkewMs:  r.ClockSkewMs,
-		CreatedAt:    r.CreatedAt,
-		UpdatedAt:    r.UpdatedAt,
-		ConflictAt:   r.ConflictAt,
+		HostID:             r.HostID,
+		AgentID:            uuid.UUID(r.AgentID.Bytes).String(),
+		TokenVersion:       r.TokenVersion,
+		Version:            r.Version,
+		InstanceID:         r.InstanceID,
+		Status:             r.Status,
+		ConnectedAt:        r.ConnectedAt,
+		LastSeenAt:         r.LastSeenAt,
+		ClockSkewMs:        r.ClockSkewMs,
+		CreatedAt:          r.CreatedAt,
+		UpdatedAt:          r.UpdatedAt,
+		ConflictAt:         r.ConflictAt,
+		ForeignMachineAt:   r.ForeignMachineAt,
+		ForeignMachineUuid: r.ForeignMachineUuid,
 
 		ProductUUID:    r.ProductUuid,
 		MachineID:      r.MachineID,

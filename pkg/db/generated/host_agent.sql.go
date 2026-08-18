@@ -77,7 +77,7 @@ func (q *Queries) DeleteHostAgentByHostID(ctx context.Context, hostID int64) (in
 }
 
 const findHostAgentsByMachineID = `-- name: FindHostAgentsByMachineID :many
-SELECT host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at, boot_nonce, prev_boot_nonce, conflict_at, product_uuid, macs, machine_id, identity_source, boot_at FROM host_agents
+SELECT host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at, boot_nonce, prev_boot_nonce, conflict_at, product_uuid, macs, machine_id, identity_source, boot_at, foreign_machine_at, foreign_machine_uuid FROM host_agents
 WHERE machine_id <> '' AND machine_id = $1
 ORDER BY host_id
 `
@@ -114,6 +114,8 @@ func (q *Queries) FindHostAgentsByMachineID(ctx context.Context, machineID strin
 			&i.MachineID,
 			&i.IdentitySource,
 			&i.BootAt,
+			&i.ForeignMachineAt,
+			&i.ForeignMachineUuid,
 		); err != nil {
 			return nil, err
 		}
@@ -127,7 +129,7 @@ func (q *Queries) FindHostAgentsByMachineID(ctx context.Context, machineID strin
 
 const findHostAgentsByProductUUID = `-- name: FindHostAgentsByProductUUID :many
 
-SELECT host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at, boot_nonce, prev_boot_nonce, conflict_at, product_uuid, macs, machine_id, identity_source, boot_at FROM host_agents
+SELECT host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at, boot_nonce, prev_boot_nonce, conflict_at, product_uuid, macs, machine_id, identity_source, boot_at, foreign_machine_at, foreign_machine_uuid FROM host_agents
 WHERE product_uuid <> '' AND product_uuid = ANY($1::text[])
 ORDER BY host_id
 `
@@ -172,6 +174,8 @@ func (q *Queries) FindHostAgentsByProductUUID(ctx context.Context, productUuids 
 			&i.MachineID,
 			&i.IdentitySource,
 			&i.BootAt,
+			&i.ForeignMachineAt,
+			&i.ForeignMachineUuid,
 		); err != nil {
 			return nil, err
 		}
@@ -184,7 +188,7 @@ func (q *Queries) FindHostAgentsByProductUUID(ctx context.Context, productUuids 
 }
 
 const getHostAgentByAgentID = `-- name: GetHostAgentByAgentID :one
-SELECT host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at, boot_nonce, prev_boot_nonce, conflict_at, product_uuid, macs, machine_id, identity_source, boot_at FROM host_agents WHERE agent_id = $1
+SELECT host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at, boot_nonce, prev_boot_nonce, conflict_at, product_uuid, macs, machine_id, identity_source, boot_at, foreign_machine_at, foreign_machine_uuid FROM host_agents WHERE agent_id = $1
 `
 
 func (q *Queries) GetHostAgentByAgentID(ctx context.Context, agentID pgtype.UUID) (HostAgent, error) {
@@ -210,12 +214,14 @@ func (q *Queries) GetHostAgentByAgentID(ctx context.Context, agentID pgtype.UUID
 		&i.MachineID,
 		&i.IdentitySource,
 		&i.BootAt,
+		&i.ForeignMachineAt,
+		&i.ForeignMachineUuid,
 	)
 	return i, err
 }
 
 const getHostAgentByHostID = `-- name: GetHostAgentByHostID :one
-SELECT host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at, boot_nonce, prev_boot_nonce, conflict_at, product_uuid, macs, machine_id, identity_source, boot_at FROM host_agents WHERE host_id = $1
+SELECT host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at, boot_nonce, prev_boot_nonce, conflict_at, product_uuid, macs, machine_id, identity_source, boot_at, foreign_machine_at, foreign_machine_uuid FROM host_agents WHERE host_id = $1
 `
 
 func (q *Queries) GetHostAgentByHostID(ctx context.Context, hostID int64) (HostAgent, error) {
@@ -241,6 +247,8 @@ func (q *Queries) GetHostAgentByHostID(ctx context.Context, hostID int64) (HostA
 		&i.MachineID,
 		&i.IdentitySource,
 		&i.BootAt,
+		&i.ForeignMachineAt,
+		&i.ForeignMachineUuid,
 	)
 	return i, err
 }
@@ -250,7 +258,7 @@ INSERT INTO host_agents (host_id, agent_id, version, status,
                          product_uuid, machine_id, macs, identity_source, boot_at)
 VALUES ($1, $2, $3, 'offline',
         $4, $5, $6, $7, $8)
-RETURNING host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at, boot_nonce, prev_boot_nonce, conflict_at, product_uuid, macs, machine_id, identity_source, boot_at
+RETURNING host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at, boot_nonce, prev_boot_nonce, conflict_at, product_uuid, macs, machine_id, identity_source, boot_at, foreign_machine_at, foreign_machine_uuid
 `
 
 type InsertHostAgentParams struct {
@@ -298,6 +306,8 @@ func (q *Queries) InsertHostAgent(ctx context.Context, arg InsertHostAgentParams
 		&i.MachineID,
 		&i.IdentitySource,
 		&i.BootAt,
+		&i.ForeignMachineAt,
+		&i.ForeignMachineUuid,
 	)
 	return i, err
 }
@@ -337,6 +347,8 @@ SET status        = 'online',
     last_seen_at  = now(),
     clock_skew_ms = $3,
     conflict_at   = NULL,
+    foreign_machine_at   = NULL,
+    foreign_machine_uuid = '',
     updated_at    = now()
 WHERE host_id = $4
 RETURNING connected_at
@@ -358,12 +370,14 @@ type MarkHostAgentOnlineParams struct {
 // value read back separately would race a concurrent reconnect; returning
 // it from the same statement is the only value that provably matches.
 //
-// conflict_at is cleared here, and only here, on the admit path. The
-// gateway refuses a contended identity for a cooldown window, so reaching
-// this statement means the window lapsed and the session that got through
-// was clean. Without the clear the column is write-only: the badge it
-// drives outranks online/offline, so a host that resolved its conflict
-// months ago would still be showing it.
+// conflict_at and foreign_machine_at are cleared here, and only here, on
+// the admit path. The gateway refuses a contended identity for a cooldown
+// window, so reaching this statement means the window lapsed and the
+// session that got through was clean; and it refuses a machine that is not
+// the one the credential names, so reaching it means the machine proved it
+// is. Without the clear either column is write-only: the badges they drive
+// outrank online/offline, so a host that resolved the problem months ago
+// would still be showing it.
 func (q *Queries) MarkHostAgentOnline(ctx context.Context, arg MarkHostAgentOnlineParams) (*time.Time, error) {
 	row := q.db.QueryRow(ctx, markHostAgentOnline,
 		arg.InstanceID,
@@ -463,7 +477,7 @@ UPDATE host_agents
 SET host_id    = $1,
     updated_at = now()
 WHERE host_id = $2
-RETURNING host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at, boot_nonce, prev_boot_nonce, conflict_at, product_uuid, macs, machine_id, identity_source, boot_at
+RETURNING host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at, boot_nonce, prev_boot_nonce, conflict_at, product_uuid, macs, machine_id, identity_source, boot_at, foreign_machine_at, foreign_machine_uuid
 `
 
 type MoveHostAgentBindingParams struct {
@@ -501,6 +515,8 @@ func (q *Queries) MoveHostAgentBinding(ctx context.Context, arg MoveHostAgentBin
 		&i.MachineID,
 		&i.IdentitySource,
 		&i.BootAt,
+		&i.ForeignMachineAt,
+		&i.ForeignMachineUuid,
 	)
 	return i, err
 }
@@ -517,7 +533,7 @@ SET host_id         = $1,
     boot_at         = $7,
     updated_at      = now()
 WHERE agent_id = $8
-RETURNING host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at, boot_nonce, prev_boot_nonce, conflict_at, product_uuid, macs, machine_id, identity_source, boot_at
+RETURNING host_id, agent_id, token_version, version, instance_id, status, connected_at, last_seen_at, clock_skew_ms, created_at, updated_at, boot_nonce, prev_boot_nonce, conflict_at, product_uuid, macs, machine_id, identity_source, boot_at, foreign_machine_at, foreign_machine_uuid
 `
 
 type RebindHostAgentParams struct {
@@ -572,8 +588,40 @@ func (q *Queries) RebindHostAgent(ctx context.Context, arg RebindHostAgentParams
 		&i.MachineID,
 		&i.IdentitySource,
 		&i.BootAt,
+		&i.ForeignMachineAt,
+		&i.ForeignMachineUuid,
 	)
 	return i, err
+}
+
+const recordHostAgentForeignMachine = `-- name: RecordHostAgentForeignMachine :exec
+UPDATE host_agents
+SET foreign_machine_at   = now(),
+    foreign_machine_uuid = $1,
+    updated_at           = now()
+WHERE host_id = $2
+`
+
+type RecordHostAgentForeignMachineParams struct {
+	ForeignMachineUuid string `json:"foreign_machine_uuid"`
+	HostID             int64  `json:"host_id"`
+}
+
+// Records that a machine presented this host's credential and was refused
+// for not being the machine it was issued to.
+//
+// Written on every refused attempt rather than only the first: the agent
+// retries forever, and the timestamp is what tells an operator whether
+// this is happening NOW or is a resolved episode still on screen. The
+// caller's uuid is stored because the row's own product_uuid answers only
+// the other half of "which machine is this".
+//
+// Deliberately does NOT touch status. The host is offline because no
+// channel is up, which the stale sweep already records; overwriting it
+// here would race the sweep for no gain.
+func (q *Queries) RecordHostAgentForeignMachine(ctx context.Context, arg RecordHostAgentForeignMachineParams) error {
+	_, err := q.db.Exec(ctx, recordHostAgentForeignMachine, arg.ForeignMachineUuid, arg.HostID)
+	return err
 }
 
 const touchHostAgent = `-- name: TouchHostAgent :execrows

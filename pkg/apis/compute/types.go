@@ -65,6 +65,16 @@ type HostSpec struct {
 	// host's identity, which is what a cloned disk produces. The gateway
 	// refuses every channel for the host until it clears.
 	AgentConflictAt *time.Time `json:"agentConflictAt,omitempty"`
+	// AgentForeignMachineAt is set while a machine keeps presenting this
+	// host's credential without being the machine it was issued to, and
+	// AgentForeignMachineUuid is that machine's SMBIOS UUID.
+	//
+	// The host reads offline the whole time, and the reason is on a
+	// machine nobody thought to look at -- so it is carried here rather
+	// than left in a server log. Clears the moment a legitimate session
+	// gets through.
+	AgentForeignMachineAt   *time.Time `json:"agentForeignMachineAt,omitempty"`
+	AgentForeignMachineUuid string     `json:"agentForeignMachineUuid,omitempty"`
 	// ImageGroupSize is how many hosts were built from this host's disk
 	// image, this one included. Above 1 means somebody cloned a machine
 	// without resetting /etc/machine-id: the hosts are distinct and

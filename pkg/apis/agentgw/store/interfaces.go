@@ -36,6 +36,11 @@ type AgentStore interface {
 	// accepts is a machine that kept its hardware identity and reset
 	// /etc/machine-id, which is the fix we ask cloned hosts to apply.
 	RefreshFingerprint(ctx context.Context, hostID int64, fp FingerprintInput) error
+	// RecordForeignMachine notes that a machine presented this host's
+	// credential and was refused for not being the machine it was issued
+	// to. It is what turns a host that silently will not come online into
+	// one whose page says why, and what to do about it.
+	RecordForeignMachine(ctx context.Context, hostID int64, callerProductUUID string) error
 	// MoveBinding re-points a live agent at another host, for a merge of
 	// two rows that turn out to be one machine. Only host_id moves: the
 	// agent keeps its id, its token_version and therefore its credential,

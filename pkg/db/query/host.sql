@@ -44,6 +44,8 @@ SELECT h.*,
     a.connected_at   AS agent_connected_at,
     a.last_seen_at   AS agent_last_seen_at,
     a.conflict_at    AS agent_conflict_at,
+    a.foreign_machine_at   AS agent_foreign_machine_at,
+    a.foreign_machine_uuid AS agent_foreign_machine_uuid,
     -- How many hosts were built from this host's disk image, this one
     -- included. 1 (or 0 for an agentless record) is the ordinary answer.
     --
@@ -102,6 +104,8 @@ SELECT h.*,
     a.connected_at   AS agent_connected_at,
     a.last_seen_at   AS agent_last_seen_at,
     a.conflict_at    AS agent_conflict_at,
+    a.foreign_machine_at   AS agent_foreign_machine_at,
+    a.foreign_machine_uuid AS agent_foreign_machine_uuid,
     -- How many hosts were built from this host's disk image, this one
     -- included. 1 (or 0 for an agentless record) is the ordinary answer.
     --

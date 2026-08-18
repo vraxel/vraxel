@@ -3428,6 +3428,11 @@ components:
         agentConnectedAt:
           type: string
           format: date-time
+        agentForeignMachineAt:
+          type: string
+          format: date-time
+        agentForeignMachineUuid:
+          type: string
         agentId:
           type: string
         agentLastSeenAt:
