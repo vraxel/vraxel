@@ -3,6 +3,7 @@ package compute
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -16,6 +17,7 @@ import (
 	"vraxel.io/vraxel/lib/oidc"
 	"vraxel.io/vraxel/lib/rest"
 	ws "vraxel.io/vraxel/lib/websocket"
+	"vraxel.io/vraxel/pkg/apis/agentgw"
 	modstore "vraxel.io/vraxel/pkg/apis/compute/store"
 	"vraxel.io/vraxel/pkg/apis/shared/scope"
 )
@@ -130,7 +132,7 @@ func runTerminalSession(
 	})
 	if err != nil {
 		logger.Warnf("terminal: open pty on host %d: %v", hostID, err)
-		sendStatus(ctx, conn, "error", "could not open a terminal on this host")
+		sendStatus(ctx, conn, "error", openFailureReason(err))
 		return
 	}
 	defer stream.Close()
@@ -157,6 +159,31 @@ func runTerminalSession(
 	_ = stream.SetDeadline(time.Now())
 	_ = stream.Close()
 	wg.Wait()
+}
+
+// openFailureReason turns a stream-open failure into something the
+// operator can act on.
+//
+// These are five different problems -- the machine is not connected, it
+// is connected to a different replica, it never answered, the agent
+// refused, or the tunnel broke -- and collapsing them into one sentence
+// means the person reading it cannot tell "install an agent" from "wait
+// a moment" from "file a bug". The detail is in the server log either
+// way; this is what reaches the person who hit it.
+func openFailureReason(err error) string {
+	switch {
+	case errors.Is(err, agentgw.ErrHostUnreachable):
+		return "this host's agent is not connected"
+	case errors.Is(err, agentgw.ErrHostOnAnotherInstance):
+		return "this host is connected to another server replica, which cannot be reached yet"
+	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
+		return "the host did not open its data channel in time"
+	}
+	var rejected *agentgw.StreamRejected
+	if errors.As(err, &rejected) {
+		return "the agent refused the terminal: " + rejected.Message
+	}
+	return "could not open a terminal on this host"
 }
 
 // lookupTerminalHost resolves the host in the caller's scope. The scope
