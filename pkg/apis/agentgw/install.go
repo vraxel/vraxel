@@ -10,9 +10,9 @@
 // The wire contract lives in lib/agent/types so the agent binary can
 // share it without linking any of this.
 //
-// This is the register / control-channel slice: register + channel are
-// live; data-channel / bundles / jobs / scrape-targets land later and 404
-// until then. The RunManager is a stub (see runmanager.go).
+// Live so far: register, the control channel, and the data channel that
+// carries interactive streams. bundles / jobs / scrape-targets land later
+// and 404 until then. The RunManager is a stub (see runmanager.go).
 package agentgw
 
 import (
@@ -53,6 +53,10 @@ type ModuleResult struct {
 	// install flow to call through an interface it declares; a stub until
 	// the jobs slice.
 	Dispatcher *RunManager
+	// DataHub opens streams on agents' data channels. Exposed so the host
+	// module's terminal can reach it through an interface it declares --
+	// compute must not import this package's handlers.
+	DataHub *DataHub
 }
 
 // Deps are the cross-module dependencies of the gateway.
@@ -125,15 +129,21 @@ func NewModule(ctx context.Context, database *db.DB, deps Deps) ModuleResult {
 	}
 	lease.Start(ctx)
 
+	// Registry -> router -> hub, in that order: the router resolves where a
+	// host's channel is, and the hub asks it to bring the data channel up.
+	router := NewChannelRouter(instanceID, registry, stores.Agent)
+	dataHub := NewDataHub(router)
+
 	handler, installScript := NewProtocolHandler(ctx, stores, deps.HostRegistrar,
 		NewTokenSigner(deps.EncryptionKey), NewSessionTokenSigner(deps.EncryptionKey),
-		registry, runManager)
+		registry, runManager, dataHub)
 
 	return ModuleResult{
 		ProtocolHandler:      handler,
 		InstallScriptHandler: installScript,
 		Registry:             registry,
 		Dispatcher:           runManager,
+		DataHub:              dataHub,
 	}
 }
 

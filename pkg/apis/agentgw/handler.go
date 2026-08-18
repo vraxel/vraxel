@@ -26,14 +26,15 @@ const AgentProtocolPathPrefix = agenttypes.ProtocolPathPrefix
 // the platform's IAM chain -- bearer credentials are validated inside each
 // route:
 //
-//   - POST /api/agent/v1/register        join token  -> agent token        (register.go)
-//   - GET  /api/agent/v1/channel          agent token -> WS control channel (channel.go)
-//   - GET  /api/agent/v1/binary/{os}/{arch}   unauthenticated              (assets.go)
-//   - GET  /install-agent.sh                  unauthenticated              (assets.go)
+//   - POST /api/agent/v1/register          join token    -> agent token        (register.go)
+//   - GET  /api/agent/v1/channel            agent token   -> WS control channel (channel.go)
+//   - GET  /api/agent/v1/data-channel       session token -> WS data channel    (datachannel.go)
+//   - GET  /api/agent/v1/binary/{os}/{arch}   unauthenticated                   (assets.go)
+//   - GET  /install-agent.sh                  unauthenticated                   (assets.go)
 //
-// data-channel / bundles / jobs / scrape-targets and the install script
-// arrive with later slices; everything else 404s. This file is only the
-// router plus the credentials/JSON helpers the routes share.
+// bundles / jobs / scrape-targets arrive with later slices; everything
+// else 404s. This file is only the router plus the credentials/JSON
+// helpers the routes share.
 type protocolHandler struct {
 	agents        gwstore.AgentStore
 	joinTokens    gwstore.JoinTokenStore
@@ -42,6 +43,7 @@ type protocolHandler struct {
 	sessionSigner *SessionTokenSigner
 	registry      *Registry
 	runManager    *RunManager
+	dataHub       *DataHub
 
 	// ctx bounds session goroutines to the server's lifetime. Sessions
 	// cannot use the request context: it stays alive only while ServeHTTP
@@ -62,7 +64,7 @@ type protocolHandler struct {
 // HTTP: the /api/agent/v1/ branch, and the install script that sits at
 // the root. They share one protocolHandler because the script has to
 // state the digests of the binaries the same instance serves.
-func NewProtocolHandler(ctx context.Context, stores gwstore.Stores, registrar HostRegistrar, signer *TokenSigner, sessionSigner *SessionTokenSigner, registry *Registry, runManager *RunManager) (protocol, installScript http.HandlerFunc) {
+func NewProtocolHandler(ctx context.Context, stores gwstore.Stores, registrar HostRegistrar, signer *TokenSigner, sessionSigner *SessionTokenSigner, registry *Registry, runManager *RunManager, dataHub *DataHub) (protocol, installScript http.HandlerFunc) {
 	h := &protocolHandler{
 		agents:        stores.Agent,
 		joinTokens:    stores.JoinToken,
@@ -71,6 +73,7 @@ func NewProtocolHandler(ctx context.Context, stores gwstore.Stores, registrar Ho
 		sessionSigner: sessionSigner,
 		registry:      registry,
 		runManager:    runManager,
+		dataHub:       dataHub,
 		ctx:           ctx,
 		binaryDir:     agentBinaryDir(),
 	}
@@ -84,6 +87,8 @@ func (h *protocolHandler) serve(w http.ResponseWriter, r *http.Request) {
 		h.handleRegister(w, r)
 	case rest == "channel":
 		h.handleChannel(w, r)
+	case rest == "data-channel":
+		h.handleDataChannel(w, r)
 	case strings.HasPrefix(rest, "binary/"):
 		h.handleBinary(w, r, strings.TrimPrefix(rest, "binary/"))
 	default:
