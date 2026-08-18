@@ -2,9 +2,9 @@
 // service on a managed machine, dials out to the server, and keeps a
 // control channel open.
 //
-// First-cut scope: registration, heartbeat and the control channel. Job
-// execution, data channels and metric scraping arrive in later slices,
-// once the server side exposes them.
+// Scope so far: registration, heartbeat, the control channel, and the
+// data channel that carries interactive streams. Job execution and metric
+// scraping arrive in later slices, once the server side exposes them.
 //
 // Outbound only. The agent listens on nothing, which is the whole point:
 // the platform can manage a host it cannot reach.
@@ -19,9 +19,11 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync/atomic"
 	"syscall"
 
 	"vraxel.io/vraxel/lib/agent/client"
+	"vraxel.io/vraxel/lib/agent/datachan"
 	"vraxel.io/vraxel/lib/agent/hostinfo"
 	"vraxel.io/vraxel/lib/agent/transport"
 	agenttypes "vraxel.io/vraxel/lib/agent/types"
@@ -81,6 +83,28 @@ func main() {
 		return
 	}
 
+	a := &agent{log: logger}
+	a.data = datachan.New(datachan.Config{
+		ServerURL: st.ServerURL,
+		Token:     a.sessionToken,
+		// An empty allowlist, which means any LOOPBACK port -- the
+		// loopback restriction itself is hard-coded in the guard and is
+		// not configurable. The operator-facing allowlist narrows it
+		// further and belongs to the slice that first opens a tcp stream:
+		// shipping the flag now would put a switch in --help that
+		// install-agent.sh cannot set, so the only way to use it would be
+		// to hand-edit a systemd unit the next install overwrites.
+		Guard: datachan.NewGuard(nil),
+		// Same trust store as every other outbound path; the data channel
+		// is a plain WSS handshake and has no reason to trust differently.
+		HTTPClient: httpClient,
+		Log:        logger,
+	})
+	// The root ctx, not the control-channel session ctx: a control-channel
+	// blip must not kill a terminal somebody is typing into. The data
+	// channel has its own reconnect, and it parks itself when idle.
+	go a.data.Run(ctx)
+
 	ch := &client.Channel{
 		// Re-read on every connect rather than captured once: resetting
 		// /etc/machine-id is what an operator does to a cloned host, and
@@ -91,7 +115,7 @@ func main() {
 		Version:     version,
 		Log:         logger,
 		HTTPClient:  httpClient,
-		OnFrame:     onFrame(logger),
+		OnFrame:     a.onFrame,
 	}
 
 	logger.Infof("vr-agent %s: agent %s, host %d, server %s", version, st.AgentID, st.HostID, st.ServerURL)
@@ -99,13 +123,48 @@ func main() {
 	logger.Infof("vr-agent: shutting down")
 }
 
-// onFrame handles server-pushed control frames. With only the control
-// slice live, no subsystem consumes a frame yet; logging each arrival is
-// what proves the channel is two-way. Later slices (jobs, data channel,
-// probes) route frames here to their owners.
-func onFrame(logger stdLogger) func(context.Context, agenttypes.Frame, client.SendFunc) {
-	return func(_ context.Context, f agenttypes.Frame, _ client.SendFunc) {
-		logger.Infof("vr-agent: control frame %s", f.Type)
+// agent owns the state the control channel's frames feed.
+type agent struct {
+	log  stdLogger
+	data *datachan.Channel
+
+	// token is the short-lived credential the server pushes over the
+	// control channel and renews for as long as it lives. Stored
+	// atomically because the frame loop writes it while the data
+	// channel's dialer reads it, on its own goroutine, per dial.
+	token atomic.Pointer[string]
+}
+
+// sessionToken returns the current credential, or "" before the first one
+// arrives. Empty is a real state, not an error: the data channel refuses
+// to dial without one and retries, which is what a reconnect looks like
+// from the inside.
+func (a *agent) sessionToken() string {
+	if p := a.token.Load(); p != nil {
+		return *p
+	}
+	return ""
+}
+
+// onFrame routes server-pushed control frames to their owners.
+func (a *agent) onFrame(_ context.Context, f agenttypes.Frame, _ client.SendFunc) {
+	switch f.Type {
+	case agenttypes.FrameTypeSessionToken:
+		tok := f.Token
+		// Only the first one is worth a line. The server renews on a timer
+		// for the life of the channel, and logging every renewal would bury
+		// the events an operator is actually reading this for.
+		if a.token.Swap(&tok) == nil {
+			a.log.Infof("vr-agent: session token received; the data channel can dial")
+		}
+	case agenttypes.FrameTypeChannelOpen:
+		// Carries no parameters: it only asks for the channel to be up.
+		// Ensure is idempotent, so a burst of concurrent openers on the
+		// server collapses into one dial here.
+		a.log.Infof("vr-agent: server asked for the data channel")
+		a.data.Ensure()
+	default:
+		a.log.Infof("vr-agent: control frame %s", f.Type)
 	}
 }
 
