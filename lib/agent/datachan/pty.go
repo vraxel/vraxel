@@ -8,6 +8,9 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"os/user"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -36,6 +39,66 @@ const (
 // that holds the human's WebSocket, not to a hardcoded constant that
 // would take a fleet upgrade to change.
 
+// serviceEnvPrefixes name variables that belong to the AGENT's service
+// manager, not to a person's shell. They leak in through os.Environ()
+// because the agent is a systemd unit, and a couple of them are not
+// merely noise: a program run in the terminal that speaks sd_notify would
+// report against the agent's own unit, and JOURNAL_STREAM changes how
+// systemd-aware tools log.
+//
+// A denylist rather than an allowlist so the system's own settings --
+// LANG and the LC_* that decide whether this terminal can render the
+// filenames on the machine, TZ, anything an operator put in
+// /etc/environment -- survive. An allowlist would have to guess at those,
+// and guessing wrong is silently mojibake.
+var serviceEnvPrefixes = []string{
+	"NOTIFY_SOCKET=",
+	"LISTEN_FDS=",
+	"LISTEN_PID=",
+	"LISTEN_FDNAMES=",
+	"JOURNAL_STREAM=",
+	"INVOCATION_ID=",
+	"MANAGERPID=",
+	"SYSTEMD_EXEC_PID=",
+}
+
+// loginEnv is the environment a login session gets: what the system set,
+// minus what belongs to the agent's unit, plus the identity variables a
+// shell and everything under it read.
+//
+// HOME especially: without it a shell falls back to the passwd entry for
+// some things and to "/" for others, so a stray `cd` or a tool writing a
+// dotfile lands somewhere nobody expects.
+func loginEnv(me *user.User) []string {
+	env := make([]string, 0, len(os.Environ())+5)
+	for _, kv := range os.Environ() {
+		if hasAnyPrefix(kv, serviceEnvPrefixes) {
+			continue
+		}
+		env = append(env, kv)
+	}
+	// TERM last-wins over anything inherited: this terminal is an xterm on
+	// the viewer's side whatever the agent was started under.
+	env = append(env, "TERM=xterm-256color")
+	if me != nil {
+		env = append(env,
+			"HOME="+me.HomeDir,
+			"USER="+me.Username,
+			"LOGNAME="+me.Username,
+		)
+	}
+	return env
+}
+
+func hasAnyPrefix(s string, prefixes []string) bool {
+	for _, p := range prefixes {
+		if strings.HasPrefix(s, p) {
+			return true
+		}
+	}
+	return false
+}
+
 // servePTY forks a process under a PTY and bridges it to the stream.
 //
 // Only the web terminal (design §5.2) uses this, because only it needs a
@@ -53,8 +116,35 @@ func (c *Channel) servePTY(ctx context.Context, stream net.Conn, open agenttypes
 	defer cancel()
 
 	cmd := exec.CommandContext(ptyCtx, argv[0], argv[1:]...)
+	// Fails on a machine whose uid has no passwd entry, which a minimal
+	// container image can produce. Then there is no home to start in and
+	// no name to set, so the shell gets what it would have got before --
+	// said out loud, because otherwise it is a terminal that silently
+	// opens in the wrong place.
+	me, err := user.Current()
+	if err != nil {
+		c.cfg.Log.Warnf("data channel: cannot resolve the current user (%v); "+
+			"the terminal will start in the agent's directory", err)
+	}
+
 	cmd.Dir = open.Dir
-	cmd.Env = append(os.Environ(), "TERM=xterm-256color")
+	if cmd.Dir == "" && me != nil {
+		// Where a login puts you. Without this the shell inherits the
+		// AGENT's working directory, which is wherever its unit file says
+		// -- an install path nobody means to be standing in.
+		cmd.Dir = me.HomeDir
+	}
+	cmd.Env = loginEnv(me)
+
+	// A login shell, the way sshd starts one: argv[0] prefixed with '-'.
+	// That is the only signal a shell has, and it is what makes
+	// /etc/profile and ~/.profile run -- which is where PATH gets the
+	// entries every other tool on the machine assumes. Only for the
+	// default shell: a caller that named a command asked for that
+	// command, not for a login.
+	if len(open.Command) == 0 {
+		cmd.Args[0] = "-" + filepath.Base(argv[0])
+	}
 
 	size := &pty.Winsize{Cols: open.Cols, Rows: open.Rows}
 	if size.Cols == 0 {
@@ -64,9 +154,9 @@ func (c *Channel) servePTY(ctx context.Context, stream net.Conn, open agenttypes
 		size.Rows = 24
 	}
 
-	f, err := pty.StartWithSize(cmd, size)
-	if err != nil {
-		reject(stream, agenttypes.StreamErrOpFailed, err.Error())
+	f, startErr := pty.StartWithSize(cmd, size)
+	if startErr != nil {
+		reject(stream, agenttypes.StreamErrOpFailed, startErr.Error())
 		return
 	}
 	defer func() { _ = f.Close() }()
