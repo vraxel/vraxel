@@ -237,9 +237,10 @@ SET host_id    = @to_host_id,
 WHERE host_id = @from_host_id
 RETURNING *;
 
--- name: RecordHostAgentForeignMachine :exec
+-- name: RecordHostAgentForeignMachine :one
 -- Records that a machine presented this host's credential and was refused
--- for not being the machine it was issued to.
+-- for not being the machine it was issued to, and reports whether that is
+-- news.
 --
 -- Written on every refused attempt rather than only the first: the agent
 -- retries forever, and the timestamp is what tells an operator whether
@@ -247,11 +248,31 @@ RETURNING *;
 -- caller's uuid is stored because the row's own product_uuid answers only
 -- the other half of "which machine is this".
 --
+-- But the UI reads the timestamp as a boolean -- a banner and a badge,
+-- neither of which renders the value -- so every attempt after the first
+-- redraws nothing. Announcing each one anyway would fan a notify out to
+-- every watcher in scope, and every open browser would refetch the host
+-- list, roughly twice a minute per stuck host, forever. That is not a
+-- corner case: a firmware or hypervisor upgrade can refuse a whole fleet
+-- at once, which is the scenario this column exists for. So the boolean
+-- says whether the state actually changed, and only then is anyone told.
+--
+-- prev is a CTE rather than a second statement because a CTE reads the
+-- pre-UPDATE snapshot, which a RETURNING clause on the same row cannot.
+--
 -- Deliberately does NOT touch status. The host is offline because no
 -- channel is up, which the stale sweep already records; overwriting it
 -- here would race the sweep for no gain.
+WITH prev AS (
+    SELECT foreign_machine_at, foreign_machine_uuid
+    FROM host_agents
+    WHERE host_id = @host_id
+)
 UPDATE host_agents
 SET foreign_machine_at   = now(),
     foreign_machine_uuid = @foreign_machine_uuid,
     updated_at           = now()
-WHERE host_id = @host_id;
+FROM prev
+WHERE host_agents.host_id = @host_id
+RETURNING prev.foreign_machine_at IS NULL
+       OR prev.foreign_machine_uuid IS DISTINCT FROM @foreign_machine_uuid AS changed;

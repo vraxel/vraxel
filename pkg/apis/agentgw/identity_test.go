@@ -392,3 +392,30 @@ func TestAdmittedMachineRecordsNothing(t *testing.T) {
 		t.Fatalf("a legitimate machine recorded %d refusals", len(store.foreign))
 	}
 }
+
+// TestEveryRefusalIsRecorded keeps the write on the retry path.
+//
+// A refused agent reconnects forever, and the timestamp is what answers
+// "is this happening now, or is it a resolved episode still on screen".
+// Recording only the first attempt would freeze that answer at whenever
+// the machine was first turned away, which for a host refused for hours
+// reads as a problem from hours ago that nobody need act on. The notify
+// fan-out is what gets suppressed on repeats, in the store, not the write.
+func TestEveryRefusalIsRecorded(t *testing.T) {
+	store := &fakeAgentStore{}
+	h := &protocolHandler{agents: store}
+	r := row(7, "agent-12", uuidNode12, sharedMachineID, nil)
+	hello := &agenttypes.Frame{Fingerprint: agenttypes.MachineFingerprint{
+		ProductUUID: uuidNode15, MachineID: sharedMachineID,
+	}}
+
+	for i := range 3 {
+		if h.verifyMachine(context.Background(), &r, hello) {
+			t.Fatalf("attempt %d admitted a foreign machine", i+1)
+		}
+	}
+
+	if got := len(store.foreignCalls()); got != 3 {
+		t.Fatalf("refusals recorded = %d, want 3; a retried refusal stops refreshing its timestamp", got)
+	}
+}

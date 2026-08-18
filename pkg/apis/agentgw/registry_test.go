@@ -83,6 +83,12 @@ func (f *fakeAgentStore) RecordForeignMachine(_ context.Context, hostID int64, u
 	f.foreign = append(f.foreign, foreignCall{hostID: hostID, uuid: uuid})
 	return nil
 }
+
+func (f *fakeAgentStore) foreignCalls() []foreignCall {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]foreignCall(nil), f.foreign...)
+}
 func (f *fakeAgentStore) GetByAgentID(context.Context, string) (*gwstore.AgentRow, error) {
 	return nil, nil
 }
