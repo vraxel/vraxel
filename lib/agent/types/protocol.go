@@ -322,8 +322,15 @@ type RegisterRequest struct {
 }
 
 // MachineFingerprint is the evidence a machine offers about which machine
-// it is. See the 20260814075808 migration for why the fields are split
-// into those a disk image carries and those it cannot.
+// it is.
+//
+// The fields divide by where they are stored, not by how much they are
+// trusted. A disk image carries some of them into every copy of itself
+// (machine-id, rootfs UUID); it cannot carry the rest, because the
+// hypervisor or the board assigns those per machine (the SMBIOS UUID,
+// MAC addresses). Only the second kind may claim an existing host row.
+// Weighting them together instead would let a clone's inherited signals
+// outvote the one signal that tells it apart from its source.
 type MachineFingerprint struct {
 	// MachineID is /etc/machine-id. Carried here as well as at the top
 	// level of RegisterRequest (where it predates this struct) because
