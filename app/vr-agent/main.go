@@ -25,6 +25,7 @@ import (
 	"vraxel.io/vraxel/lib/agent/client"
 	"vraxel.io/vraxel/lib/agent/datachan"
 	"vraxel.io/vraxel/lib/agent/hostinfo"
+	"vraxel.io/vraxel/lib/agent/nodemetrics"
 	"vraxel.io/vraxel/lib/agent/transport"
 	agenttypes "vraxel.io/vraxel/lib/agent/types"
 	"vraxel.io/vraxel/lib/buildinfo"
@@ -84,9 +85,16 @@ func main() {
 	}
 
 	a := &agent{log: logger}
+	// The collector starts before anything can ask it a question, because
+	// its first useful answer is two samples away and the clock on that
+	// starts here.
+	metrics := nodemetrics.New(nodemetrics.Config{Log: logger})
+	go metrics.Run(ctx)
+
 	a.data = datachan.New(datachan.Config{
 		ServerURL: st.ServerURL,
 		Token:     a.sessionToken,
+		Metrics:   metrics,
 		// An empty allowlist, which means any LOOPBACK port -- the
 		// loopback restriction itself is hard-coded in the guard and is
 		// not configurable. The operator-facing allowlist narrows it
@@ -109,13 +117,14 @@ func main() {
 		// Re-read on every connect rather than captured once: resetting
 		// /etc/machine-id is what an operator does to a cloned host, and
 		// the server only learns it happened if the next hello says so.
-		Fingerprint: func() agenttypes.MachineFingerprint { return hostinfo.Collect().Fingerprint() },
-		ServerURL:   st.ServerURL,
-		AgentToken:  func() string { return st.AgentToken },
-		Version:     version,
-		Log:         logger,
-		HTTPClient:  httpClient,
-		OnFrame:     a.onFrame,
+		Fingerprint:    func() agenttypes.MachineFingerprint { return hostinfo.Collect().Fingerprint() },
+		ServerURL:      st.ServerURL,
+		AgentToken:     func() string { return st.AgentToken },
+		Version:        version,
+		Log:            logger,
+		HTTPClient:     httpClient,
+		OnFrame:        a.onFrame,
+		MetricsSummary: metrics.Summary,
 	}
 
 	logger.Infof("vr-agent %s: agent %s, host %d, server %s", version, st.AgentID, st.HostID, st.ServerURL)

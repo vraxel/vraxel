@@ -72,6 +72,10 @@ type Config struct {
 	// Shell is the login shell for pty streams with no explicit command.
 	// Defaults to /bin/bash, falling back to /bin/sh.
 	Shell string
+	// Metrics answers metrics streams. Nil means the host does not
+	// collect (non-Linux, or the collector failed to start), and every
+	// metrics stream is rejected with a message saying so.
+	Metrics MetricsQuerier
 	// Log receives connection lifecycle messages.
 	Log Logger
 }
@@ -263,6 +267,8 @@ func (c *Channel) serve(ctx context.Context, stream net.Conn) {
 		c.serveExec(ctx, stream, open)
 	case agenttypes.StreamKindFile:
 		c.serveFile(ctx, stream, open)
+	case agenttypes.StreamKindMetrics:
+		c.serveMetrics(ctx, stream, open)
 	default:
 		reject(stream, agenttypes.StreamErrUnknownKind, "unknown stream kind "+open.Kind)
 	}

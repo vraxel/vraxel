@@ -37,6 +37,17 @@ const (
 	StreamKindExec = "exec"
 	// StreamKindFile runs local filesystem operations.
 	StreamKindFile = "file"
+	// StreamKindMetrics answers a windowed, downsampled read of the
+	// agent's in-memory metric history. Unlike every other kind it is a
+	// request/response, not a session: the gateway sends the window in
+	// the header, the agent writes one JSON MetricsResult and closes.
+	//
+	// It rides the data channel rather than the control channel because
+	// a 24h answer is hundreds of kilobytes and the control channel
+	// carries instructions only (MaxFrameBytes). It is a stream rather
+	// than an HTTP endpoint on the agent because the agent listens on
+	// nothing -- the data channel is the only way in.
+	StreamKindMetrics = "metrics"
 )
 
 // MaxStreamHeaderBytes caps the opening header of a stream. The header is
@@ -95,6 +106,19 @@ type StreamOpen struct {
 	// Offset / Length window a read op; zero Length means "to EOF".
 	Offset int64 `json:"offset,omitempty"`
 	Length int64 `json:"length,omitempty"`
+
+	// --- metrics ---
+	// FromMs / ToMs are the half-open window [FromMs, ToMs), and StepSec
+	// is the requested bucket width. The agent snaps StepSec UP to a
+	// resolution it actually holds and reports what it used, so the
+	// caller never has to know which tiers exist.
+	FromMs  int64 `json:"fromMs,omitempty"`
+	ToMs    int64 `json:"toMs,omitempty"`
+	StepSec int   `json:"stepSec,omitempty"`
+	// Series selects chart series by name (the Series* constants). Empty
+	// means every series the agent holds -- which is what the host detail
+	// page asks for, since it draws all of them at once.
+	Series []string `json:"series,omitempty"`
 }
 
 // StreamAccept is the agent's answer to StreamOpen. A stream is only

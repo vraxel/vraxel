@@ -121,12 +121,27 @@ type Frame struct {
 	// ClockUnixMs is the agent's wall clock at send time. The server
 	// diffs it against its own to maintain host_agents.clock_skew_ms;
 	// a drifting host clock corrupts metric timestamps.
-	//
-	// The heartbeat carries no utilisation payload on purpose: liveness
-	// is the frame arriving, and every host utilisation series comes from
-	// node_exporter (scraped in Step 11), so an agent-side /proc sample
-	// would have no consumer and would risk colliding with node_* names.
 	ClockUnixMs int64 `json:"clockUnixMs,omitempty"`
+
+	// Metrics is the current-utilisation snapshot, when the agent's
+	// built-in collector is running. Nil otherwise, and nil until the
+	// collector has two samples to derive rates from.
+	//
+	// This field once did not exist, on the reasoning that liveness is
+	// the frame arriving and that every utilisation number comes from
+	// node_exporter. Both halves stopped holding: the collector reads
+	// /proc directly so no exporter has to be installed first, and the
+	// host LIST has to sort and filter on these numbers, which is the one
+	// thing a per-host on-demand read cannot serve. Historical series
+	// still do not ride the heartbeat -- they stay in the agent's ring
+	// buffer and are read over the data channel when somebody opens a
+	// chart. This carries nine numbers, roughly 200 bytes a beat.
+	//
+	// It is NOT a series and must not become one: the server keeps one
+	// row per host and overwrites it. A heartbeat is also not an event
+	// worth publishing -- at one beat per host per 15s, notifying
+	// watchers here would flood every open page forever.
+	Metrics *MetricsSummary `json:"metrics,omitempty"`
 
 	// --- job.dispatch ---
 	// Job carries the work order. Bulky material (bundle, vars) moves over
