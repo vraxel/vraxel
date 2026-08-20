@@ -343,6 +343,7 @@ func (h *protocolHandler) handleFrame(ctx context.Context, sess *Session, f *age
 		}
 		h.touch(ctx, sess, skew)
 		h.recordMetrics(ctx, sess, f.Metrics)
+		h.alerts.Evaluate(ctx, sess.HostID, f.Metrics)
 	case agenttypes.FrameTypeHello:
 		// A second hello on an established channel is harmless; treat it
 		// as a heartbeat so a reconnect-confused agent still stays fresh.

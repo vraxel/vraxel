@@ -2,6 +2,7 @@ import { Navigate, type RouteObject } from "react-router"
 import HostListPage from "./hosts/list"
 import HostDetailPage from "./hosts/detail"
 import HostOnboardPage from "./hosts/onboard"
+import AlertRuleListPage from "./alert-rules/list"
 
 // Every resource declared in NAV_ITEMS with workspace / namespace scopes
 // must be routable at all three depths: buildScopedPath turns the scope
@@ -17,6 +18,7 @@ const hostRoutes = (prefix: string): RouteObject[] => [
   { path: `${prefix}hosts`, element: <HostListPage /> },
   { path: `${prefix}hosts/onboard`, element: <HostOnboardPage /> },
   { path: `${prefix}hosts/:hostId`, element: <HostDetailPage /> },
+  { path: `${prefix}host-alert-rules`, element: <AlertRuleListPage /> },
 ]
 
 export const computeRoutes: RouteObject[] = [

@@ -63,6 +63,10 @@ type ModuleResult struct {
 type Deps struct {
 	// HostRegistrar is the host module's hosts-row writer.
 	HostRegistrar HostRegistrar
+	// HostScopes resolves a host's tenancy for the alert evaluator, so a
+	// workspace rule stays inside its workspace. Same seam as
+	// HostRegistrar: compute implements it, agentgw consumes it.
+	HostScopes HostScopes
 	// JoinTokens is shared with the host module's agent-join-tokens
 	// resource, so the assembly layer builds it once (NewJoinTokenStore)
 	// and passes the same instance to both.
@@ -126,6 +130,9 @@ func NewModule(ctx context.Context, database *db.DB, deps Deps) ModuleResult {
 		if err := stores.Agent.MarkStaleOffline(tickCtx, agentStaleAfter); err != nil {
 			logger.Warnf("agentgw: sweep stale agents: %v", err)
 		}
+		if err := stores.Alert.SweepDisabled(tickCtx); err != nil {
+			logger.Warnf("agentgw: sweep disabled alert states: %v", err)
+		}
 	}
 	lease.Start(ctx)
 
@@ -136,7 +143,7 @@ func NewModule(ctx context.Context, database *db.DB, deps Deps) ModuleResult {
 
 	handler, installScript := NewProtocolHandler(ctx, stores, deps.HostRegistrar,
 		NewTokenSigner(deps.EncryptionKey), NewSessionTokenSigner(deps.EncryptionKey),
-		registry, runManager, dataHub)
+		registry, runManager, dataHub, newAlertEvaluator(stores.Alert, deps.HostScopes))
 
 	return ModuleResult{
 		ProtocolHandler:      handler,

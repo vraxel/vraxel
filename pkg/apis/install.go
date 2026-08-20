@@ -85,6 +85,7 @@ func NewModules(ctx context.Context, database *db.DB, listenAddr string) Result 
 	// Not a REST module; its handler is mounted by main ahead of IAM.
 	agentgwResult := agentgw.NewModule(ctx, database, agentgw.Deps{
 		HostRegistrar: compute.NewAgentHostRegistrar(database),
+		HostScopes:    compute.NewHostScopes(database),
 		JoinTokens:    agentgw.NewJoinTokenStore(database),
 		EncryptionKey: pkiResult.EncryptionKey,
 		ServerName:    config.Get().Server.Name,
