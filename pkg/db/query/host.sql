@@ -55,12 +55,24 @@ SELECT h.*,
     -- operator needs to know about is often the one their current filter
     -- hides.
     (SELECT count(*) FROM host_agents s
-      WHERE s.machine_id <> '' AND s.machine_id = a.machine_id) AS image_group_size
+      WHERE s.machine_id <> '' AND s.machine_id = a.machine_id) AS image_group_size,
+    m.sampled_at     AS metrics_sampled_at,
+    m.cpu_used_pct   AS metrics_cpu_used_pct,
+    m.mem_used_pct   AS metrics_mem_used_pct,
+    m.disk_used_pct  AS metrics_disk_used_pct,
+    m.disk_used_path AS metrics_disk_used_path,
+    m.load1          AS metrics_load1,
+    m.load5          AS metrics_load5,
+    m.load15         AS metrics_load15,
+    m.net_rx_bps     AS metrics_net_rx_bps,
+    m.net_tx_bps     AS metrics_net_tx_bps,
+    m.cpu_trend      AS metrics_cpu_trend
 FROM hosts h
 LEFT JOIN users u ON u.id = h.created_by
 LEFT JOIN workspaces w ON w.id = h.workspace_id
 LEFT JOIN namespaces ns ON ns.id = h.namespace_id
 LEFT JOIN host_agents a ON a.host_id = h.id
+LEFT JOIN host_metrics_latest m ON m.host_id = h.id
 WHERE h.id = @id
   AND (sqlc.narg('workspace_id_filter')::BIGINT IS NULL OR h.workspace_id IS NOT DISTINCT FROM sqlc.narg('workspace_id_filter')::BIGINT)
   AND (sqlc.narg('namespace_id_filter')::BIGINT IS NULL OR h.namespace_id IS NOT DISTINCT FROM sqlc.narg('namespace_id_filter')::BIGINT);
@@ -115,12 +127,24 @@ SELECT h.*,
     -- operator needs to know about is often the one their current filter
     -- hides.
     (SELECT count(*) FROM host_agents s
-      WHERE s.machine_id <> '' AND s.machine_id = a.machine_id) AS image_group_size
+      WHERE s.machine_id <> '' AND s.machine_id = a.machine_id) AS image_group_size,
+    m.sampled_at     AS metrics_sampled_at,
+    m.cpu_used_pct   AS metrics_cpu_used_pct,
+    m.mem_used_pct   AS metrics_mem_used_pct,
+    m.disk_used_pct  AS metrics_disk_used_pct,
+    m.disk_used_path AS metrics_disk_used_path,
+    m.load1          AS metrics_load1,
+    m.load5          AS metrics_load5,
+    m.load15         AS metrics_load15,
+    m.net_rx_bps     AS metrics_net_rx_bps,
+    m.net_tx_bps     AS metrics_net_tx_bps,
+    m.cpu_trend      AS metrics_cpu_trend
 FROM hosts h
 LEFT JOIN users u ON u.id = h.created_by
 LEFT JOIN workspaces w ON w.id = h.workspace_id
 LEFT JOIN namespaces ns ON ns.id = h.namespace_id
 LEFT JOIN host_agents a ON a.host_id = h.id
+LEFT JOIN host_metrics_latest m ON m.host_id = h.id
 WHERE (sqlc.narg('scope')::VARCHAR IS NULL OR h.scope = ANY(string_to_array(sqlc.narg('scope')::VARCHAR, ',')))
   AND (sqlc.narg('workspace_id')::BIGINT IS NULL OR h.workspace_id = sqlc.narg('workspace_id'))
   AND (sqlc.narg('namespace_id')::BIGINT IS NULL OR h.namespace_id = sqlc.narg('namespace_id'))
@@ -151,6 +175,16 @@ ORDER BY
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'os' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN h.os END DESC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'cpu_cores' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN h.cpu_cores END ASC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'cpu_cores' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN h.cpu_cores END DESC,
+    -- Metric sorts keep agentless hosts (NULL) at the bottom in BOTH
+    -- directions: "most loaded first" must not open with a page of
+    -- hosts that reported nothing. ASC gets that from PG's default;
+    -- DESC needs it said.
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'cpu_used_pct' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN m.cpu_used_pct END ASC,
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'cpu_used_pct' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN m.cpu_used_pct END DESC NULLS LAST,
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'mem_used_pct' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN m.mem_used_pct END ASC,
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'mem_used_pct' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN m.mem_used_pct END DESC NULLS LAST,
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'disk_used_pct' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN m.disk_used_pct END ASC,
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'disk_used_pct' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN m.disk_used_pct END DESC NULLS LAST,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'organization' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN COALESCE(NULLIF(w.display_name, ''), w.name, '') END ASC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'organization' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN COALESCE(NULLIF(ns.display_name, ''), ns.name, '') END ASC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'organization' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN COALESCE(NULLIF(w.display_name, ''), w.name, '') END DESC,

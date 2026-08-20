@@ -2,6 +2,7 @@ package agentgw
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -341,6 +342,7 @@ func (h *protocolHandler) handleFrame(ctx context.Context, sess *Session, f *age
 				sess.AgentID, skew, clockSkewWarnMs)
 		}
 		h.touch(ctx, sess, skew)
+		h.recordMetrics(ctx, sess, f.Metrics)
 	case agenttypes.FrameTypeHello:
 		// A second hello on an established channel is harmless; treat it
 		// as a heartbeat so a reconnect-confused agent still stays fresh.
@@ -378,6 +380,42 @@ func WriteFrame(ctx context.Context, conn *ws.Conn, f agenttypes.Frame) error {
 
 // frameWriteTimeout bounds one control-frame write.
 const frameWriteTimeout = 10 * time.Second
+
+// recordMetrics persists a heartbeat's utilisation snapshot. Nil is the
+// ordinary case for the first beat after an agent starts (the collector
+// needs two samples) and for agents that predate the field, so it is
+// not an event, let alone an error. A failed write costs nothing but
+// staleness the next beat repairs, so it is logged and swallowed --
+// utilisation display must never be able to take a control channel down.
+func (h *protocolHandler) recordMetrics(ctx context.Context, sess *Session, m *agenttypes.MetricsSummary) {
+	if m == nil {
+		return
+	}
+	// A nil trend must become [] before Marshal, which would otherwise
+	// render it as JSON null -- valid jsonb, but a second spelling of
+	// "no buckets" every reader would have to know about.
+	trend := []byte("[]")
+	if len(m.CPUTrend) > 0 {
+		if b, err := json.Marshal(m.CPUTrend); err == nil {
+			trend = b
+		}
+	}
+	if err := h.agents.UpsertMetrics(ctx, sess.HostID, gwstore.MetricsInput{
+		SampledAt:    time.UnixMilli(m.SampledAtMs),
+		CPUUsedPct:   m.CPUUsedPct,
+		MemUsedPct:   m.MemUsedPct,
+		DiskUsedPct:  m.DiskUsedPct,
+		DiskUsedPath: m.DiskUsedPath,
+		Load1:        m.Load1,
+		Load5:        m.Load5,
+		Load15:       m.Load15,
+		NetRxBps:     m.NetRxBps,
+		NetTxBps:     m.NetTxBps,
+		CPUTrend:     trend,
+	}); err != nil {
+		logger.Warnf("agentgw: record metrics for host %d: %v", sess.HostID, err)
+	}
+}
 
 // clockSkew returns agentClock - serverClock in milliseconds at the moment
 // the frame is processed. It therefore INCLUDES one-way network latency

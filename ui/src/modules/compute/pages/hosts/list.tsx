@@ -27,6 +27,11 @@ import { hostsApi } from "@/modules/compute/api/hosts"
 import type { Host } from "@/modules/compute/api/types"
 import { hostsDef } from "@/modules/compute/defs"
 import { AgentStatusBadge } from "@/modules/compute/components/agent-status-badge"
+import {
+  HostCpuCell,
+  HostDiskCell,
+  HostMemCell,
+} from "@/modules/compute/components/host-metrics-cells"
 import { HostEditDialog } from "@/modules/compute/components/host-edit-dialog"
 import { HostTerminalDialog } from "@/modules/compute/components/host-terminal-dialog"
 import { useHostWatch } from "@/modules/compute/use-host-watch"
@@ -54,6 +59,11 @@ export default function HostListPage() {
     api: hostsApi,
     scope,
     filterKeys: ["agent_status", "scope", "origin"],
+    // The utilisation columns change every heartbeat, and the watch
+    // stream deliberately says nothing about that (state transitions
+    // only, so per-beat churn cannot flood watchers). Two beats is a
+    // reasonable freshness for numbers a human is glancing at.
+    refetchIntervalMs: 30_000,
   })
   useHostWatch(scope)
 
@@ -177,6 +187,27 @@ export default function HostListPage() {
             : t("compute.host.originManual")}
         </span>
       ),
+    },
+    {
+      key: "cpu",
+      header: t("compute.host.cpu"),
+      sortable: true,
+      sortKey: "cpu_used_pct",
+      cell: (h) => <HostCpuCell spec={h.spec} />,
+    },
+    {
+      key: "memory",
+      header: t("compute.host.memory"),
+      sortable: true,
+      sortKey: "mem_used_pct",
+      cell: (h) => <HostMemCell spec={h.spec} />,
+    },
+    {
+      key: "disk",
+      header: t("compute.host.disk"),
+      sortable: true,
+      sortKey: "disk_used_pct",
+      cell: (h) => <HostDiskCell spec={h.spec} />,
     },
     {
       key: "createdAt",

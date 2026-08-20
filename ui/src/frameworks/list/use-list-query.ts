@@ -39,6 +39,14 @@ export interface UseListQueryOptions<T> {
   extraParams?: Record<string, string | number | boolean | undefined>
   /** When false, the list query does not run (e.g. gated behind a permission). */
   enabled?: boolean
+  /**
+   * Poll the list at this interval. For lists whose rows carry values
+   * that change while nobody edits anything (host utilisation, from the
+   * agents' heartbeats): the watch stream only fires on state
+   * transitions -- deliberately, so per-heartbeat churn cannot flood
+   * watchers -- so freshness for these values comes from polling.
+   */
+  refetchIntervalMs?: number
 }
 
 /**
@@ -66,6 +74,7 @@ export function useListQuery<T extends ListRow>(opts: UseListQueryOptions<T>) {
     defaultPageSize = 20,
     extraParams,
     enabled = true,
+    refetchIntervalMs,
   } = opts
   const filterKeys = filterSpecs.map((f) => (typeof f === "string" ? f : f.key))
   // filterSpecs is a fresh array literal on every caller render; key the
@@ -207,6 +216,7 @@ export function useListQuery<T extends ListRow>(opts: UseListQueryOptions<T>) {
     queryFn: () => api.list(scope, params),
     enabled,
     placeholderData: keepPreviousData,
+    refetchInterval: refetchIntervalMs,
   })
   const rows = useMemo(() => query.data?.items ?? [], [query.data])
   const totalCount = query.data?.totalCount ?? 0

@@ -1,6 +1,7 @@
 package compute
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -229,6 +230,21 @@ func hostToAPI(r *modstore.HostRow) Host {
 	}
 	if r.AgentForeignMachineUuid != nil {
 		h.Spec.AgentForeignMachineUuid = *r.AgentForeignMachineUuid
+	}
+	h.Spec.MetricsSampledAt = r.MetricsSampledAt
+	h.Spec.CPUUsedPct = r.CPUUsedPct
+	h.Spec.MemUsedPct = r.MemUsedPct
+	h.Spec.DiskUsedPct = r.DiskUsedPct
+	h.Spec.DiskUsedPath = r.DiskUsedPath
+	h.Spec.Load1, h.Spec.Load5, h.Spec.Load15 = r.Load1, r.Load5, r.Load15
+	h.Spec.NetRxBps, h.Spec.NetTxBps = r.NetRxBps, r.NetTxBps
+	// The trend travelled as JSON from the agent's heartbeat into jsonb
+	// and comes out as JSON again; this decode exists only because the
+	// API type is a concrete array for the schema generators. A mangled
+	// value (impossible short of hand-edited rows) degrades to no
+	// sparkline rather than to a failed host list.
+	if len(r.CPUTrend) > 0 {
+		_ = json.Unmarshal(r.CPUTrend, &h.Spec.CPUTrend)
 	}
 	return h
 }
