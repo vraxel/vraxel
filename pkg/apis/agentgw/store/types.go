@@ -71,6 +71,26 @@ type FingerprintInput struct {
 	BootAt      *time.Time
 }
 
+// MetricsInput is one heartbeat's utilisation snapshot, ready to store.
+// SampledAt is the agent's clock, kept on purpose: readers derive
+// staleness from it, so a host with a broken clock reads as stale
+// rather than as fresh numbers that are wrong. CPUTrend is the
+// sparkline as raw JSON (numbers and nulls), stored and served without
+// the server ever interpreting a bucket.
+type MetricsInput struct {
+	SampledAt    time.Time
+	CPUUsedPct   float64
+	MemUsedPct   float64
+	DiskUsedPct  float64
+	DiskUsedPath string
+	Load1        float64
+	Load5        float64
+	Load15       float64
+	NetRxBps     float64
+	NetTxBps     float64
+	CPUTrend     []byte
+}
+
 // BindInput is one machine claiming one host row.
 type BindInput struct {
 	HostID  int64

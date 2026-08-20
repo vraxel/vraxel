@@ -91,6 +91,34 @@ export interface HostSpec {
    * 0 or 1 is the ordinary answer and the UI says nothing.
    */
   imageGroupSize?: number /* int64 */;
+  /**
+   * --- latest utilisation, read-only ---
+   * From the agent's most recent heartbeat: one overwritten snapshot,
+   * not a series. Pointers because absence is a state -- a host whose
+   * agent has never reported shows "-", not a plausible-looking 0%.
+   * MetricsSampledAt is the AGENT's clock; the UI greys values whose
+   * age exceeds a couple of beats rather than trusting them fresh.
+   */
+  metricsSampledAt?: string;
+  cpuUsedPct?: number /* float64 */;
+  memUsedPct?: number /* float64 */;
+  diskUsedPct?: number /* float64 */;
+  /**
+   * DiskUsedPath names the mountpoint DiskUsedPct describes -- the
+   * fullest real filesystem, not necessarily /.
+   */
+  diskUsedPath?: string;
+  load1?: number /* float64 */;
+  load5?: number /* float64 */;
+  load15?: number /* float64 */;
+  netRxBps?: number /* float64 */;
+  netTxBps?: number /* float64 */;
+  /**
+   * CPUTrend is the list sparkline: CPU used % over roughly the last
+   * 24h in 48 half-hour buckets, oldest first; null entries are buckets
+   * the agent holds nothing for.
+   */
+  cpuTrend?: (number /* float64 */ | undefined)[];
 }
 /**
  * Host is a managed machine.

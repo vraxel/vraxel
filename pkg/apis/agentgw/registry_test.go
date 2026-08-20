@@ -35,6 +35,7 @@ type fakeAgentStore struct {
 	orphans []time.Duration
 	stale   []time.Duration
 	foreign []foreignCall
+	metrics []metricsCall
 	// touchLost makes Touch report that the row belongs to somebody else,
 	// which is what drives the re-claim path.
 	touchLost bool
@@ -81,6 +82,18 @@ func (f *fakeAgentStore) RecordForeignMachine(_ context.Context, hostID int64, u
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.foreign = append(f.foreign, foreignCall{hostID: hostID, uuid: uuid})
+	return nil
+}
+
+type metricsCall struct {
+	hostID int64
+	in     gwstore.MetricsInput
+}
+
+func (f *fakeAgentStore) UpsertMetrics(_ context.Context, hostID int64, in gwstore.MetricsInput) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.metrics = append(f.metrics, metricsCall{hostID: hostID, in: in})
 	return nil
 }
 

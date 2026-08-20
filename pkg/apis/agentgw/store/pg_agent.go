@@ -367,6 +367,35 @@ func (s *pgAgentStore) MarkOffline(ctx context.Context, hostID int64, instanceID
 	return nil
 }
 
+// UpsertMetrics overwrites the host's latest snapshot. Deliberately no
+// hostevent publish: this fires once per host per heartbeat, and the
+// notify-per-write pattern is exactly what flooded watchers in the
+// foreign-machine retry loop. Readers poll on their own cadence.
+func (s *pgAgentStore) UpsertMetrics(ctx context.Context, hostID int64, in MetricsInput) error {
+	trend := in.CPUTrend
+	if len(trend) == 0 {
+		trend = []byte("[]")
+	}
+	err := s.Q().UpsertHostMetricsLatest(ctx, generated.UpsertHostMetricsLatestParams{
+		HostID:       hostID,
+		SampledAt:    in.SampledAt,
+		CpuUsedPct:   float32(in.CPUUsedPct),
+		MemUsedPct:   float32(in.MemUsedPct),
+		DiskUsedPct:  float32(in.DiskUsedPct),
+		DiskUsedPath: in.DiskUsedPath,
+		Load1:        float32(in.Load1),
+		Load5:        float32(in.Load5),
+		Load15:       float32(in.Load15),
+		NetRxBps:     float32(in.NetRxBps),
+		NetTxBps:     float32(in.NetTxBps),
+		CpuTrend:     trend,
+	})
+	if err != nil {
+		return fmt.Errorf("upsert host metrics: %w", err)
+	}
+	return nil
+}
+
 func (s *pgAgentStore) MarkOrphansOffline(ctx context.Context, staleAfter time.Duration) error {
 	hostIDs, err := s.Q().MarkOrphanedHostAgentsOffline(ctx, staleAfter.Seconds())
 	if err != nil {

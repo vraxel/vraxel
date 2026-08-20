@@ -7,6 +7,7 @@ package generated
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -184,12 +185,24 @@ SELECT h.id, h.name, h.display_name, h.description, h.hostname, h.os, h.arch, h.
     -- operator needs to know about is often the one their current filter
     -- hides.
     (SELECT count(*) FROM host_agents s
-      WHERE s.machine_id <> '' AND s.machine_id = a.machine_id) AS image_group_size
+      WHERE s.machine_id <> '' AND s.machine_id = a.machine_id) AS image_group_size,
+    m.sampled_at     AS metrics_sampled_at,
+    m.cpu_used_pct   AS metrics_cpu_used_pct,
+    m.mem_used_pct   AS metrics_mem_used_pct,
+    m.disk_used_pct  AS metrics_disk_used_pct,
+    m.disk_used_path AS metrics_disk_used_path,
+    m.load1          AS metrics_load1,
+    m.load5          AS metrics_load5,
+    m.load15         AS metrics_load15,
+    m.net_rx_bps     AS metrics_net_rx_bps,
+    m.net_tx_bps     AS metrics_net_tx_bps,
+    m.cpu_trend      AS metrics_cpu_trend
 FROM hosts h
 LEFT JOIN users u ON u.id = h.created_by
 LEFT JOIN workspaces w ON w.id = h.workspace_id
 LEFT JOIN namespaces ns ON ns.id = h.namespace_id
 LEFT JOIN host_agents a ON a.host_id = h.id
+LEFT JOIN host_metrics_latest m ON m.host_id = h.id
 WHERE h.id = $1
   AND ($2::BIGINT IS NULL OR h.workspace_id IS NOT DISTINCT FROM $2::BIGINT)
   AND ($3::BIGINT IS NULL OR h.namespace_id IS NOT DISTINCT FROM $3::BIGINT)
@@ -202,47 +215,58 @@ type GetHostByIDParams struct {
 }
 
 type GetHostByIDRow struct {
-	ID                      int64       `json:"id"`
-	Name                    string      `json:"name"`
-	DisplayName             string      `json:"display_name"`
-	Description             string      `json:"description"`
-	Hostname                string      `json:"hostname"`
-	Os                      string      `json:"os"`
-	Arch                    string      `json:"arch"`
-	CpuCores                int32       `json:"cpu_cores"`
-	MemoryMb                int64       `json:"memory_mb"`
-	DiskGb                  int64       `json:"disk_gb"`
-	Scope                   string      `json:"scope"`
-	WorkspaceID             *int64      `json:"workspace_id"`
-	NamespaceID             *int64      `json:"namespace_id"`
-	Status                  string      `json:"status"`
-	StatusMessage           string      `json:"status_message"`
-	SshPort                 int32       `json:"ssh_port"`
-	AgentPort               int32       `json:"agent_port"`
-	MonitorStatus           string      `json:"monitor_status"`
-	MonitorMessage          string      `json:"monitor_message"`
-	LogAgentStatus          string      `json:"log_agent_status"`
-	LogAgentMessage         string      `json:"log_agent_message"`
-	Origin                  string      `json:"origin"`
-	ConnectivityMode        string      `json:"connectivity_mode"`
-	ReportedIps             []string    `json:"reported_ips"`
-	ReportedPrimaryIp       string      `json:"reported_primary_ip"`
-	PrimaryIpOverride       string      `json:"primary_ip_override"`
-	CreatedBy               *int64      `json:"created_by"`
-	CreatedAt               time.Time   `json:"created_at"`
-	UpdatedAt               time.Time   `json:"updated_at"`
-	CreatorName             string      `json:"creator_name"`
-	WorkspaceName           string      `json:"workspace_name"`
-	NamespaceName           string      `json:"namespace_name"`
-	AgentID                 pgtype.UUID `json:"agent_id"`
-	AgentStatus             *string     `json:"agent_status"`
-	AgentVersion            *string     `json:"agent_version"`
-	AgentConnectedAt        *time.Time  `json:"agent_connected_at"`
-	AgentLastSeenAt         *time.Time  `json:"agent_last_seen_at"`
-	AgentConflictAt         *time.Time  `json:"agent_conflict_at"`
-	AgentForeignMachineAt   *time.Time  `json:"agent_foreign_machine_at"`
-	AgentForeignMachineUuid *string     `json:"agent_foreign_machine_uuid"`
-	ImageGroupSize          int64       `json:"image_group_size"`
+	ID                      int64           `json:"id"`
+	Name                    string          `json:"name"`
+	DisplayName             string          `json:"display_name"`
+	Description             string          `json:"description"`
+	Hostname                string          `json:"hostname"`
+	Os                      string          `json:"os"`
+	Arch                    string          `json:"arch"`
+	CpuCores                int32           `json:"cpu_cores"`
+	MemoryMb                int64           `json:"memory_mb"`
+	DiskGb                  int64           `json:"disk_gb"`
+	Scope                   string          `json:"scope"`
+	WorkspaceID             *int64          `json:"workspace_id"`
+	NamespaceID             *int64          `json:"namespace_id"`
+	Status                  string          `json:"status"`
+	StatusMessage           string          `json:"status_message"`
+	SshPort                 int32           `json:"ssh_port"`
+	AgentPort               int32           `json:"agent_port"`
+	MonitorStatus           string          `json:"monitor_status"`
+	MonitorMessage          string          `json:"monitor_message"`
+	LogAgentStatus          string          `json:"log_agent_status"`
+	LogAgentMessage         string          `json:"log_agent_message"`
+	Origin                  string          `json:"origin"`
+	ConnectivityMode        string          `json:"connectivity_mode"`
+	ReportedIps             []string        `json:"reported_ips"`
+	ReportedPrimaryIp       string          `json:"reported_primary_ip"`
+	PrimaryIpOverride       string          `json:"primary_ip_override"`
+	CreatedBy               *int64          `json:"created_by"`
+	CreatedAt               time.Time       `json:"created_at"`
+	UpdatedAt               time.Time       `json:"updated_at"`
+	CreatorName             string          `json:"creator_name"`
+	WorkspaceName           string          `json:"workspace_name"`
+	NamespaceName           string          `json:"namespace_name"`
+	AgentID                 pgtype.UUID     `json:"agent_id"`
+	AgentStatus             *string         `json:"agent_status"`
+	AgentVersion            *string         `json:"agent_version"`
+	AgentConnectedAt        *time.Time      `json:"agent_connected_at"`
+	AgentLastSeenAt         *time.Time      `json:"agent_last_seen_at"`
+	AgentConflictAt         *time.Time      `json:"agent_conflict_at"`
+	AgentForeignMachineAt   *time.Time      `json:"agent_foreign_machine_at"`
+	AgentForeignMachineUuid *string         `json:"agent_foreign_machine_uuid"`
+	ImageGroupSize          int64           `json:"image_group_size"`
+	MetricsSampledAt        *time.Time      `json:"metrics_sampled_at"`
+	MetricsCpuUsedPct       *float32        `json:"metrics_cpu_used_pct"`
+	MetricsMemUsedPct       *float32        `json:"metrics_mem_used_pct"`
+	MetricsDiskUsedPct      *float32        `json:"metrics_disk_used_pct"`
+	MetricsDiskUsedPath     *string         `json:"metrics_disk_used_path"`
+	MetricsLoad1            *float32        `json:"metrics_load1"`
+	MetricsLoad5            *float32        `json:"metrics_load5"`
+	MetricsLoad15           *float32        `json:"metrics_load15"`
+	MetricsNetRxBps         *float32        `json:"metrics_net_rx_bps"`
+	MetricsNetTxBps         *float32        `json:"metrics_net_tx_bps"`
+	MetricsCpuTrend         json.RawMessage `json:"metrics_cpu_trend"`
 }
 
 func (q *Queries) GetHostByID(ctx context.Context, arg GetHostByIDParams) (GetHostByIDRow, error) {
@@ -290,6 +314,17 @@ func (q *Queries) GetHostByID(ctx context.Context, arg GetHostByIDParams) (GetHo
 		&i.AgentForeignMachineAt,
 		&i.AgentForeignMachineUuid,
 		&i.ImageGroupSize,
+		&i.MetricsSampledAt,
+		&i.MetricsCpuUsedPct,
+		&i.MetricsMemUsedPct,
+		&i.MetricsDiskUsedPct,
+		&i.MetricsDiskUsedPath,
+		&i.MetricsLoad1,
+		&i.MetricsLoad5,
+		&i.MetricsLoad15,
+		&i.MetricsNetRxBps,
+		&i.MetricsNetTxBps,
+		&i.MetricsCpuTrend,
 	)
 	return i, err
 }
@@ -336,12 +371,24 @@ SELECT h.id, h.name, h.display_name, h.description, h.hostname, h.os, h.arch, h.
     -- operator needs to know about is often the one their current filter
     -- hides.
     (SELECT count(*) FROM host_agents s
-      WHERE s.machine_id <> '' AND s.machine_id = a.machine_id) AS image_group_size
+      WHERE s.machine_id <> '' AND s.machine_id = a.machine_id) AS image_group_size,
+    m.sampled_at     AS metrics_sampled_at,
+    m.cpu_used_pct   AS metrics_cpu_used_pct,
+    m.mem_used_pct   AS metrics_mem_used_pct,
+    m.disk_used_pct  AS metrics_disk_used_pct,
+    m.disk_used_path AS metrics_disk_used_path,
+    m.load1          AS metrics_load1,
+    m.load5          AS metrics_load5,
+    m.load15         AS metrics_load15,
+    m.net_rx_bps     AS metrics_net_rx_bps,
+    m.net_tx_bps     AS metrics_net_tx_bps,
+    m.cpu_trend      AS metrics_cpu_trend
 FROM hosts h
 LEFT JOIN users u ON u.id = h.created_by
 LEFT JOIN workspaces w ON w.id = h.workspace_id
 LEFT JOIN namespaces ns ON ns.id = h.namespace_id
 LEFT JOIN host_agents a ON a.host_id = h.id
+LEFT JOIN host_metrics_latest m ON m.host_id = h.id
 WHERE ($1::VARCHAR IS NULL OR h.scope = ANY(string_to_array($1::VARCHAR, ',')))
   AND ($2::BIGINT IS NULL OR h.workspace_id = $2)
   AND ($3::BIGINT IS NULL OR h.namespace_id = $3)
@@ -372,6 +419,16 @@ ORDER BY
     CASE WHEN $7::VARCHAR = 'os' AND $8::VARCHAR = 'desc' THEN h.os END DESC,
     CASE WHEN $7::VARCHAR = 'cpu_cores' AND $8::VARCHAR = 'asc' THEN h.cpu_cores END ASC,
     CASE WHEN $7::VARCHAR = 'cpu_cores' AND $8::VARCHAR = 'desc' THEN h.cpu_cores END DESC,
+    -- Metric sorts keep agentless hosts (NULL) at the bottom in BOTH
+    -- directions: "most loaded first" must not open with a page of
+    -- hosts that reported nothing. ASC gets that from PG's default;
+    -- DESC needs it said.
+    CASE WHEN $7::VARCHAR = 'cpu_used_pct' AND $8::VARCHAR = 'asc' THEN m.cpu_used_pct END ASC,
+    CASE WHEN $7::VARCHAR = 'cpu_used_pct' AND $8::VARCHAR = 'desc' THEN m.cpu_used_pct END DESC NULLS LAST,
+    CASE WHEN $7::VARCHAR = 'mem_used_pct' AND $8::VARCHAR = 'asc' THEN m.mem_used_pct END ASC,
+    CASE WHEN $7::VARCHAR = 'mem_used_pct' AND $8::VARCHAR = 'desc' THEN m.mem_used_pct END DESC NULLS LAST,
+    CASE WHEN $7::VARCHAR = 'disk_used_pct' AND $8::VARCHAR = 'asc' THEN m.disk_used_pct END ASC,
+    CASE WHEN $7::VARCHAR = 'disk_used_pct' AND $8::VARCHAR = 'desc' THEN m.disk_used_pct END DESC NULLS LAST,
     CASE WHEN $7::VARCHAR = 'organization' AND $8::VARCHAR = 'asc' THEN COALESCE(NULLIF(w.display_name, ''), w.name, '') END ASC,
     CASE WHEN $7::VARCHAR = 'organization' AND $8::VARCHAR = 'asc' THEN COALESCE(NULLIF(ns.display_name, ''), ns.name, '') END ASC,
     CASE WHEN $7::VARCHAR = 'organization' AND $8::VARCHAR = 'desc' THEN COALESCE(NULLIF(w.display_name, ''), w.name, '') END DESC,
@@ -400,47 +457,58 @@ type ListHostsParams struct {
 }
 
 type ListHostsRow struct {
-	ID                      int64       `json:"id"`
-	Name                    string      `json:"name"`
-	DisplayName             string      `json:"display_name"`
-	Description             string      `json:"description"`
-	Hostname                string      `json:"hostname"`
-	Os                      string      `json:"os"`
-	Arch                    string      `json:"arch"`
-	CpuCores                int32       `json:"cpu_cores"`
-	MemoryMb                int64       `json:"memory_mb"`
-	DiskGb                  int64       `json:"disk_gb"`
-	Scope                   string      `json:"scope"`
-	WorkspaceID             *int64      `json:"workspace_id"`
-	NamespaceID             *int64      `json:"namespace_id"`
-	Status                  string      `json:"status"`
-	StatusMessage           string      `json:"status_message"`
-	SshPort                 int32       `json:"ssh_port"`
-	AgentPort               int32       `json:"agent_port"`
-	MonitorStatus           string      `json:"monitor_status"`
-	MonitorMessage          string      `json:"monitor_message"`
-	LogAgentStatus          string      `json:"log_agent_status"`
-	LogAgentMessage         string      `json:"log_agent_message"`
-	Origin                  string      `json:"origin"`
-	ConnectivityMode        string      `json:"connectivity_mode"`
-	ReportedIps             []string    `json:"reported_ips"`
-	ReportedPrimaryIp       string      `json:"reported_primary_ip"`
-	PrimaryIpOverride       string      `json:"primary_ip_override"`
-	CreatedBy               *int64      `json:"created_by"`
-	CreatedAt               time.Time   `json:"created_at"`
-	UpdatedAt               time.Time   `json:"updated_at"`
-	CreatorName             string      `json:"creator_name"`
-	WorkspaceName           string      `json:"workspace_name"`
-	NamespaceName           string      `json:"namespace_name"`
-	AgentID                 pgtype.UUID `json:"agent_id"`
-	AgentStatus             *string     `json:"agent_status"`
-	AgentVersion            *string     `json:"agent_version"`
-	AgentConnectedAt        *time.Time  `json:"agent_connected_at"`
-	AgentLastSeenAt         *time.Time  `json:"agent_last_seen_at"`
-	AgentConflictAt         *time.Time  `json:"agent_conflict_at"`
-	AgentForeignMachineAt   *time.Time  `json:"agent_foreign_machine_at"`
-	AgentForeignMachineUuid *string     `json:"agent_foreign_machine_uuid"`
-	ImageGroupSize          int64       `json:"image_group_size"`
+	ID                      int64           `json:"id"`
+	Name                    string          `json:"name"`
+	DisplayName             string          `json:"display_name"`
+	Description             string          `json:"description"`
+	Hostname                string          `json:"hostname"`
+	Os                      string          `json:"os"`
+	Arch                    string          `json:"arch"`
+	CpuCores                int32           `json:"cpu_cores"`
+	MemoryMb                int64           `json:"memory_mb"`
+	DiskGb                  int64           `json:"disk_gb"`
+	Scope                   string          `json:"scope"`
+	WorkspaceID             *int64          `json:"workspace_id"`
+	NamespaceID             *int64          `json:"namespace_id"`
+	Status                  string          `json:"status"`
+	StatusMessage           string          `json:"status_message"`
+	SshPort                 int32           `json:"ssh_port"`
+	AgentPort               int32           `json:"agent_port"`
+	MonitorStatus           string          `json:"monitor_status"`
+	MonitorMessage          string          `json:"monitor_message"`
+	LogAgentStatus          string          `json:"log_agent_status"`
+	LogAgentMessage         string          `json:"log_agent_message"`
+	Origin                  string          `json:"origin"`
+	ConnectivityMode        string          `json:"connectivity_mode"`
+	ReportedIps             []string        `json:"reported_ips"`
+	ReportedPrimaryIp       string          `json:"reported_primary_ip"`
+	PrimaryIpOverride       string          `json:"primary_ip_override"`
+	CreatedBy               *int64          `json:"created_by"`
+	CreatedAt               time.Time       `json:"created_at"`
+	UpdatedAt               time.Time       `json:"updated_at"`
+	CreatorName             string          `json:"creator_name"`
+	WorkspaceName           string          `json:"workspace_name"`
+	NamespaceName           string          `json:"namespace_name"`
+	AgentID                 pgtype.UUID     `json:"agent_id"`
+	AgentStatus             *string         `json:"agent_status"`
+	AgentVersion            *string         `json:"agent_version"`
+	AgentConnectedAt        *time.Time      `json:"agent_connected_at"`
+	AgentLastSeenAt         *time.Time      `json:"agent_last_seen_at"`
+	AgentConflictAt         *time.Time      `json:"agent_conflict_at"`
+	AgentForeignMachineAt   *time.Time      `json:"agent_foreign_machine_at"`
+	AgentForeignMachineUuid *string         `json:"agent_foreign_machine_uuid"`
+	ImageGroupSize          int64           `json:"image_group_size"`
+	MetricsSampledAt        *time.Time      `json:"metrics_sampled_at"`
+	MetricsCpuUsedPct       *float32        `json:"metrics_cpu_used_pct"`
+	MetricsMemUsedPct       *float32        `json:"metrics_mem_used_pct"`
+	MetricsDiskUsedPct      *float32        `json:"metrics_disk_used_pct"`
+	MetricsDiskUsedPath     *string         `json:"metrics_disk_used_path"`
+	MetricsLoad1            *float32        `json:"metrics_load1"`
+	MetricsLoad5            *float32        `json:"metrics_load5"`
+	MetricsLoad15           *float32        `json:"metrics_load15"`
+	MetricsNetRxBps         *float32        `json:"metrics_net_rx_bps"`
+	MetricsNetTxBps         *float32        `json:"metrics_net_tx_bps"`
+	MetricsCpuTrend         json.RawMessage `json:"metrics_cpu_trend"`
 }
 
 func (q *Queries) ListHosts(ctx context.Context, arg ListHostsParams) ([]ListHostsRow, error) {
@@ -505,6 +573,17 @@ func (q *Queries) ListHosts(ctx context.Context, arg ListHostsParams) ([]ListHos
 			&i.AgentForeignMachineAt,
 			&i.AgentForeignMachineUuid,
 			&i.ImageGroupSize,
+			&i.MetricsSampledAt,
+			&i.MetricsCpuUsedPct,
+			&i.MetricsMemUsedPct,
+			&i.MetricsDiskUsedPct,
+			&i.MetricsDiskUsedPath,
+			&i.MetricsLoad1,
+			&i.MetricsLoad5,
+			&i.MetricsLoad15,
+			&i.MetricsNetRxBps,
+			&i.MetricsNetTxBps,
+			&i.MetricsCpuTrend,
 		); err != nil {
 			return nil, err
 		}

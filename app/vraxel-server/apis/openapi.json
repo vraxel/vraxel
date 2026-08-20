@@ -5574,6 +5574,17 @@
             "type": "integer",
             "format": "int32"
           },
+          "cpuTrend": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          "cpuUsedPct": {
+            "type": "number",
+            "format": "double"
+          },
           "createdByName": {
             "type": "string"
           },
@@ -5583,6 +5594,13 @@
           "diskGb": {
             "type": "integer",
             "format": "int64"
+          },
+          "diskUsedPath": {
+            "type": "string"
+          },
+          "diskUsedPct": {
+            "type": "number",
+            "format": "double"
           },
           "displayName": {
             "type": "string"
@@ -5597,15 +5615,43 @@
           "ip": {
             "type": "string"
           },
+          "load1": {
+            "type": "number",
+            "format": "double"
+          },
+          "load15": {
+            "type": "number",
+            "format": "double"
+          },
+          "load5": {
+            "type": "number",
+            "format": "double"
+          },
+          "memUsedPct": {
+            "type": "number",
+            "format": "double"
+          },
           "memoryMb": {
             "type": "integer",
             "format": "int64"
+          },
+          "metricsSampledAt": {
+            "type": "string",
+            "format": "date-time"
           },
           "namespaceId": {
             "type": "string"
           },
           "namespaceName": {
             "type": "string"
+          },
+          "netRxBps": {
+            "type": "number",
+            "format": "double"
+          },
+          "netTxBps": {
+            "type": "number",
+            "format": "double"
           },
           "origin": {
             "type": "string"

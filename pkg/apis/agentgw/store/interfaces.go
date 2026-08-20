@@ -75,6 +75,12 @@ type AgentStore interface {
 	// MarkOrphansOffline clears rows left online by instances that no
 	// longer hold a lease, including this process's own previous life.
 	MarkOrphansOffline(ctx context.Context, staleAfter time.Duration) error
+	// UpsertMetrics overwrites the host's utilisation snapshot with what
+	// a heartbeat carried. One row per host, no host event -- see the
+	// host_metrics_latest migration for why publishing here would flood
+	// every watcher.
+	UpsertMetrics(ctx context.Context, hostID int64, in MetricsInput) error
+
 	// MarkStaleOffline sweeps rows with no heartbeat for staleAfter. The
 	// cutoff is applied against the DB clock, not the caller's.
 	MarkStaleOffline(ctx context.Context, staleAfter time.Duration) error

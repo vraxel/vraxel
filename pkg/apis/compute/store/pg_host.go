@@ -67,6 +67,23 @@ type HostRow struct {
 	// ImageGroupSize counts the hosts built from this host's disk image,
 	// this one included.
 	ImageGroupSize int64
+
+	// The latest utilisation snapshot from host_metrics_latest, nil/empty
+	// when the host has never had a reporting agent. MetricsSampledAt is
+	// the agent's clock -- readers derive staleness from it. CPUTrend is
+	// the sparkline as raw JSON (numbers and nulls), passed through
+	// without the store interpreting a bucket.
+	MetricsSampledAt *time.Time
+	CPUUsedPct       *float64
+	MemUsedPct       *float64
+	DiskUsedPct      *float64
+	DiskUsedPath     string
+	Load1            *float64
+	Load5            *float64
+	Load15           *float64
+	NetRxBps         *float64
+	NetTxBps         *float64
+	CPUTrend         []byte
 }
 
 // HostCreateInput is a host recorded by hand.
@@ -272,6 +289,23 @@ func uuidString(u pgtype.UUID) string {
 	return uuid.UUID(u.Bytes).String()
 }
 
+// f64 widens the joined real column, keeping absent absent. The float32
+// in the row is the storage column's type, not a display decision.
+func f64(v *float32) *float64 {
+	if v == nil {
+		return nil
+	}
+	f := float64(*v)
+	return &f
+}
+
+func strOr(v *string) string {
+	if v == nil {
+		return ""
+	}
+	return *v
+}
+
 // The two generated row types are structurally identical but distinct
 // Go types, so the mapping is written once per query rather than shared
 // through an interface nobody else would implement.
@@ -296,6 +330,17 @@ func listRowToDomain(r *generated.ListHostsRow) HostRow {
 		AgentForeignMachineAt:   r.AgentForeignMachineAt,
 		AgentForeignMachineUuid: r.AgentForeignMachineUuid,
 		ImageGroupSize:          r.ImageGroupSize,
+		MetricsSampledAt:        r.MetricsSampledAt,
+		CPUUsedPct:              f64(r.MetricsCpuUsedPct),
+		MemUsedPct:              f64(r.MetricsMemUsedPct),
+		DiskUsedPct:             f64(r.MetricsDiskUsedPct),
+		DiskUsedPath:            strOr(r.MetricsDiskUsedPath),
+		Load1:                   f64(r.MetricsLoad1),
+		Load5:                   f64(r.MetricsLoad5),
+		Load15:                  f64(r.MetricsLoad15),
+		NetRxBps:                f64(r.MetricsNetRxBps),
+		NetTxBps:                f64(r.MetricsNetTxBps),
+		CPUTrend:                r.MetricsCpuTrend,
 	}
 }
 
@@ -319,5 +364,16 @@ func getRowToDomain(r *generated.GetHostByIDRow) HostRow {
 		AgentForeignMachineAt:   r.AgentForeignMachineAt,
 		AgentForeignMachineUuid: r.AgentForeignMachineUuid,
 		ImageGroupSize:          r.ImageGroupSize,
+		MetricsSampledAt:        r.MetricsSampledAt,
+		CPUUsedPct:              f64(r.MetricsCpuUsedPct),
+		MemUsedPct:              f64(r.MetricsMemUsedPct),
+		DiskUsedPct:             f64(r.MetricsDiskUsedPct),
+		DiskUsedPath:            strOr(r.MetricsDiskUsedPath),
+		Load1:                   f64(r.MetricsLoad1),
+		Load5:                   f64(r.MetricsLoad5),
+		Load15:                  f64(r.MetricsLoad15),
+		NetRxBps:                f64(r.MetricsNetRxBps),
+		NetTxBps:                f64(r.MetricsNetTxBps),
+		CPUTrend:                r.MetricsCpuTrend,
 	}
 }

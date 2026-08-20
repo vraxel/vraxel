@@ -82,6 +82,29 @@ type HostSpec struct {
 	// it surfaces, and one of them may be a duplicate record of another.
 	// 0 or 1 is the ordinary answer and the UI says nothing.
 	ImageGroupSize int64 `json:"imageGroupSize,omitempty"`
+
+	// --- latest utilisation, read-only ---
+	// From the agent's most recent heartbeat: one overwritten snapshot,
+	// not a series. Pointers because absence is a state -- a host whose
+	// agent has never reported shows "-", not a plausible-looking 0%.
+	// MetricsSampledAt is the AGENT's clock; the UI greys values whose
+	// age exceeds a couple of beats rather than trusting them fresh.
+	MetricsSampledAt *time.Time `json:"metricsSampledAt,omitempty"`
+	CPUUsedPct       *float64   `json:"cpuUsedPct,omitempty"`
+	MemUsedPct       *float64   `json:"memUsedPct,omitempty"`
+	DiskUsedPct      *float64   `json:"diskUsedPct,omitempty"`
+	// DiskUsedPath names the mountpoint DiskUsedPct describes -- the
+	// fullest real filesystem, not necessarily /.
+	DiskUsedPath string   `json:"diskUsedPath,omitempty"`
+	Load1        *float64 `json:"load1,omitempty"`
+	Load5        *float64 `json:"load5,omitempty"`
+	Load15       *float64 `json:"load15,omitempty"`
+	NetRxBps     *float64 `json:"netRxBps,omitempty"`
+	NetTxBps     *float64 `json:"netTxBps,omitempty"`
+	// CPUTrend is the list sparkline: CPU used % over roughly the last
+	// 24h in 48 half-hour buckets, oldest first; null entries are buckets
+	// the agent holds nothing for.
+	CPUTrend []*float64 `json:"cpuTrend,omitempty"`
 }
 
 // Host is a managed machine.

@@ -106,6 +106,21 @@ type HostAgentJoinToken struct {
 	TargetHostID *int64    `json:"target_host_id"`
 }
 
+type HostMetricsLatest struct {
+	HostID       int64           `json:"host_id"`
+	SampledAt    time.Time       `json:"sampled_at"`
+	CpuUsedPct   float32         `json:"cpu_used_pct"`
+	MemUsedPct   float32         `json:"mem_used_pct"`
+	DiskUsedPct  float32         `json:"disk_used_pct"`
+	DiskUsedPath string          `json:"disk_used_path"`
+	Load1        float32         `json:"load1"`
+	Load5        float32         `json:"load5"`
+	Load15       float32         `json:"load15"`
+	NetRxBps     float32         `json:"net_rx_bps"`
+	NetTxBps     float32         `json:"net_tx_bps"`
+	CpuTrend     json.RawMessage `json:"cpu_trend"`
+}
+
 type LoginThrottle struct {
 	Key         string    `json:"key"`
 	WindowStart time.Time `json:"window_start"`
