@@ -190,6 +190,114 @@ paths:
       responses:
         "204":
           description: No Content
+  /api/compute/v1/host-alert-rules:
+    get:
+      summary: List host-alert-rules
+      operationId: listHostAlertRules
+      tags:
+        - HostAlertRule
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+    post:
+      summary: Create a HostAlertRule
+      operationId: createHostAlertRules
+      tags:
+        - HostAlertRule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/compute/v1/host-alert-rules/{host_alert_ruleId}:
+    get:
+      summary: Get a HostAlertRule
+      operationId: getHostAlertRules
+      tags:
+        - HostAlertRule
+      parameters:
+        - name: host_alert_ruleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+    put:
+      summary: Update a HostAlertRule
+      operationId: updateHostAlertRules
+      tags:
+        - HostAlertRule
+      parameters:
+        - name: host_alert_ruleId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+    delete:
+      summary: Delete a HostAlertRule
+      operationId: deleteHostAlertRules
+      tags:
+        - HostAlertRule
+      parameters:
+        - name: host_alert_ruleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: No Content
   /api/compute/v1/hosts:
     get:
       summary: 获取主机列表
@@ -517,6 +625,140 @@ paths:
           schema:
             type: string
         - name: agent_join_tokenId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: No Content
+  /api/compute/v1/workspaces/{workspaceId}/host-alert-rules:
+    get:
+      summary: List host-alert-rules
+      operationId: listWorkspacesHostAlertRules
+      tags:
+        - HostAlertRule
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+    post:
+      summary: Create a HostAlertRule
+      operationId: createWorkspacesHostAlertRules
+      tags:
+        - HostAlertRule
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/compute/v1/workspaces/{workspaceId}/host-alert-rules/{host_alert_ruleId}:
+    get:
+      summary: Get a HostAlertRule
+      operationId: getWorkspacesHostAlertRules
+      tags:
+        - HostAlertRule
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: host_alert_ruleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+    put:
+      summary: Update a HostAlertRule
+      operationId: updateWorkspacesHostAlertRules
+      tags:
+        - HostAlertRule
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: host_alert_ruleId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+    delete:
+      summary: Delete a HostAlertRule
+      operationId: deleteWorkspacesHostAlertRules
+      tags:
+        - HostAlertRule
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: host_alert_ruleId
           in: path
           required: true
           schema:
@@ -923,6 +1165,165 @@ paths:
           schema:
             type: string
         - name: agent_join_tokenId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: No Content
+  /api/compute/v1/workspaces/{workspaceId}/namespaces/{namespaceId}/host-alert-rules:
+    get:
+      summary: List host-alert-rules
+      operationId: listWorkspacesNamespacesHostAlertRules
+      tags:
+        - HostAlertRule
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: namespaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+    post:
+      summary: Create a HostAlertRule
+      operationId: createWorkspacesNamespacesHostAlertRules
+      tags:
+        - HostAlertRule
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: namespaceId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/compute/v1/workspaces/{workspaceId}/namespaces/{namespaceId}/host-alert-rules/{host_alert_ruleId}:
+    get:
+      summary: Get a HostAlertRule
+      operationId: getWorkspacesNamespacesHostAlertRules
+      tags:
+        - HostAlertRule
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: namespaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: host_alert_ruleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+    put:
+      summary: Update a HostAlertRule
+      operationId: updateWorkspacesNamespacesHostAlertRules
+      tags:
+        - HostAlertRule
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: namespaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: host_alert_ruleId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+    delete:
+      summary: Delete a HostAlertRule
+      operationId: deleteWorkspacesNamespacesHostAlertRules
+      tags:
+        - HostAlertRule
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: namespaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: host_alert_ruleId
           in: path
           required: true
           schema:
@@ -3541,6 +3942,40 @@ components:
           $ref: '#/components/schemas/ObjectMeta'
         spec:
           $ref: '#/components/schemas/HostSpec'
+    HostAlertRuleSpec:
+      type: object
+      properties:
+        createdByName:
+          type: string
+        description:
+          type: string
+        enabled:
+          type: boolean
+        firingCount:
+          type: integer
+          format: int64
+        forSeconds:
+          type: integer
+          format: int32
+        metric:
+          type: string
+        namespaceId:
+          type: string
+        namespaceName:
+          type: string
+        op:
+          type: string
+        scope:
+          type: string
+        severity:
+          type: string
+        threshold:
+          type: number
+          format: double
+        workspaceId:
+          type: string
+        workspaceName:
+          type: string
     HostList:
       type: object
       properties:
@@ -3589,6 +4024,9 @@ components:
           type: string
         agentVersion:
           type: string
+        alertsFiring:
+          type: integer
+          format: int64
         arch:
           type: string
         connectivityMode:
@@ -3618,6 +4056,10 @@ components:
           format: double
         displayName:
           type: string
+        firingAlerts:
+          type: array
+          items:
+            $ref: '#/components/schemas/HostFiringAlert'
         hostname:
           type: string
         imageGroupSize:

@@ -252,5 +252,9 @@ func hostToAPI(r *modstore.HostRow) Host {
 	if len(r.CPUTrend) > 0 {
 		_ = json.Unmarshal(r.CPUTrend, &h.Spec.CPUTrend)
 	}
+	h.Spec.AlertsFiring = r.AlertsFiring
+	if len(r.FiringAlerts) > 0 {
+		_ = json.Unmarshal(r.FiringAlerts, &h.Spec.FiringAlerts)
+	}
 	return h
 }

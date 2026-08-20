@@ -106,6 +106,33 @@ type HostAgentJoinToken struct {
 	TargetHostID *int64    `json:"target_host_id"`
 }
 
+type HostAlertRule struct {
+	ID          int64     `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Scope       string    `json:"scope"`
+	WorkspaceID *int64    `json:"workspace_id"`
+	NamespaceID *int64    `json:"namespace_id"`
+	Metric      string    `json:"metric"`
+	Op          string    `json:"op"`
+	Threshold   float32   `json:"threshold"`
+	ForSeconds  int32     `json:"for_seconds"`
+	Severity    string    `json:"severity"`
+	Enabled     bool      `json:"enabled"`
+	CreatedBy   *int64    `json:"created_by"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type HostAlertState struct {
+	HostID        int64      `json:"host_id"`
+	RuleID        int64      `json:"rule_id"`
+	BreachedSince time.Time  `json:"breached_since"`
+	Firing        bool       `json:"firing"`
+	FiringSince   *time.Time `json:"firing_since"`
+	Value         float32    `json:"value"`
+}
+
 type HostMetricsLatest struct {
 	HostID       int64           `json:"host_id"`
 	SampledAt    time.Time       `json:"sampled_at"`

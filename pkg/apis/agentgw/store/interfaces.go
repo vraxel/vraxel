@@ -119,6 +119,7 @@ type JoinTokenStore interface {
 type Stores struct {
 	Agent     AgentStore
 	JoinToken JoinTokenStore
+	Alert     AlertStore
 }
 
 // NewStores builds the pg-backed store set.
@@ -126,5 +127,6 @@ func NewStores(d *db.DB) Stores {
 	return Stores{
 		Agent:     NewPGAgentStore(d),
 		JoinToken: NewPGJoinTokenStore(d),
+		Alert:     NewPGAlertStore(d),
 	}
 }

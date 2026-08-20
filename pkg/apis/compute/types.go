@@ -105,6 +105,69 @@ type HostSpec struct {
 	// 24h in 48 half-hour buckets, oldest first; null entries are buckets
 	// the agent holds nothing for.
 	CPUTrend []*float64 `json:"cpuTrend,omitempty"`
+
+	// --- threshold alerts, read-only ---
+	// AlertsFiring is how many alert rules are firing on this host.
+	AlertsFiring int64 `json:"alertsFiring,omitempty"`
+	// FiringAlerts names them, on the detail response only -- the list
+	// carries the count and nothing else.
+	FiringAlerts []HostFiringAlert `json:"firingAlerts,omitempty"`
+}
+
+// HostAlertRuleSpec is one threshold over the heartbeat snapshot.
+// +openapi:description=主机告警规则：对心跳快照字段的阈值判定，服务端在心跳路径评估。
+type HostAlertRuleSpec struct {
+	Description string `json:"description,omitempty"`
+
+	// --- set at creation, read-only afterwards ---
+	Scope         string `json:"scope,omitempty"`
+	WorkspaceID   string `json:"workspaceId,omitempty"`
+	NamespaceID   string `json:"namespaceId,omitempty"`
+	WorkspaceName string `json:"workspaceName,omitempty"`
+	NamespaceName string `json:"namespaceName,omitempty"`
+
+	// Metric is one of the heartbeat summary's numeric fields:
+	// cpu_used_pct, mem_used_pct, disk_used_pct, load1, load5, load15,
+	// net_rx_bps, net_tx_bps.
+	Metric string `json:"metric"`
+	// Op is gt / ge / lt / le.
+	Op        string  `json:"op"`
+	Threshold float64 `json:"threshold"`
+	// ForSeconds is how long the breach must hold (wall clock) before
+	// the alert fires. 0 on create means the 60s default.
+	ForSeconds int32 `json:"forSeconds,omitempty"`
+	// Severity is info / warning / critical.
+	Severity string `json:"severity"`
+	// Enabled defaults to true when omitted on create.
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// --- read-only ---
+	// FiringCount is how many hosts this rule is firing on right now.
+	FiringCount   int64  `json:"firingCount,omitempty"`
+	CreatedByName string `json:"createdByName,omitempty"`
+}
+
+// HostAlertRule is a threshold alert rule over host utilisation.
+type HostAlertRule struct {
+	runtime.TypeMeta `json:",inline"`
+	Metadata         apitypes.ObjectMeta `json:"metadata"`
+	Spec             HostAlertRuleSpec   `json:"spec"`
+}
+
+func (r *HostAlertRule) GetTypeMeta() *runtime.TypeMeta { return &r.TypeMeta }
+
+// HostFiringAlert is one firing alert on a host, carried on the host
+// detail so the page can say WHICH thresholds are breached, not just
+// how many.
+type HostFiringAlert struct {
+	RuleID    string     `json:"ruleId"`
+	RuleName  string     `json:"ruleName"`
+	Metric    string     `json:"metric"`
+	Op        string     `json:"op"`
+	Threshold float64    `json:"threshold"`
+	Severity  string     `json:"severity"`
+	Value     float64    `json:"value"`
+	Since     *time.Time `json:"since,omitempty"`
 }
 
 // HostMetrics is one windowed read of a host's chart series, the answer

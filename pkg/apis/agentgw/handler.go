@@ -44,6 +44,7 @@ type protocolHandler struct {
 	registry      *Registry
 	runManager    *RunManager
 	dataHub       *DataHub
+	alerts        *alertEvaluator
 
 	// ctx bounds session goroutines to the server's lifetime. Sessions
 	// cannot use the request context: it stays alive only while ServeHTTP
@@ -64,7 +65,7 @@ type protocolHandler struct {
 // HTTP: the /api/agent/v1/ branch, and the install script that sits at
 // the root. They share one protocolHandler because the script has to
 // state the digests of the binaries the same instance serves.
-func NewProtocolHandler(ctx context.Context, stores gwstore.Stores, registrar HostRegistrar, signer *TokenSigner, sessionSigner *SessionTokenSigner, registry *Registry, runManager *RunManager, dataHub *DataHub) (protocol, installScript http.HandlerFunc) {
+func NewProtocolHandler(ctx context.Context, stores gwstore.Stores, registrar HostRegistrar, signer *TokenSigner, sessionSigner *SessionTokenSigner, registry *Registry, runManager *RunManager, dataHub *DataHub, alerts *alertEvaluator) (protocol, installScript http.HandlerFunc) {
 	h := &protocolHandler{
 		agents:        stores.Agent,
 		joinTokens:    stores.JoinToken,
@@ -74,6 +75,7 @@ func NewProtocolHandler(ctx context.Context, stores gwstore.Stores, registrar Ho
 		registry:      registry,
 		runManager:    runManager,
 		dataHub:       dataHub,
+		alerts:        alerts,
 		ctx:           ctx,
 		binaryDir:     agentBinaryDir(),
 	}

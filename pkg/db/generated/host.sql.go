@@ -196,7 +196,28 @@ SELECT h.id, h.name, h.display_name, h.description, h.hostname, h.os, h.arch, h.
     m.load15         AS metrics_load15,
     m.net_rx_bps     AS metrics_net_rx_bps,
     m.net_tx_bps     AS metrics_net_tx_bps,
-    m.cpu_trend      AS metrics_cpu_trend
+    m.cpu_trend      AS metrics_cpu_trend,
+    -- Firing threshold alerts, for the list's red badge. A scalar
+    -- subquery over a table that only holds live problems, so it is
+    -- cheap exactly when everything is fine.
+    (SELECT count(*) FROM host_alert_states s2
+      WHERE s2.host_id = h.id AND s2.firing) AS alerts_firing,
+    -- The firing alerts themselves, detail-only: which thresholds are
+    -- breached, not just how many. json_agg because the shape is a
+    -- read-only display list that goes straight to the API response.
+    (SELECT COALESCE(jsonb_agg(jsonb_build_object(
+        'ruleId', s3.rule_id::text,
+        'ruleName', r3.name,
+        'metric', r3.metric,
+        'op', r3.op,
+        'threshold', r3.threshold,
+        'severity', r3.severity,
+        'value', s3.value,
+        'since', s3.firing_since
+      ) ORDER BY s3.firing_since DESC), '[]'::jsonb)
+      FROM host_alert_states s3
+      JOIN host_alert_rules r3 ON r3.id = s3.rule_id
+      WHERE s3.host_id = h.id AND s3.firing)::jsonb AS firing_alerts
 FROM hosts h
 LEFT JOIN users u ON u.id = h.created_by
 LEFT JOIN workspaces w ON w.id = h.workspace_id
@@ -267,6 +288,8 @@ type GetHostByIDRow struct {
 	MetricsNetRxBps         *float32        `json:"metrics_net_rx_bps"`
 	MetricsNetTxBps         *float32        `json:"metrics_net_tx_bps"`
 	MetricsCpuTrend         json.RawMessage `json:"metrics_cpu_trend"`
+	AlertsFiring            int64           `json:"alerts_firing"`
+	FiringAlerts            json.RawMessage `json:"firing_alerts"`
 }
 
 func (q *Queries) GetHostByID(ctx context.Context, arg GetHostByIDParams) (GetHostByIDRow, error) {
@@ -325,6 +348,8 @@ func (q *Queries) GetHostByID(ctx context.Context, arg GetHostByIDParams) (GetHo
 		&i.MetricsNetRxBps,
 		&i.MetricsNetTxBps,
 		&i.MetricsCpuTrend,
+		&i.AlertsFiring,
+		&i.FiringAlerts,
 	)
 	return i, err
 }
@@ -382,7 +407,12 @@ SELECT h.id, h.name, h.display_name, h.description, h.hostname, h.os, h.arch, h.
     m.load15         AS metrics_load15,
     m.net_rx_bps     AS metrics_net_rx_bps,
     m.net_tx_bps     AS metrics_net_tx_bps,
-    m.cpu_trend      AS metrics_cpu_trend
+    m.cpu_trend      AS metrics_cpu_trend,
+    -- Firing threshold alerts, for the list's red badge. A scalar
+    -- subquery over a table that only holds live problems, so it is
+    -- cheap exactly when everything is fine.
+    (SELECT count(*) FROM host_alert_states s2
+      WHERE s2.host_id = h.id AND s2.firing) AS alerts_firing
 FROM hosts h
 LEFT JOIN users u ON u.id = h.created_by
 LEFT JOIN workspaces w ON w.id = h.workspace_id
@@ -509,6 +539,7 @@ type ListHostsRow struct {
 	MetricsNetRxBps         *float32        `json:"metrics_net_rx_bps"`
 	MetricsNetTxBps         *float32        `json:"metrics_net_tx_bps"`
 	MetricsCpuTrend         json.RawMessage `json:"metrics_cpu_trend"`
+	AlertsFiring            int64           `json:"alerts_firing"`
 }
 
 func (q *Queries) ListHosts(ctx context.Context, arg ListHostsParams) ([]ListHostsRow, error) {
@@ -584,6 +615,7 @@ func (q *Queries) ListHosts(ctx context.Context, arg ListHostsParams) ([]ListHos
 			&i.MetricsNetRxBps,
 			&i.MetricsNetTxBps,
 			&i.MetricsCpuTrend,
+			&i.AlertsFiring,
 		); err != nil {
 			return nil, err
 		}

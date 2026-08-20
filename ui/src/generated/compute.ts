@@ -119,6 +119,85 @@ export interface HostSpec {
    * the agent holds nothing for.
    */
   cpuTrend?: (number /* float64 */ | undefined)[];
+  /**
+   * --- threshold alerts, read-only ---
+   * AlertsFiring is how many alert rules are firing on this host.
+   */
+  alertsFiring?: number /* int64 */;
+  /**
+   * FiringAlerts names them, on the detail response only -- the list
+   * carries the count and nothing else.
+   */
+  firingAlerts?: HostFiringAlert[];
+}
+/**
+ * HostAlertRuleSpec is one threshold over the heartbeat snapshot.
+ * +openapi:description=主机告警规则：对心跳快照字段的阈值判定，服务端在心跳路径评估。
+ */
+export interface HostAlertRuleSpec {
+  description?: string;
+  /**
+   * --- set at creation, read-only afterwards ---
+   */
+  scope?: string;
+  workspaceId?: string;
+  namespaceId?: string;
+  workspaceName?: string;
+  namespaceName?: string;
+  /**
+   * Metric is one of the heartbeat summary's numeric fields:
+   * cpu_used_pct, mem_used_pct, disk_used_pct, load1, load5, load15,
+   * net_rx_bps, net_tx_bps.
+   */
+  metric: string;
+  /**
+   * Op is gt / ge / lt / le.
+   */
+  op: string;
+  threshold: number /* float64 */;
+  /**
+   * ForSeconds is how long the breach must hold (wall clock) before
+   * the alert fires. 0 on create means the 60s default.
+   */
+  forSeconds?: number /* int32 */;
+  /**
+   * Severity is info / warning / critical.
+   */
+  severity: string;
+  /**
+   * Enabled defaults to true when omitted on create.
+   */
+  enabled?: boolean;
+  /**
+   * --- read-only ---
+   * FiringCount is how many hosts this rule is firing on right now.
+   */
+  firingCount?: number /* int64 */;
+  createdByName?: string;
+}
+/**
+ * HostAlertRule is a threshold alert rule over host utilisation.
+ */
+export interface HostAlertRule {
+  apiVersion?: string;
+  kind?: string;
+  metadata: ObjectMeta;
+  spec: HostAlertRuleSpec;
+}
+/**
+ * HostFiringAlert is one firing alert on a host, carried on the host
+ * detail so the page can say WHICH thresholds are breached, not just
+ * how many.
+ */
+export interface HostFiringAlert {
+  ruleId: string;
+  ruleName: string;
+  metric: string;
+  op: string;
+  threshold: number /* float64 */;
+  severity: string;
+  value: number /* float64 */;
+  since?: string;
 }
 /**
  * HostMetrics is one windowed read of a host's chart series, the answer

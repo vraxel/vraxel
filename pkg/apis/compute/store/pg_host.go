@@ -84,6 +84,11 @@ type HostRow struct {
 	NetRxBps         *float64
 	NetTxBps         *float64
 	CPUTrend         []byte
+
+	// AlertsFiring counts firing threshold alerts; FiringAlerts is the
+	// detail-only jsonb list naming them, passed through undecoded.
+	AlertsFiring int64
+	FiringAlerts []byte
 }
 
 // HostCreateInput is a host recorded by hand.
@@ -341,6 +346,7 @@ func listRowToDomain(r *generated.ListHostsRow) HostRow {
 		NetRxBps:                f64(r.MetricsNetRxBps),
 		NetTxBps:                f64(r.MetricsNetTxBps),
 		CPUTrend:                r.MetricsCpuTrend,
+		AlertsFiring:            r.AlertsFiring,
 	}
 }
 
@@ -375,5 +381,7 @@ func getRowToDomain(r *generated.GetHostByIDRow) HostRow {
 		NetRxBps:                f64(r.MetricsNetRxBps),
 		NetTxBps:                f64(r.MetricsNetTxBps),
 		CPUTrend:                r.MetricsCpuTrend,
+		AlertsFiring:            r.AlertsFiring,
+		FiringAlerts:            r.FiringAlerts,
 	}
 }

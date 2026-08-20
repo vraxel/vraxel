@@ -43,6 +43,23 @@ func NewAgentHostRegistrar(d *db.DB) agentgw.HostRegistrar {
 	return &agentHostRegistrar{store: modstore.NewPGAgentHostStore(d)}
 }
 
+// NewHostScopes builds compute's implementation of the gateway's
+// HostScopes: the alert evaluator asking which tenancy a host belongs
+// to. Same seam and same reason as NewAgentHostRegistrar.
+func NewHostScopes(d *db.DB) agentgw.HostScopes {
+	return hostScopes{store: modstore.NewPGHostStore(d)}
+}
+
+type hostScopes struct{ store modstore.HostStore }
+
+func (h hostScopes) GetHostScope(ctx context.Context, hostID int64) (string, *int64, *int64, error) {
+	s, err := h.store.GetScope(ctx, hostID)
+	if err != nil {
+		return "", nil, nil, err
+	}
+	return s.Scope, s.WorkspaceID, s.NamespaceID, nil
+}
+
 // Registrar returns the module's route-registration closure. Building
 // the stores only wraps the handle, so a nil database yields a registrar
 // that declares every route without touching Postgres -- that is what
@@ -69,5 +86,6 @@ func Registrar(database *db.DB, serverURL string, hub *statushub.Hub, terminals 
 	return func(s *apiserver.Server) {
 		apiserver.Register(s, HostsDef(hosts, agentHosts, agents, hub, terminals, dialer))
 		apiserver.Register(s, AgentJoinTokensDef(tokens, hosts, serverURL))
+		apiserver.Register(s, AlertRulesDef(modstore.NewPGAlertRuleStore(database)))
 	}
 }
