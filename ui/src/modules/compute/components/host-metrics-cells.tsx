@@ -24,11 +24,7 @@ function UtilValue({ value, stale }: { value?: number; stale: boolean }) {
   if (typeof value !== "number") {
     return <span className="text-muted-foreground text-sm">-</span>
   }
-  const tone = stale
-    ? "text-muted-foreground/60"
-    : value >= 90
-      ? "text-destructive"
-      : ""
+  const tone = stale ? "text-muted-foreground/60" : value >= 90 ? "text-destructive" : ""
   return <span className={`text-sm tabular-nums ${tone}`}>{Math.round(value)}%</span>
 }
 
