@@ -31,6 +31,7 @@ type hostOps struct {
 func HostsDef(store modstore.HostStore, agentHosts modstore.AgentHostStore, agents agentgw.AgentStore, hub *statushub.Hub, terminals *ws.SessionManager, dialer *AgentDialerHolder) apiserver.ResourceDef[Host] {
 	o := hostOps{store: store}
 	m := hostMergeOps{hosts: store, agentHosts: agentHosts, agents: agents}
+	metrics := hostMetricsOps{hosts: store, backend: NewAgentLiveMetrics(dialer)}
 	return apiserver.ResourceDef[Host]{
 		Group: "compute", Name: "hosts",
 		Scopes: apiserver.ScopeAll,
@@ -45,6 +46,11 @@ func HostsDef(store modstore.HostStore, agentHosts modstore.AgentHostStore, agen
 			// Read-only, so it inherits compute:hosts:get and declares no
 			// permission of its own.
 			apiserver.Verb("image-siblings", m.imageSiblings),
+			// Also read-only under compute:hosts:get -- unlike the
+			// terminal, which runs commands as root and carries its own
+			// permission code, reading utilisation curves is exactly what
+			// "may read this host's details" should cover.
+			apiserver.VerbAny("metrics", metrics.series),
 		},
 		Actions: []apiserver.ActionDef{
 			// On the collection, and borrowing the collection's own

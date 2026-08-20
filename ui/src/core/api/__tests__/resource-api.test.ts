@@ -83,10 +83,10 @@ describe("action / verb / sub", () => {
     })
   })
 
-  it("defineVerb gets the colon form /{id}:{verb}", async () => {
+  it("defineVerb gets a plain segment under the item", async () => {
     const templates = defineVerb(hostsDef, "templates")
     await templates({}, 7, { refresh: true })
-    expect(calls[0].url).toBe("compute/v1/hosts/7:templates")
+    expect(calls[0].url).toBe("compute/v1/hosts/7/templates")
     expect(calls[0].opts?.searchParams?.toString()).toBe("refresh=true")
   })
 

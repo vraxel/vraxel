@@ -29,10 +29,6 @@ describe("scopeOf / resourcePath", () => {
     expect(resourcePath(credentials, { ws: "3" }, 42, "rotate")).toBe(
       "pki/v1/workspaces/3/credentials/42/rotate",
     )
-    // Backend CustomVerb form: /{parent}/{id}:{verb}
-    expect(resourcePath(credentials, {}, 42, { verb: "usages" })).toBe(
-      "pki/v1/credentials/42:usages",
-    )
   })
 
   it("scopeOf resolves by presence of ws/ns", () => {

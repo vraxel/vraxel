@@ -33,6 +33,18 @@ const compute = {
   "compute.host.hostname": "主机名",
   "compute.host.agentVersion": "Agent 版本",
 
+  "compute.host.metrics.title": "监控",
+  "compute.host.metrics.load": "负载",
+  "compute.host.metrics.filesystem": "文件系统",
+  "compute.host.metrics.diskIO": "磁盘 IO",
+  "compute.host.metrics.network": "网络",
+  "compute.host.metrics.used": "已用",
+  "compute.host.metrics.read": "读",
+  "compute.host.metrics.write": "写",
+  "compute.host.metrics.noData": "暂无数据",
+  "compute.host.metrics.offline": "主机离线，历史指标不可用",
+  "compute.host.metrics.lastSample": "最后采样",
+
   "compute.host.edit": "编辑主机",
   "compute.host.deleteConfirm": "确定要删除主机「{name}」吗？此操作不可撤销。",
   "compute.host.deleteAgentWarning":

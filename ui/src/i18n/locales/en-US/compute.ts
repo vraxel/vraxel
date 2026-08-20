@@ -32,6 +32,18 @@ const compute = {
   "compute.host.hostname": "Hostname",
   "compute.host.agentVersion": "Agent version",
 
+  "compute.host.metrics.title": "Metrics",
+  "compute.host.metrics.load": "Load",
+  "compute.host.metrics.filesystem": "Filesystem",
+  "compute.host.metrics.diskIO": "Disk IO",
+  "compute.host.metrics.network": "Network",
+  "compute.host.metrics.used": "used",
+  "compute.host.metrics.read": "read",
+  "compute.host.metrics.write": "write",
+  "compute.host.metrics.noData": "No data",
+  "compute.host.metrics.offline": "Host is offline; historical metrics are unavailable",
+  "compute.host.metrics.lastSample": "last sample",
+
   "compute.host.edit": "Edit host",
   "compute.host.deleteConfirm":
     'Are you sure you want to delete host "{name}"? This action cannot be undone.',

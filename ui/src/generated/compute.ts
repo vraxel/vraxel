@@ -121,6 +121,32 @@ export interface HostSpec {
   cpuTrend?: (number /* float64 */ | undefined)[];
 }
 /**
+ * HostMetrics is one windowed read of a host's chart series, the answer
+ * of GET /hosts/{id}:metrics. A fixed grid: FromMs plus i*StepSec
+ * locates bucket i, and every series carries exactly Count values.
+ * The names are the chart vocabulary (cpu.used_pct, net.rx_bps, ...),
+ * NOT raw metric names: values arrive derived -- percentages and
+ * per-second rates -- so the frontend plots what it is handed and never
+ * computes a rate. Which backend answered (the agent's in-memory ring,
+ * or VictoriaMetrics on the full tier) is invisible on purpose.
+ * +openapi:description=主机监控曲线：固定网格 + 派生后的图表序列，null 为该桶无数据。
+ */
+export interface HostMetrics {
+  fromMs: number /* int64 */;
+  stepSec: number /* int */;
+  count: number /* int */;
+  series: HostMetricsSeries[];
+}
+/**
+ * HostMetricsSeries is one line on a chart; a null value is a bucket the
+ * agent holds nothing for and must render as a gap, not a zero.
+ */
+export interface HostMetricsSeries {
+  name: string;
+  labels?: { [key: string]: string};
+  values: (number /* float64 */ | undefined)[];
+}
+/**
  * Host is a managed machine.
  * +openapi:description=主机：通过 agent 纳管或手工录入的机器
  */

@@ -18,6 +18,7 @@ import { hostsApi } from "@/modules/compute/api/hosts"
 import { hostsDef } from "@/modules/compute/defs"
 import { AgentStatusBadge } from "@/modules/compute/components/agent-status-badge"
 import { HostEditDialog } from "@/modules/compute/components/host-edit-dialog"
+import { HostMetricsPanel } from "@/modules/compute/components/host-metrics-panel"
 import { AgentInstallDialog } from "@/modules/compute/components/agent-install-dialog"
 import { HostMergeDialog } from "@/modules/compute/components/host-merge-dialog"
 import { HostTerminalDialog } from "@/modules/compute/components/host-terminal-dialog"
@@ -242,6 +243,8 @@ export default function HostDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      <HostMetricsPanel host={host} scope={scope} />
 
       <HostEditDialog
         host={editOpen ? host : null}
