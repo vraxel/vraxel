@@ -103,11 +103,16 @@ export function defineAction<TBody = void, TResp = unknown>(def: ResourceDef, ac
     )
 }
 
-/** Read-only custom verb: GET /{resource}/{id}:{verb} (backend CustomVerbs[]). */
+/**
+ * Read-only verb on one item: GET /{resource}/{id}/{verb} (backend
+ * VerbDef, inherits the parent's get permission). For verbs whose answer
+ * is a single object; a verb answering a list shape reads better through
+ * defineSubApi.
+ */
 export function defineVerb<TResp>(def: ResourceDef, verb: string) {
   return (s: ScopeRef, id: string | number, params?: object) =>
     apiRequest<TResp>(
-      api.get(resourcePath(def, s, id, { verb }), { searchParams: toSearchParams(params) }).json(),
+      api.get(resourcePath(def, s, id, verb), { searchParams: toSearchParams(params) }).json(),
     )
 }
 

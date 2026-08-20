@@ -56,21 +56,19 @@ export function scopeOf(s: ScopeRef): Scope {
 
 /**
  * API path for a resource collection/item under a scope, relative to the
- * shared ky prefix "/api". Segments append as path parts; a trailing
- * { verb } produces the backend CustomVerb colon form `:{verb}`.
+ * shared ky prefix "/api". Segments append as plain path parts --
+ * read-only verbs included, because the backend registers them as
+ * ordinary segments under the item (apiserver resource.go). A colon
+ * form used to be supported here for a URL no route ever served.
  */
 export function resourcePath(
   def: ResourceDef,
   s: ScopeRef,
-  ...segments: (string | number | { verb: string })[]
+  ...segments: (string | number)[]
 ): string {
   let p = `${def.module}/v1/${SCOPE_PREFIX[scopeOf(s)](s)}${def.name}`
   for (const seg of segments) {
-    if (typeof seg === "object") {
-      p += `:${seg.verb}`
-    } else {
-      p += `/${seg}`
-    }
+    p += `/${seg}`
   }
   return p
 }

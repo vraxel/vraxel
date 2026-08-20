@@ -1,8 +1,8 @@
-import { defineAction, defineResourceApi, defineSubApi } from "@/core/api/resource-api"
+import { defineAction, defineResourceApi, defineSubApi, defineVerb } from "@/core/api/resource-api"
 import type { ListParams } from "@/core/api/types"
 import { hostsDef } from "../defs"
 import type { Host, HostList } from "./types"
-import type { HostMergeRequest, HostMergeResponse } from "@/generated/compute"
+import type { HostMergeRequest, HostMergeResponse, HostMetrics } from "@/generated/compute"
 
 // Params the list route understands beyond the standard ones. Both are
 // server-side filters, so the toolbar does not have to hold the whole
@@ -54,7 +54,12 @@ export const mergeHost = defineAction<HostMergeRequest, HostMergeResponse>(hosts
 // Hosts built from the same disk image as this one -- the candidates for
 // a merge, and the evidence for deciding one.
 //
-// defineSubApi rather than defineVerb: the backend registers verbs at
-// /{resource}/{id}/{verb} (apiserver resource.go), while defineVerb
-// builds the colon form no route matches.
+// defineSubApi rather than defineVerb because the answer is a list
+// shape; both build the same /{id}/{segment} URL.
 export const hostImageSiblingsApi = defineSubApi<Host>(hostsDef, "image-siblings")
+
+// One windowed read of the host's utilisation charts. The window rides
+// as snake_case query params; the answer is a fixed grid of derived
+// chart series (see HostMetrics in the generated types), so the caller
+// plots what it gets and never computes a rate.
+export const hostMetricsApi = defineVerb<HostMetrics>(hostsDef, "metrics")

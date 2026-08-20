@@ -6,6 +6,8 @@ info:
 tags:
   - name: AuditLog
     description: 审计日志：记录 API 写操作和认证事件
+  - name: HostMetrics
+    description: 主机监控曲线：固定网格 + 派生后的图表序列，null 为该桶无数据。
   - name: Host
     description: 主机：通过 agent 纳管或手工录入的机器
   - name: AgentJoinToken
@@ -355,6 +357,44 @@ paths:
       responses:
         "200":
           description: OK
+  /api/compute/v1/hosts/{hostId}/metrics:
+    get:
+      summary: Get metrics of Host
+      operationId: listHostsMetrics
+      tags:
+        - Host
+      parameters:
+        - name: hostId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricList'
   /api/compute/v1/hosts/{hostId}/terminal:
     get:
       summary: terminal Host
@@ -687,6 +727,49 @@ paths:
       responses:
         "200":
           description: OK
+  /api/compute/v1/workspaces/{workspaceId}/hosts/{hostId}/metrics:
+    get:
+      summary: Get metrics of Host
+      operationId: listWorkspacesHostsMetrics
+      tags:
+        - Host
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: hostId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricList'
   /api/compute/v1/workspaces/{workspaceId}/hosts/{hostId}/terminal:
     get:
       summary: terminal Host
@@ -1085,6 +1168,54 @@ paths:
       responses:
         "200":
           description: OK
+  /api/compute/v1/workspaces/{workspaceId}/namespaces/{namespaceId}/hosts/{hostId}/metrics:
+    get:
+      summary: Get metrics of Host
+      operationId: listWorkspacesNamespacesHostsMetrics
+      tags:
+        - Host
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: namespaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: hostId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricList'
   /api/compute/v1/workspaces/{workspaceId}/namespaces/{namespaceId}/hosts/{hostId}/terminal:
     get:
       summary: terminal Host
@@ -3419,6 +3550,22 @@ components:
             $ref: '#/components/schemas/Host'
         totalCount:
           type: integer
+    HostMetrics:
+      type: object
+      properties:
+        count:
+          type: integer
+          format: int
+        fromMs:
+          type: integer
+          format: int64
+        series:
+          type: array
+          items:
+            $ref: '#/components/schemas/HostMetricsSeries'
+        stepSec:
+          type: integer
+          format: int
     HostSpec:
       type: object
       properties:
@@ -3522,6 +3669,15 @@ components:
         workspaceName:
           type: string
     Image-siblingList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+        totalCount:
+          type: integer
+    MetricList:
       type: object
       properties:
         items:
@@ -4118,6 +4274,7 @@ x-tagGroups:
       - AuditLog
   - name: compute
     tags:
+      - HostMetrics
       - Host
       - AgentJoinToken
   - name: iam
