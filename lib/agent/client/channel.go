@@ -107,6 +107,12 @@ type Channel struct {
 	// event self-correct instead of leaving the server permanently wrong.
 	ProbeStates func() []agenttypes.ProbeState
 
+	// MetricsSummary, if set, is sampled on every heartbeat: the
+	// current-utilisation snapshot the host list sorts and filters on.
+	// Nil results are fine and expected -- the collector needs two
+	// samples before it can say anything honest.
+	MetricsSummary func() *agenttypes.MetricsSummary
+
 	// live holds the current session's writer, so callers outside the
 	// frame loop (probe verdicts, pending_restart) can push a frame
 	// without one being handed to them first.
@@ -322,6 +328,7 @@ func (c *Channel) heartbeatLoop(ctx context.Context, send SendFunc, endSession c
 				ID:          fmt.Sprintf("hb-%d", seq),
 				ClockUnixMs: time.Now().UnixMilli(),
 				ProbeStates: c.probeStates(),
+				Metrics:     c.metricsSummary(),
 			}); err != nil {
 				c.Log.Warnf("control channel: heartbeat failed (%v); reconnecting", err)
 				endSession()
@@ -347,6 +354,13 @@ func (c *Channel) handle(ctx context.Context, f agenttypes.Frame, send SendFunc)
 // metrics that are, by design, second class. Unhealthy probes are kept
 // first: they are what an operator is looking for, and the server
 // reconciles the rest from the change events.
+func (c *Channel) metricsSummary() *agenttypes.MetricsSummary {
+	if c.MetricsSummary == nil {
+		return nil
+	}
+	return c.MetricsSummary()
+}
+
 func (c *Channel) probeStates() []agenttypes.ProbeState {
 	if c.ProbeStates == nil {
 		return nil

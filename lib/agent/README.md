@@ -11,18 +11,24 @@ Outbound only. The agent listens on nothing.
 |---|---|
 | `types` | The wire contract. Zero dependencies, shared verbatim by both ends. |
 | `client` | Control channel: register, dial, heartbeat, reconnect, frame loop. |
-| `datachan` | Data channel: one WSS per host, yamux streams, `tcp` / `pty` / `exec` / `file` kinds. |
+| `datachan` | Data channel: one WSS per host, yamux streams, `tcp` / `pty` / `exec` / `file` / `metrics` kinds. |
 | `probe` | Local periodic probes with k8s threshold semantics. |
 | `transport` | The TLS trust store and HTTP client every outbound call shares. |
 | `scrape` | Local exporter collection, pushed to VictoriaMetrics. |
+| `nodemetrics` | Host metrics: node_exporter's collector set run in-process, 24h in-memory history, windowed queries. |
 | `upgrade` | Self-replacement of the agent binary, with rollback. |
 | `hostinfo` | Static host facts for registration. |
 
 ## Dependency surface
 
 `lib/agent/...` imports exactly one package from this repo,
-`lib/websocket` (itself self-contained), and four third-party libraries:
+`lib/websocket` (itself self-contained), and two kinds of third-party
+code. The transport and terminal core needs four small libraries:
 `coder/websocket`, `hashicorp/yamux`, `creack/pty`, `google/uuid`.
+`nodemetrics` additionally imports `prometheus/node_exporter/collector`
+and its tree (client_golang, procfs, kingpin, per-collector helpers) --
+accepted deliberately, see `nodemetrics/source_linux.go` for why running
+upstream's collectors beats reimplementing or forking them.
 
 It imports nothing from `pkg/apis`, and that is enforced:
 

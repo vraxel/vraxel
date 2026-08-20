@@ -37,7 +37,7 @@ type gateway struct {
 	cancel  context.CancelFunc
 }
 
-func newGateway(t *testing.T, guard *Guard) *gateway {
+func newGateway(t *testing.T, guard *Guard, opts ...func(*Config)) *gateway {
 	t.Helper()
 	g := &gateway{sess: make(chan *yamux.Session, 1)}
 
@@ -62,12 +62,16 @@ func newGateway(t *testing.T, guard *Guard) *gateway {
 	}))
 	t.Cleanup(g.srv.Close)
 
-	g.channel = New(Config{
+	cfg := Config{
 		ServerURL: g.srv.URL,
 		Token:     func() string { return "session-token" },
 		Guard:     guard,
 		Log:       testLogger{t},
-	})
+	}
+	for _, o := range opts {
+		o(&cfg)
+	}
+	g.channel = New(cfg)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	g.cancel = cancel
