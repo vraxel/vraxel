@@ -57,27 +57,35 @@ type protocolHandler struct {
 	// fleet-wide install storm hashes a ~20MB file once rather than once
 	// per host.
 	binaryDir string
-	shaMu     sync.Mutex
-	shaCache  map[string]string
+	// metricsPushURL / serverName feed the scrape-targets answer: the VM
+	// address hosts push to (empty = lite tier, no push), and the
+	// deployment identity that labels every series so one VM can ingest
+	// several deployments.
+	metricsPushURL string
+	serverName     string
+	shaMu          sync.Mutex
+	shaCache       map[string]string
 }
 
 // NewProtocolHandler builds the two handlers the gateway exposes over
 // HTTP: the /api/agent/v1/ branch, and the install script that sits at
 // the root. They share one protocolHandler because the script has to
 // state the digests of the binaries the same instance serves.
-func NewProtocolHandler(ctx context.Context, stores gwstore.Stores, registrar HostRegistrar, signer *TokenSigner, sessionSigner *SessionTokenSigner, registry *Registry, runManager *RunManager, dataHub *DataHub, alerts *alertEvaluator) (protocol, installScript http.HandlerFunc) {
+func NewProtocolHandler(ctx context.Context, stores gwstore.Stores, registrar HostRegistrar, signer *TokenSigner, sessionSigner *SessionTokenSigner, registry *Registry, runManager *RunManager, dataHub *DataHub, alerts *alertEvaluator, metricsPushURL, serverName string) (protocol, installScript http.HandlerFunc) {
 	h := &protocolHandler{
-		agents:        stores.Agent,
-		joinTokens:    stores.JoinToken,
-		registrar:     registrar,
-		signer:        signer,
-		sessionSigner: sessionSigner,
-		registry:      registry,
-		runManager:    runManager,
-		dataHub:       dataHub,
-		alerts:        alerts,
-		ctx:           ctx,
-		binaryDir:     agentBinaryDir(),
+		agents:         stores.Agent,
+		joinTokens:     stores.JoinToken,
+		registrar:      registrar,
+		signer:         signer,
+		sessionSigner:  sessionSigner,
+		registry:       registry,
+		runManager:     runManager,
+		dataHub:        dataHub,
+		alerts:         alerts,
+		ctx:            ctx,
+		binaryDir:      agentBinaryDir(),
+		metricsPushURL: metricsPushURL,
+		serverName:     serverName,
 	}
 	return h.serve, h.handleInstallScript
 }
@@ -91,6 +99,8 @@ func (h *protocolHandler) serve(w http.ResponseWriter, r *http.Request) {
 		h.handleChannel(w, r)
 	case rest == "data-channel":
 		h.handleDataChannel(w, r)
+	case rest == "scrape-targets":
+		h.handleScrapeTargets(w, r)
 	case strings.HasPrefix(rest, "binary/"):
 		h.handleBinary(w, r, strings.TrimPrefix(rest, "binary/"))
 	default:

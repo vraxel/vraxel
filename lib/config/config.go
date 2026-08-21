@@ -20,6 +20,25 @@ type Config struct {
 	Logger   LoggerConfig   `yaml:"logger"`
 	OIDC     OIDCConfig     `yaml:"oidc"`
 	Admin    AdminConfig    `yaml:"admin"`
+	Metrics  MetricsConfig  `yaml:"metrics"`
+}
+
+// MetricsConfig turns on the full metrics tier: a VictoriaMetrics the
+// agents push their embedded collector output to, and the server
+// queries charts from. Both empty (the default) is the lite tier --
+// history stays in each agent's in-memory ring and charts read it over
+// the data channel. The two URLs are separate on purpose: hosts and the
+// server routinely sit on different networks, and the address a host
+// can push to is not necessarily one the server can query.
+type MetricsConfig struct {
+	// PushURL is the VictoriaMetrics base URL reachable FROM the managed
+	// hosts, e.g. "http://vm.internal:8428". Non-empty makes
+	// scrape-targets tell every agent to push its collector output.
+	PushURL string `yaml:"pushUrl"`
+	// QueryURL is the VictoriaMetrics base URL reachable from
+	// vraxel-server. Non-empty switches the host charts to querying VM
+	// instead of the agents' rings.
+	QueryURL string `yaml:"queryUrl"`
 }
 
 // ServerConfig holds server-level configuration.

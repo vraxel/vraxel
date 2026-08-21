@@ -50,3 +50,12 @@ admin:
   email: "admin@vraxel.io"
   phone: "13800000000"
   displayName: "Admin"
+
+metrics:
+  # Full metrics tier: a VictoriaMetrics instance. Both empty (default)
+  # runs the lite tier -- 24h of history in each agent's memory, charts
+  # read on demand over the data channel; nothing extra to deploy.
+  # pushUrl must be reachable FROM the managed hosts; queryUrl from this
+  # server. They differ whenever hosts sit behind a different network.
+  pushUrl: ""   # e.g. "http://vm.internal:8428"
+  queryUrl: ""  # e.g. "http://vm.internal:8428"

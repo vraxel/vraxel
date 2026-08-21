@@ -2,6 +2,7 @@ package nodemetrics
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	dto "github.com/prometheus/client_model/go"
@@ -75,5 +76,35 @@ func TestMetricValueJSONRoundTrip(t *testing.T) {
 	}
 	if out[0] != 1.5 || !out[1].IsNone() {
 		t.Fatalf("round trip: %v", out)
+	}
+}
+
+func TestRenderFamilies(t *testing.T) {
+	fams := []*dto.MetricFamily{
+		{
+			Name:   sp("node_load1"),
+			Help:   sp("1m load average."),
+			Type:   tp(dto.MetricType_GAUGE),
+			Metric: []*dto.Metric{{Gauge: &dto.Gauge{Value: fp(0.5)}}},
+		},
+		{
+			Name: sp("node_cpu_seconds_total"),
+			Type: tp(dto.MetricType_COUNTER),
+			Metric: []*dto.Metric{{
+				Label:   []*dto.LabelPair{{Name: sp("mode"), Value: sp("idle")}},
+				Counter: &dto.Counter{Value: fp(12.5)},
+			}},
+		},
+	}
+	text := string(renderFamilies(fams))
+	for _, want := range []string{
+		"# HELP node_load1 1m load average.",
+		"# TYPE node_load1 gauge",
+		"node_load1 0.5",
+		`node_cpu_seconds_total{mode="idle"} 12.5`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("exposition missing %q:\n%s", want, text)
+		}
 	}
 }

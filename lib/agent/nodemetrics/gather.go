@@ -1,8 +1,23 @@
 package nodemetrics
 
 import (
+	"bytes"
+
 	dto "github.com/prometheus/client_model/go"
+	"github.com/prometheus/common/expfmt"
 )
+
+// renderFamilies writes the families as Prometheus exposition text --
+// the same encoder the exporter ecosystem uses, so what the full tier
+// pushes is what node_exporter would have served. A family the encoder
+// rejects is skipped rather than failing the batch.
+func renderFamilies(families []*dto.MetricFamily) []byte {
+	var buf bytes.Buffer
+	for _, f := range families {
+		_, _ = expfmt.MetricFamilyToText(&buf, f)
+	}
+	return buf.Bytes()
+}
 
 // familiesToSample converts one Gather into ring points.
 //

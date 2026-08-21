@@ -84,12 +84,13 @@ func NewModules(ctx context.Context, database *db.DB, listenAddr string) Result 
 	// The agent gateway: machine-facing register + control-channel surface.
 	// Not a REST module; its handler is mounted by main ahead of IAM.
 	agentgwResult := agentgw.NewModule(ctx, database, agentgw.Deps{
-		HostRegistrar: compute.NewAgentHostRegistrar(database),
-		HostScopes:    compute.NewHostScopes(database),
-		JoinTokens:    agentgw.NewJoinTokenStore(database),
-		EncryptionKey: pkiResult.EncryptionKey,
-		ServerName:    config.Get().Server.Name,
-		ListenAddr:    listenAddr,
+		HostRegistrar:  compute.NewAgentHostRegistrar(database),
+		HostScopes:     compute.NewHostScopes(database),
+		MetricsPushURL: config.Get().Metrics.PushURL,
+		JoinTokens:     agentgw.NewJoinTokenStore(database),
+		EncryptionKey:  pkiResult.EncryptionKey,
+		ServerName:     config.Get().Server.Name,
+		ListenAddr:     listenAddr,
 	})
 
 	// Host watch: cross-instance host / agent-status events onto this
@@ -122,7 +123,7 @@ func moduleRegistrars(database *db.DB, serverURL string, hostWatch *statushub.Hu
 	return []func(*apiserver.Server){
 		iam.Registrar(database),
 		audit.Registrar(database),
-		compute.Registrar(database, serverURL, hostWatch, terminals, terminalDialer),
+		compute.Registrar(database, serverURL, hostWatch, terminals, terminalDialer, config.Get().Metrics.QueryURL),
 	}
 }
 

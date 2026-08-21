@@ -20,9 +20,22 @@ type ScrapeTarget struct {
 	Labels map[string]string `json:"labels,omitempty"`
 }
 
+// NodeMetricsPush tells the agent to push its embedded collector's
+// output alongside the scraped targets. The labels ride every line via
+// extra_label -- the server decides them (host identity, job), the
+// agent never invents its own. Nil means do not push, which is both the
+// lite tier and the server's dedup switch for a host that already runs
+// a real node_exporter target.
+type NodeMetricsPush struct {
+	Labels map[string]string `json:"labels,omitempty"`
+}
+
 // ScrapeTargetsResponse is the scrape-targets body.
 type ScrapeTargetsResponse struct {
 	Targets []ScrapeTarget `json:"targets"`
+	// NodeMetrics, when set, turns on pushing the embedded collector's
+	// exposition to PushURL on the scrape interval.
+	NodeMetrics *NodeMetricsPush `json:"nodeMetrics,omitempty"`
 	// PushURL is the VictoriaMetrics base URL reachable FROM the host.
 	// Empty disables scraping entirely.
 	PushURL string `json:"pushUrl"`

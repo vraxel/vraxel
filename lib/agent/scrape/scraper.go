@@ -84,7 +84,14 @@ type Config struct {
 	// uses the system defaults. Exporters are on loopback and plain HTTP,
 	// so it never applies to them.
 	TLS *tls.Config
-	Log Logger
+	// Self returns the embedded collector's exposition body and the time
+	// it was sampled, or a nil body when the host collects nothing.
+	// Pushed on the scrape interval whenever the server's answer enables
+	// it (NodeMetrics) -- the server decides, the agent never guesses.
+	// This is the one body this package renders itself; scraped targets
+	// stay byte-for-byte passthrough.
+	Self func() (body []byte, at time.Time)
+	Log  Logger
 }
 
 // Scraper owns the per-target loops and the target list.
@@ -105,7 +112,12 @@ type Scraper struct {
 	// out the interval it read at startup -- the default, since no target
 	// list has arrived yet -- and the first batch would be one default
 	// interval late no matter what period the server asked for.
+	// selfChanged is the same wakeup for the self-push loop. Two
+	// channels, not one: a single size-1 channel with two receivers
+	// hands each signal to whichever loop wins the race, and the loser
+	// keeps serving the interval it started with.
 	settingsChanged chan struct{}
+	selfChanged     chan struct{}
 
 	mu       sync.Mutex
 	targets  map[string]*targetLoop
@@ -119,6 +131,27 @@ type settings struct {
 	pushURL     string
 	ingestToken string
 	interval    time.Duration
+	// selfLabels non-nil means the server asked for the embedded
+	// collector's output to be pushed, carrying these labels.
+	selfLabels map[string]string
+}
+
+// equal replaces the == the struct lost when it grew a map field. The
+// comparison matters: it is what turns "the server said the same thing
+// again" into not waking the loops.
+func (a settings) equal(b settings) bool {
+	if a.pushURL != b.pushURL || a.ingestToken != b.ingestToken || a.interval != b.interval {
+		return false
+	}
+	if (a.selfLabels == nil) != (b.selfLabels == nil) || len(a.selfLabels) != len(b.selfLabels) {
+		return false
+	}
+	for k, v := range a.selfLabels {
+		if b.selfLabels[k] != v {
+			return false
+		}
+	}
+	return true
 }
 
 // result is one target's last outcome, the raw material for the
@@ -156,6 +189,7 @@ func New(cfg Config) *Scraper {
 		workers:         make(chan struct{}, maxWorkers),
 		refreshNow:      make(chan struct{}, 1),
 		settingsChanged: make(chan struct{}, 1),
+		selfChanged:     make(chan struct{}, 1),
 		targets:         map[string]*targetLoop{},
 		results:         map[string]result{},
 		settings:        settings{interval: defaultInterval},
@@ -185,6 +219,7 @@ func (s *Scraper) Refresh() {
 // until ctx ends.
 func (s *Scraper) Run(ctx context.Context) {
 	go s.runSynthetic(ctx)
+	go s.runSelf(ctx)
 
 	ticker := time.NewTicker(refreshInterval)
 	defer ticker.Stop()
@@ -218,7 +253,13 @@ func (s *Scraper) refresh(ctx context.Context) error {
 
 	s.mu.Lock()
 	next := settings{pushURL: resp.PushURL, ingestToken: resp.IngestToken, interval: interval}
-	changed := next != s.settings
+	if resp.NodeMetrics != nil {
+		next.selfLabels = resp.NodeMetrics.Labels
+		if next.selfLabels == nil {
+			next.selfLabels = map[string]string{}
+		}
+	}
+	changed := !next.equal(s.settings)
 	s.settings = next
 	wanted := map[string]agenttypes.ScrapeTarget{}
 	for _, t := range resp.Targets {
@@ -253,6 +294,10 @@ func (s *Scraper) refresh(ctx context.Context) error {
 	if changed {
 		select {
 		case s.settingsChanged <- struct{}{}:
+		default:
+		}
+		select {
+		case s.selfChanged <- struct{}{}:
 		default:
 		}
 	}

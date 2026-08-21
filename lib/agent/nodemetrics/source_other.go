@@ -2,7 +2,11 @@
 
 package nodemetrics
 
-import "errors"
+import (
+	"errors"
+
+	dto "github.com/prometheus/client_model/go"
+)
 
 // errUnsupported is why nothing is collected off Linux.
 //
@@ -19,4 +23,6 @@ type source struct{}
 
 func newSource(Logger) (*source, error) { return nil, errUnsupported }
 
-func (s *source) collect(atMs int64) Sample { return Sample{AtMs: atMs} }
+func (s *source) collect(atMs int64) (Sample, []*dto.MetricFamily) {
+	return Sample{AtMs: atMs}, nil
+}
