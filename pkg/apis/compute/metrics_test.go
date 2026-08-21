@@ -126,3 +126,15 @@ func contains(s, sub string) bool {
 	}
 	return false
 }
+
+// A misaligned window sitting exactly at the point cap gains a bucket
+// once both ends are grid-aligned. The verb must count the way the agent
+// counts, or it waves through a request the agent then 409s.
+func TestMetricsVerbBoundsMatchAgentAlignment(t *testing.T) {
+	o := hostMetricsOps{hosts: fakeHostReader{}, backend: &fakeMetricsBackend{res: &HostMetrics{}}}
+	if _, err := o.series(metricsCtx(), 7, list.Query{Filters: map[string]any{
+		"from_ms": "1", "to_ms": "30000001", "step_sec": "15",
+	}}); err == nil {
+		t.Fatal("2001 aligned buckets must be a 400 here, not a data-channel 409")
+	}
+}

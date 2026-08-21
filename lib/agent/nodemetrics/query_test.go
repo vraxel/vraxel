@@ -165,3 +165,23 @@ func close(a, b float64) bool {
 	d := a - b
 	return d < 0.001 && d > -0.001
 }
+
+// The UI's "last hour at 15s" preset: from is the caller's now minus one
+// hour, and the newest sample lags that now by up to a sampling period.
+// An exact coverage test silently downgraded exactly this request to the
+// coarse tier -- the flagship window was the one window that never got
+// its resolution.
+func TestQueryLastHourPresetStaysFine(t *testing.T) {
+	r := NewRing(0)
+	base := int64(2) * 3600 * 1000
+	r.Add(Sample{AtMs: base, Points: []Point{{Name: mLoad1, Kind: Gauge, Value: 1}}})
+
+	callerNow := base + 9_000 // the sample lags the browser's clock
+	res, err := r.Query(callerNow-3_600_000, callerNow, 15, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.StepSec != 15 {
+		t.Fatalf("the 1h preset must answer at 15s, got %ds", res.StepSec)
+	}
+}

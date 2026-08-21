@@ -126,9 +126,18 @@ func (r *Ring) Query(fromMs, toMs int64, stepSec int, names []string) (agenttype
 	// The fine tier only covers the last hour, so a window reaching
 	// further back has to be answered from the coarse one -- and a caller
 	// asking for minute buckets gains nothing from the fine tier anyway.
+	//
+	// The coverage test carries four slots of slack, and that slack is
+	// what makes the flagship "last hour at 15s" request work at all:
+	// the newest sample lags the caller's clock by up to one sampling
+	// period, so a from of now-1h sits just past the tier's exact span
+	// and an exact test would silently downgrade every such window to
+	// 60s. Buckets the slack admits but the tier does not hold answer
+	// null -- a sliver of gap at the chart's left edge, against the
+	// whole window losing its resolution.
 	coarseMs := CoarseStep.Milliseconds()
 	fine := int64(stepSec)*1000 < coarseMs &&
-		fromMs >= r.newestMs-int64(fineSlots-1)*FineStep.Milliseconds()
+		fromMs >= r.newestMs-int64(fineSlots+4)*FineStep.Milliseconds()
 
 	stepMs := coarseMs
 	if fine {
