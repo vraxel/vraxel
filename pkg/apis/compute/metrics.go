@@ -197,7 +197,14 @@ func (o hostMetricsOps) series(ctx apiserver.Ctx, id int64, q list.Query) (any, 
 	if req.StepSec < 1 {
 		return nil, apierrors.NewBadRequest("step_sec must be at least 1", nil)
 	}
-	if points := (req.ToMs - req.FromMs) / 1000 / int64(req.StepSec); points > agenttypes.MetricsMaxPoints {
+	// The SAME arithmetic the agent applies -- from aligned down, to
+	// aligned up -- not the naive division: a misaligned window sitting
+	// exactly at the cap gains a bucket under alignment, and checking a
+	// different number here would wave through requests the agent then
+	// rejects as a 409.
+	stepMs := int64(req.StepSec) * 1000
+	points := ((req.ToMs+stepMs-1)/stepMs*stepMs - req.FromMs/stepMs*stepMs) / stepMs
+	if points > agenttypes.MetricsMaxPoints {
 		return nil, apierrors.NewBadRequest(
 			fmt.Sprintf("the window at this step is %d points; the limit is %d", points, agenttypes.MetricsMaxPoints), nil)
 	}

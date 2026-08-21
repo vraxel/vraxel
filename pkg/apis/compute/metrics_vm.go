@@ -43,17 +43,20 @@ type vmExpr struct {
 // agent's ring derives locally, expressed over the node_exporter series
 // the full tier pushes. The two backends answering identically for the
 // same window is the "lite to full with no seam" promise, so a change
-// on either side of this table is a change to both.
+// on either side of this table is a change to both. That includes the
+// clamps: every percentage the agent backend runs through clampPct is
+// clamped here too, or a deep disk queue reads 100.4% busy on one tier
+// and 100% on the other.
 var vmVocabulary = map[string]vmExpr{
 	agenttypes.SeriesCPUUsedPct: {
-		expr: `100 * (1 - sum(rate(node_cpu_seconds_total{mode=~"idle|iowait"}[` + vmRateWindow + `])) / sum(rate(node_cpu_seconds_total[` + vmRateWindow + `])))`,
+		expr: `clamp(100 * (1 - sum(rate(node_cpu_seconds_total{mode=~"idle|iowait"}[` + vmRateWindow + `])) / sum(rate(node_cpu_seconds_total[` + vmRateWindow + `]))), 0, 100)`,
 	},
 	agenttypes.SeriesCPUModePct: {
-		expr: `100 * sum by (mode) (rate(node_cpu_seconds_total[` + vmRateWindow + `])) / on () group_left () sum(rate(node_cpu_seconds_total[` + vmRateWindow + `]))`,
+		expr: `clamp(100 * sum by (mode) (rate(node_cpu_seconds_total[` + vmRateWindow + `])) / on () group_left () sum(rate(node_cpu_seconds_total[` + vmRateWindow + `])), 0, 100)`,
 		dim:  "mode",
 	},
 	agenttypes.SeriesMemUsedPct: {
-		expr: `100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)`,
+		expr: `clamp(100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes), 0, 100)`,
 	},
 	agenttypes.SeriesMemUsed: {
 		expr: `node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes`,
@@ -63,13 +66,13 @@ var vmVocabulary = map[string]vmExpr{
 	// accepted: rendering it as 0 would need per-host or() gymnastics to
 	// keep the vector matched, for a line nobody reads on such hosts.
 	agenttypes.SeriesSwapUsed: {
-		expr: `100 * (1 - node_memory_SwapFree_bytes / node_memory_SwapTotal_bytes)`,
+		expr: `clamp(100 * (1 - node_memory_SwapFree_bytes / node_memory_SwapTotal_bytes), 0, 100)`,
 	},
 	agenttypes.SeriesLoad1:  {expr: `node_load1`},
 	agenttypes.SeriesLoad5:  {expr: `node_load5`},
 	agenttypes.SeriesLoad15: {expr: `node_load15`},
 	agenttypes.SeriesFSUsedPct: {
-		expr: `100 * (1 - node_filesystem_avail_bytes / node_filesystem_size_bytes)`,
+		expr: `clamp(100 * (1 - node_filesystem_avail_bytes / node_filesystem_size_bytes), 0, 100)`,
 		dim:  "mountpoint",
 	},
 	agenttypes.SeriesFSSize: {
@@ -85,7 +88,7 @@ var vmVocabulary = map[string]vmExpr{
 		dim:  "device",
 	},
 	agenttypes.SeriesDiskUtilPct: {
-		expr: `100 * rate(node_disk_io_time_seconds_total[` + vmRateWindow + `])`,
+		expr: `clamp(100 * rate(node_disk_io_time_seconds_total[` + vmRateWindow + `]), 0, 100)`,
 		dim:  "device",
 	},
 	agenttypes.SeriesNetRxBps: {
