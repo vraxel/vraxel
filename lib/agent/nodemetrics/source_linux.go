@@ -8,6 +8,7 @@ import (
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/node_exporter/collector"
 )
 
@@ -78,7 +79,7 @@ func newSource(log Logger) (*source, error) {
 // exactly what is wanted: one broken collector must not cost the round.
 // Per-collector failures are additionally visible in the data itself,
 // as node_scrape_collector_success{collector=...} 0.
-func (s *source) collect(atMs int64) Sample {
+func (s *source) collect(atMs int64) (Sample, []*dto.MetricFamily) {
 	fams, err := s.reg.Gather()
 	msg := ""
 	if err != nil {
@@ -90,5 +91,5 @@ func (s *source) collect(atMs int64) Sample {
 		}
 		s.lastGatherErr = msg
 	}
-	return familiesToSample(atMs, fams)
+	return familiesToSample(atMs, fams), fams
 }

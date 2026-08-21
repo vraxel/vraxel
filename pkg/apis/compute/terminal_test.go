@@ -17,7 +17,8 @@ import (
 // terminalAction finds the terminal action on the hosts resource.
 func terminalAction(t *testing.T) apiserver.ActionDef {
 	t.Helper()
-	def := HostsDef(nil, nil, nil, nil, NewTerminalSessions(), NewAgentDialerHolder())
+	def := HostsDef(nil, nil, nil, nil, NewTerminalSessions(), NewAgentDialerHolder(),
+		NewAgentLiveMetrics(NewAgentDialerHolder()))
 	for _, a := range def.Actions {
 		if a.Name == "terminal" {
 			return a

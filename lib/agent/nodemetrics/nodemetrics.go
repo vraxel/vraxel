@@ -44,7 +44,10 @@ package nodemetrics
 
 import (
 	"context"
+	"sync"
 	"time"
+
+	dto "github.com/prometheus/client_model/go"
 
 	agenttypes "vraxel.io/vraxel/lib/agent/types"
 )
@@ -71,6 +74,15 @@ type Collector struct {
 	// by Run's goroutine. It exists so a host that is permanently over
 	// the cap says so once rather than once every fifteen seconds.
 	lastDropped int
+
+	// The last gather, kept for Exposition. The ring cannot serve that
+	// role: it caps series, drops non-gauge/counter types and holds no
+	// HELP/TYPE lines, so rendering from it would push a degraded copy
+	// of what node_exporter would have served -- and byte-equivalence
+	// with node_exporter is the full tier's whole promise.
+	mu       sync.Mutex
+	families []*dto.MetricFamily
+	sampled  time.Time
 }
 
 // New builds a Collector. It reads nothing until Run.
@@ -105,7 +117,13 @@ func (c *Collector) Run(ctx context.Context) {
 }
 
 func (c *Collector) round(src *source) {
-	dropped := c.ring.Add(src.collect(time.Now().UnixMilli()))
+	now := time.Now()
+	sample, families := src.collect(now.UnixMilli())
+	c.mu.Lock()
+	c.families, c.sampled = families, now
+	c.mu.Unlock()
+
+	dropped := c.ring.Add(sample)
 	if dropped == c.lastDropped {
 		return
 	}
@@ -126,4 +144,18 @@ func (c *Collector) Summary() *agenttypes.MetricsSummary { return c.ring.Summary
 // Query answers one windowed read of the history.
 func (c *Collector) Query(fromMs, toMs int64, stepSec int, names []string) (agenttypes.MetricsResult, error) {
 	return c.ring.Query(fromMs, toMs, stepSec, names)
+}
+
+// Exposition renders the last gather as Prometheus exposition text, and
+// says when it was sampled -- the shape scrape.Config.Self wants. A nil
+// body means the host collects nothing (or has not sampled yet), which
+// the push loop treats as "nothing this round".
+func (c *Collector) Exposition() ([]byte, time.Time) {
+	c.mu.Lock()
+	families, at := c.families, c.sampled
+	c.mu.Unlock()
+	if len(families) == 0 {
+		return nil, at
+	}
+	return renderFamilies(families), at
 }

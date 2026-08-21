@@ -71,7 +71,10 @@ func (h hostScopes) GetHostScope(ctx context.Context, hostID int64) (string, *in
 // hub is the watch stream from NewModule. It is required: the /watch
 // route binds it at registration, so a caller with nothing to stream
 // passes an unattached hub rather than nil.
-func Registrar(database *db.DB, serverURL string, hub *statushub.Hub, terminals *ws.SessionManager, dialer *AgentDialerHolder) func(*apiserver.Server) {
+// metricsQueryURL is config metrics.queryUrl. Non-empty switches the
+// host charts from the agents' in-memory rings to VictoriaMetrics; the
+// frontend cannot tell, which is the point of the MetricsBackend seam.
+func Registrar(database *db.DB, serverURL string, hub *statushub.Hub, terminals *ws.SessionManager, dialer *AgentDialerHolder, metricsQueryURL string) func(*apiserver.Server) {
 	hosts := modstore.NewPGHostStore(database)
 	// host_agents belongs to the gateway; the merge reaches it through
 	// the same top-level factory the join-token store uses, so no
@@ -84,7 +87,11 @@ func Registrar(database *db.DB, serverURL string, hub *statushub.Hub, terminals 
 	// cross-module data path in the tree works.
 	tokens := agentgw.NewJoinTokenStore(database)
 	return func(s *apiserver.Server) {
-		apiserver.Register(s, HostsDef(hosts, agentHosts, agents, hub, terminals, dialer))
+		backend := NewAgentLiveMetrics(dialer)
+		if metricsQueryURL != "" {
+			backend = NewVMMetrics(metricsQueryURL)
+		}
+		apiserver.Register(s, HostsDef(hosts, agentHosts, agents, hub, terminals, dialer, backend))
 		apiserver.Register(s, AgentJoinTokensDef(tokens, hosts, serverURL))
 		apiserver.Register(s, AlertRulesDef(modstore.NewPGAlertRuleStore(database)))
 	}

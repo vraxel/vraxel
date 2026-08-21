@@ -77,6 +77,10 @@ type Deps struct {
 	// ServerName is config server.name, the deployment identity component
 	// of this instance's id.
 	ServerName string
+	// MetricsPushURL is config metrics.pushUrl: the VictoriaMetrics
+	// address hosts push their collector output to. Empty is the lite
+	// tier -- scrape-targets then tells agents to push nothing.
+	MetricsPushURL string
 	// ListenAddr is the address this process serves HTTP on. It is the
 	// port source for the address siblings use to reach this instance;
 	// externalUrl cannot be, because behind a load balancer it names the
@@ -143,7 +147,8 @@ func NewModule(ctx context.Context, database *db.DB, deps Deps) ModuleResult {
 
 	handler, installScript := NewProtocolHandler(ctx, stores, deps.HostRegistrar,
 		NewTokenSigner(deps.EncryptionKey), NewSessionTokenSigner(deps.EncryptionKey),
-		registry, runManager, dataHub, newAlertEvaluator(stores.Alert, deps.HostScopes))
+		registry, runManager, dataHub, newAlertEvaluator(stores.Alert, deps.HostScopes),
+		deps.MetricsPushURL, deps.ServerName)
 
 	return ModuleResult{
 		ProtocolHandler:      handler,

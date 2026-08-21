@@ -26,6 +26,7 @@ import (
 	"vraxel.io/vraxel/lib/agent/datachan"
 	"vraxel.io/vraxel/lib/agent/hostinfo"
 	"vraxel.io/vraxel/lib/agent/nodemetrics"
+	"vraxel.io/vraxel/lib/agent/scrape"
 	"vraxel.io/vraxel/lib/agent/transport"
 	agenttypes "vraxel.io/vraxel/lib/agent/types"
 	"vraxel.io/vraxel/lib/buildinfo"
@@ -113,6 +114,19 @@ func main() {
 	// channel has its own reconnect, and it parks itself when idle.
 	go a.data.Run(ctx)
 
+	// The scraper is inert until the server's scrape-targets answer says
+	// otherwise (a push URL, targets, the node-metrics switch), so
+	// starting it unconditionally costs one 60s polling loop and nothing
+	// else on the lite tier.
+	a.scraper = scrape.New(scrape.Config{
+		ServerURL: st.ServerURL,
+		Token:     a.sessionToken,
+		TLS:       tlsCfg,
+		Self:      metrics.Exposition,
+		Log:       logger,
+	})
+	go a.scraper.Run(ctx)
+
 	ch := &client.Channel{
 		// Re-read on every connect rather than captured once: resetting
 		// /etc/machine-id is what an operator does to a cloned host, and
@@ -134,8 +148,9 @@ func main() {
 
 // agent owns the state the control channel's frames feed.
 type agent struct {
-	log  stdLogger
-	data *datachan.Channel
+	log     stdLogger
+	data    *datachan.Channel
+	scraper *scrape.Scraper
 
 	// token is the short-lived credential the server pushes over the
 	// control channel and renews for as long as it lives. Stored
@@ -166,6 +181,10 @@ func (a *agent) onFrame(_ context.Context, f agenttypes.Frame, _ client.SendFunc
 		if a.token.Swap(&tok) == nil {
 			a.log.Infof("vr-agent: session token received; the data channel can dial")
 		}
+	case agenttypes.FrameTypeConfigReload:
+		// The server changed something the scraper polls for (targets,
+		// the push switch); skip the 60s wait.
+		a.scraper.Refresh()
 	case agenttypes.FrameTypeChannelOpen:
 		// Carries no parameters: it only asks for the channel to be up.
 		// Ensure is idempotent, so a burst of concurrent openers on the
