@@ -265,6 +265,7 @@ export function HostLogsDialog({
 
           {source === "journal" && (
             <Input
+              name="unit"
               className="w-56"
               value={unitInput}
               onChange={(e) => setUnitInput(e.target.value)}
@@ -275,6 +276,7 @@ export function HostLogsDialog({
 
           {source === "file" && (
             <Input
+              name="path"
               className="w-72 font-mono"
               value={pathInput}
               onChange={(e) => setPathInput(e.target.value)}
