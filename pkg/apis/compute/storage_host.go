@@ -74,6 +74,14 @@ func HostsDef(store modstore.HostStore, agentHosts modstore.AgentHostStore, agen
 			// the one thing here that must never be silent.
 			apiserver.WSAction("terminal", []string{"compute:hosts:terminal"},
 				NewTerminalHandler(store, terminals, dialer), apiserver.MarkInteractive()),
+			// Its own code, like the terminal and unlike metrics: the
+			// journal carries auth logs and whatever every service prints,
+			// which is more than "may read this host's details" should
+			// grant -- and less than a root shell, which is why it does not
+			// demand compute:hosts:terminal either. Read-only, but still a
+			// privileged read, so it is audited the same way.
+			apiserver.WSAction("logs", []string{"compute:hosts:logs"},
+				NewHostLogsHandler(store, terminals, dialer), apiserver.MarkInteractive()),
 		},
 	}
 }

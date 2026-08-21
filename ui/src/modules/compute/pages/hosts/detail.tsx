@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Link, useNavigate, useParams } from "react-router"
-import { ArrowLeft, Pencil, PlugZap, SquareTerminal, Trash2 } from "lucide-react"
+import { ArrowLeft, Pencil, PlugZap, ScrollText, SquareTerminal, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { formatDateTime } from "@/shared/lib/format"
 import { Button } from "@/shared/ui/button"
@@ -21,6 +21,7 @@ import { HostEditDialog } from "@/modules/compute/components/host-edit-dialog"
 import { HostMetricsPanel } from "@/modules/compute/components/host-metrics-panel"
 import { AgentInstallDialog } from "@/modules/compute/components/agent-install-dialog"
 import { HostMergeDialog } from "@/modules/compute/components/host-merge-dialog"
+import { HostLogsDialog } from "@/modules/compute/components/host-logs-dialog"
 import { HostTerminalDialog } from "@/modules/compute/components/host-terminal-dialog"
 import { useHostWatch } from "@/modules/compute/use-host-watch"
 import { ConfirmDialog } from "@/shared/components/confirm-dialog"
@@ -38,6 +39,7 @@ export default function HostDetailPage() {
   const canUpdate = hasPermission("compute:hosts:update", permScope)
   const canDelete = hasPermission("compute:hosts:delete", permScope)
   const canOpenTerminal = hasPermission("compute:hosts:terminal", permScope)
+  const canViewLogs = hasPermission("compute:hosts:logs", permScope)
   // Installing an agent means minting a join token, which the API gates
   // on compute:hosts:create -- a token is the power to bring a machine
   // into this scope.
@@ -48,6 +50,7 @@ export default function HostDetailPage() {
   const [installOpen, setInstallOpen] = useState(false)
   const [mergeOpen, setMergeOpen] = useState(false)
   const [terminalOpen, setTerminalOpen] = useState(false)
+  const [logsOpen, setLogsOpen] = useState(false)
 
   const query = useApiQuery({
     queryKey: qk.detail(hostsDef, scope, hostId ?? ""),
@@ -120,6 +123,21 @@ export default function HostDetailPage() {
             >
               <SquareTerminal className="size-4" />
               {t("compute.host.terminal.open")}
+            </Button>
+          )}
+          {canViewLogs && (
+            <Button
+              variant="outline"
+              size="sm"
+              // Logs ride the same agent channel as the terminal.
+              disabled={host.spec.agentStatus !== "online"}
+              title={
+                host.spec.agentStatus === "online" ? undefined : t("compute.host.logs.needsAgent")
+              }
+              onClick={() => setLogsOpen(true)}
+            >
+              <ScrollText className="size-4" />
+              {t("compute.host.logs.open")}
             </Button>
           )}
           {canInstallAgent && (
@@ -294,6 +312,8 @@ export default function HostDetailPage() {
         open={terminalOpen}
         onOpenChange={setTerminalOpen}
       />
+
+      <HostLogsDialog host={host} scope={scope} open={logsOpen} onOpenChange={setLogsOpen} />
 
       <ConfirmDialog
         open={deleteOpen}

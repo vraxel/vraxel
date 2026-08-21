@@ -444,6 +444,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Image-siblingList'
+  /api/compute/v1/hosts/{hostId}/logs:
+    get:
+      summary: logs Host
+      operationId: logsHosts
+      tags:
+        - Host
+      parameters:
+        - name: hostId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
   /api/compute/v1/hosts/{hostId}/merge:
     post:
       summary: merge Host
@@ -943,6 +958,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Image-siblingList'
+  /api/compute/v1/workspaces/{workspaceId}/hosts/{hostId}/logs:
+    get:
+      summary: logs Host
+      operationId: logsWorkspacesHosts
+      tags:
+        - Host
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: hostId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
   /api/compute/v1/workspaces/{workspaceId}/hosts/{hostId}/merge:
     post:
       summary: merge Host
@@ -1538,6 +1573,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Image-siblingList'
+  /api/compute/v1/workspaces/{workspaceId}/namespaces/{namespaceId}/hosts/{hostId}/logs:
+    get:
+      summary: logs Host
+      operationId: logsWorkspacesNamespacesHosts
+      tags:
+        - Host
+      parameters:
+        - name: workspaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: namespaceId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: hostId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
   /api/compute/v1/workspaces/{workspaceId}/namespaces/{namespaceId}/hosts/{hostId}/merge:
     post:
       summary: merge Host
