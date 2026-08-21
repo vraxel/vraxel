@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"vraxel.io/vraxel/pkg/apis/shared/hostevent"
 	"vraxel.io/vraxel/pkg/db"
@@ -107,9 +108,24 @@ func (s *pgAlertStore) RecordBreach(ctx context.Context, hostID, ruleID int64, v
 		HostID: hostID, RuleID: ruleID, Value: float32(value),
 	})
 	if err != nil {
+		// A foreign-key violation here means the rule (or the host) was
+		// deleted after the evaluator's rule cache last refreshed -- the
+		// write lost a race with a deletion, and losing it produces
+		// exactly the end state a deletion wants: no row. Every instance
+		// keeps hitting this once per beat until its 30s cache catches
+		// up, so treating it as an error would turn each rule deletion
+		// into half a minute of alarming logs about nothing.
+		if isForeignKeyViolation(err) {
+			return nil
+		}
 		return fmt.Errorf("record alert breach: %w", err)
 	}
 	return nil
+}
+
+func isForeignKeyViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23503"
 }
 
 // The two transition writes publish the host event themselves, because
