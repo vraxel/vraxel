@@ -163,13 +163,13 @@ func TestValidTerminalSizeRejectsUint16Wrap(t *testing.T) {
 // telling them apart, which is exactly the state this replaced.
 func TestOpenFailureReasonSeparatesTheCauses(t *testing.T) {
 	reasons := map[string]string{
-		"offline":   openFailureReason(agentgw.ErrHostUnreachable),
-		"elsewhere": openFailureReason(fmt.Errorf("wrapped: %w", agentgw.ErrHostOnAnotherInstance)),
-		"timed out": openFailureReason(context.DeadlineExceeded),
+		"offline":   openFailureReason(agentgw.ErrHostUnreachable, "terminal"),
+		"elsewhere": openFailureReason(fmt.Errorf("wrapped: %w", agentgw.ErrHostOnAnotherInstance), "terminal"),
+		"timed out": openFailureReason(context.DeadlineExceeded, "terminal"),
 		"agent said no": openFailureReason(&agentgw.StreamRejected{
 			Code: agenttypes.StreamErrTargetNotAllowed, Message: "not loopback",
-		}),
-		"anything else": openFailureReason(errors.New("tunnel broke")),
+		}, "terminal"),
+		"anything else": openFailureReason(errors.New("tunnel broke"), "terminal"),
 	}
 
 	seen := map[string]string{}

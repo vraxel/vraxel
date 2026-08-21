@@ -210,6 +210,26 @@ const compute = {
   "compute.host.terminal.idle": "会话空闲超时，已断开",
   "compute.host.terminal.needsAgent": "该主机尚未接入 agent，无法打开终端",
 
+  // host logs
+  "compute.host.logs.title": "主机日志",
+  "compute.host.logs.open": "查看日志",
+  "compute.host.logs.sourceJournal": "系统日志",
+  "compute.host.logs.sourceKernel": "内核 (dmesg)",
+  "compute.host.logs.sourceFile": "文件",
+  "compute.host.logs.unitPlaceholder": "按 unit 过滤，如 nginx，回车应用",
+  "compute.host.logs.pathPlaceholder": "/var/log/ 下的文件路径，回车应用",
+  "compute.host.logs.priorityAll": "全部级别",
+  "compute.host.logs.follow": "跟随",
+  "compute.host.logs.refresh": "刷新",
+  "compute.host.logs.connecting": "连接中…",
+  "compute.host.logs.connected": "已连接",
+  "compute.host.logs.closed": "已结束",
+  "compute.host.logs.failed": "无法打开日志流",
+  "compute.host.logs.ended": "日志流已结束",
+  "compute.host.logs.wall": "已连续查看 30 分钟，连接已断开，点击刷新重新连接",
+  "compute.host.logs.needPath": "输入 /var/log/ 下的文件路径并回车开始查看",
+  "compute.host.logs.needsAgent": "该主机尚未接入 agent，无法查看日志",
+
   // agent identity refusal
   "compute.agent.foreignMachine": "凭证属于另一台机器",
   "compute.agent.foreignMachineHint":

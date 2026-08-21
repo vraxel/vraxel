@@ -91,7 +91,7 @@ func runTerminalSession(
 		return
 	}
 
-	host, hostID, ok := lookupTerminalHost(ctx, params, conn, hosts)
+	host, hostID, ok := lookupStreamHost(ctx, params, conn, hosts)
 	if !ok {
 		return
 	}
@@ -132,7 +132,7 @@ func runTerminalSession(
 	})
 	if err != nil {
 		logger.Warnf("terminal: open pty on host %d: %v", hostID, err)
-		sendStatus(ctx, conn, "error", openFailureReason(err))
+		sendStatus(ctx, conn, "error", openFailureReason(err, "terminal"))
 		return
 	}
 	defer stream.Close()
@@ -162,7 +162,8 @@ func runTerminalSession(
 }
 
 // openFailureReason turns a stream-open failure into something the
-// operator can act on.
+// operator can act on. what names the thing that failed to open --
+// "terminal", "log stream" -- for the sentences that mention it.
 //
 // These are five different problems -- the machine is not connected, it
 // is connected to a different replica, it never answered, the agent
@@ -170,7 +171,7 @@ func runTerminalSession(
 // means the person reading it cannot tell "install an agent" from "wait
 // a moment" from "file a bug". The detail is in the server log either
 // way; this is what reaches the person who hit it.
-func openFailureReason(err error) string {
+func openFailureReason(err error, what string) string {
 	switch {
 	case errors.Is(err, agentgw.ErrHostUnreachable):
 		return "this host's agent is not connected"
@@ -181,15 +182,16 @@ func openFailureReason(err error) string {
 	}
 	var rejected *agentgw.StreamRejected
 	if errors.As(err, &rejected) {
-		return "the agent refused the terminal: " + rejected.Message
+		return "the agent refused the " + what + ": " + rejected.Message
 	}
-	return "could not open a terminal on this host"
+	return "could not open a " + what + " on this host"
 }
 
-// lookupTerminalHost resolves the host in the caller's scope. The scope
-// comes from the URL, so a workspace-scoped route cannot reach a host in
-// another workspace even with a valid id.
-func lookupTerminalHost(
+// lookupStreamHost resolves the host in the caller's scope for the WS
+// stream routes (terminal, logs). The scope comes from the URL, so a
+// workspace-scoped route cannot reach a host in another workspace even
+// with a valid id.
+func lookupStreamHost(
 	ctx context.Context,
 	params map[string]string,
 	conn *ws.Conn,

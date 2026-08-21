@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Link, useParams } from "react-router"
-import { EllipsisVertical, Pencil, Plus, SquareTerminal, Trash2 } from "lucide-react"
+import { EllipsisVertical, Pencil, Plus, ScrollText, SquareTerminal, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { formatDateTime } from "@/shared/lib/format"
 import { Badge } from "@/shared/ui/badge"
@@ -34,6 +34,7 @@ import {
   HostMemCell,
 } from "@/modules/compute/components/host-metrics-cells"
 import { HostEditDialog } from "@/modules/compute/components/host-edit-dialog"
+import { HostLogsDialog } from "@/modules/compute/components/host-logs-dialog"
 import { HostTerminalDialog } from "@/modules/compute/components/host-terminal-dialog"
 import { useHostWatch } from "@/modules/compute/use-host-watch"
 
@@ -48,12 +49,14 @@ export default function HostListPage() {
   const canUpdate = hasPermission("compute:hosts:update", permScope)
   const canDelete = hasPermission("compute:hosts:delete", permScope)
   const canOpenTerminal = hasPermission("compute:hosts:terminal", permScope)
+  const canViewLogs = hasPermission("compute:hosts:logs", permScope)
 
   const qc = useQueryClient()
 
   const [editTarget, setEditTarget] = useState<Host | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Host | null>(null)
   const [terminalTarget, setTerminalTarget] = useState<Host | null>(null)
+  const [logsTarget, setLogsTarget] = useState<Host | null>(null)
 
   const query = useListQuery<Host>({
     def: hostsDef,
@@ -255,7 +258,7 @@ export default function HostListPage() {
         </Button>
       }
       rowActions={
-        canUpdate || canDelete || canOpenTerminal
+        canUpdate || canDelete || canOpenTerminal || canViewLogs
           ? (h) => (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -275,7 +278,19 @@ export default function HostListPage() {
                       {t("compute.host.terminal.open")}
                     </DropdownMenuItem>
                   )}
-                  {canOpenTerminal && (canUpdate || canDelete) && <DropdownMenuSeparator />}
+                  {canViewLogs && (
+                    <DropdownMenuItem
+                      // Logs ride the same agent channel as the terminal.
+                      disabled={h.spec.agentStatus !== "online"}
+                      onClick={() => setLogsTarget(h)}
+                    >
+                      <ScrollText className="mr-2 h-4 w-4" />
+                      {t("compute.host.logs.open")}
+                    </DropdownMenuItem>
+                  )}
+                  {(canOpenTerminal || canViewLogs) && (canUpdate || canDelete) && (
+                    <DropdownMenuSeparator />
+                  )}
                   {canUpdate && (
                     <DropdownMenuItem onClick={() => setEditTarget(h)}>
                       <Pencil className="mr-2 h-4 w-4" />
@@ -304,6 +319,15 @@ export default function HostListPage() {
           scope={scope}
           open
           onOpenChange={(o) => !o && setTerminalTarget(null)}
+        />
+      )}
+
+      {logsTarget && (
+        <HostLogsDialog
+          host={logsTarget}
+          scope={scope}
+          open
+          onOpenChange={(o) => !o && setLogsTarget(null)}
         />
       )}
 
