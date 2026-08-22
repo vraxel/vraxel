@@ -1,4 +1,5 @@
-import { memo, useCallback, useId, useMemo, useState } from "react"
+import { memo, useCallback, useId, useMemo, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import {
   Area,
   AreaChart,
@@ -117,22 +118,25 @@ function MetricChartImpl({
   const hasData = series.some((s) => s.values.some((v) => typeof v === "number"))
   const scale = useMemo(() => bpsScale(max), [max])
   const gradPrefix = useId().replace(/:/g, "")
+  const mouseRef = useRef({ x: 0, y: 0 })
 
   const [hidden, setHidden] = useState<Set<string>>(() => new Set())
-  // Click = toggle that one series. If every series ends up hidden,
-  // restore all (a chart with nothing visible is useless).
+  // Click = isolate (show only this); Ctrl/Cmd+click = toggle one.
+  // If all end up hidden, restore all.
   const handleLegendClick = useCallback(
-    (label: string) => {
+    (label: string, e: React.MouseEvent) => {
       setHidden((prev) => {
-        const next = new Set(prev)
-        if (next.has(label)) {
-          next.delete(label)
-        } else {
-          next.add(label)
-        }
         const allLabels = series.map((s) => s.label)
-        if (allLabels.every((l) => next.has(l))) return new Set()
-        return next
+        if (e.ctrlKey || e.metaKey) {
+          const next = new Set(prev)
+          if (next.has(label)) next.delete(label)
+          else next.add(label)
+          if (allLabels.every((l) => next.has(l))) return new Set()
+          return next
+        }
+        const visibleCount = allLabels.filter((l) => !prev.has(l)).length
+        if (visibleCount === 1 && !prev.has(label)) return new Set()
+        return new Set(allLabels.filter((l) => l !== label))
       })
     },
     [series],
@@ -153,7 +157,12 @@ function MetricChartImpl({
         </div>
       ) : (
         <>
-          <div className="relative h-[160px] cursor-crosshair">
+          <div
+            className="relative h-[160px] cursor-crosshair"
+            onMouseMove={(e) => {
+              mouseRef.current = { x: e.clientX, y: e.clientY }
+            }}
+          >
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data} margin={{ top: 12, right: 8, bottom: 0, left: 0 }}>
                 <defs>
@@ -212,8 +221,12 @@ function MetricChartImpl({
                         return vb - va
                       })
                     if (!visible.length) return null
-                    return (
-                      <div className="bg-popover text-popover-foreground max-h-[200px] max-w-[360px] overflow-y-auto rounded-md border px-2.5 py-1.5 text-xs shadow-md">
+                    const { x: mx, y: my } = mouseRef.current
+                    return createPortal(
+                      <div
+                        className="bg-popover text-popover-foreground pointer-events-none fixed z-50 max-h-[200px] max-w-[360px] overflow-y-auto rounded-md border px-2.5 py-1.5 text-xs shadow-md"
+                        style={{ left: mx + 16, top: my - 12 }}
+                      >
                         <div className="text-muted-foreground mb-1">
                           {typeof label === "number" ? formatTime(label) : String(label)}
                         </div>
@@ -231,13 +244,13 @@ function MetricChartImpl({
                             </span>
                           </div>
                         ))}
-                      </div>
+                      </div>,
+                      document.body,
                     )
                   }}
                   cursor={{ stroke: "currentColor", strokeOpacity: 0.15, strokeDasharray: "3 3" }}
                   isAnimationActive={false}
-                  allowEscapeViewBox={{ x: true, y: true }}
-                  wrapperStyle={{ zIndex: 20, overflow: "visible" }}
+                  wrapperStyle={{ display: "none" }}
                 />
                 {series.map((s, i) => {
                   const isHidden = hidden.has(s.label)
@@ -274,7 +287,7 @@ function MetricChartImpl({
                   <span
                     key={s.key}
                     className={`flex cursor-pointer items-center gap-1 select-none ${isHidden ? "line-through opacity-40" : ""}`}
-                    onClick={() => handleLegendClick(s.label)}
+                    onClick={(e) => handleLegendClick(s.label, e)}
                   >
                     <span
                       className="inline-block h-2.5 w-2.5 rounded-sm"
