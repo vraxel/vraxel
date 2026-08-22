@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import { keepPreviousData } from "@tanstack/react-query"
 import { formatDateTime } from "@/shared/lib/format"
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card"
 import { Button } from "@/shared/ui/button"
@@ -127,6 +128,11 @@ export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef 
     // from, and the panel says so instead of polling into an error.
     enabled: online,
     refetchInterval: 30_000,
+    // Switching range mints a new key, and without this the charts fall
+    // back to skeletons: six recharts instances torn down and rebuilt,
+    // losing whatever series the operator had isolated. Keeping the
+    // previous window on screen swaps the data in place instead.
+    placeholderData: keepPreviousData,
     // Failures render inline on the card. Without this, the 30s poll
     // against a briefly unreachable agent raises a toast per attempt --
     // a sustained storm for as long as the page stays open.
@@ -240,7 +246,13 @@ export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef 
           </div>
         ) : (
           <HoverTsContext.Provider value={hoverTs}>
-            <div className="grid gap-3 md:grid-cols-2">
+            {/* Dimmed while the charts still show the previous window,
+                so keeping them on screen does not read as "loaded". */}
+            <div
+              className={`grid gap-3 transition-opacity md:grid-cols-2 ${
+                query.isPlaceholderData ? "opacity-50" : ""
+              }`}
+            >
               {charts.map((c) => (
                 <MetricChart
                   key={c.id}

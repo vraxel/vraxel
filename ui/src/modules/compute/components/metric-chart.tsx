@@ -478,9 +478,14 @@ function MetricChartImpl({
                       dot={false}
                       activeDot={isHidden ? false : { r: 3, strokeWidth: 0, fill: color }}
                       connectNulls={false}
-                      animationDuration={500}
-                      animationEasing="ease-out"
-                      isAnimationActive={true}
+                      // No animation. Recharts animates an Area by
+                      // growing it from the baseline, re-interpolating
+                      // every monotone segment each frame -- at 24h that
+                      // is 1440 points across twenty interfaces, which
+                      // stalls the range switch. It also does not read as
+                      // a transition on the 30s poll: the curve replays
+                      // from zero rather than easing to the new values.
+                      isAnimationActive={false}
                     />
                   )
                 })}
