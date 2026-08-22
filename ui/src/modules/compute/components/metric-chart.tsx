@@ -38,11 +38,14 @@ function formatUnit(v: number, unit: ChartUnit): string {
   }
 }
 
-// Every chart uses the same Y-axis width so plot areas align across
-// all panels in the 2-column grid. 48px fits the widest realistic
-// label ("210 KB/s" at fontSize 10) without pushing the Y-axis away
-// from the title.
-const Y_AXIS_WIDTH = 48
+// Y-axis width per unit type. Uniform within each type so charts of
+// the same kind align; different across types because "100%" and
+// "210 KB/s" have very different pixel widths at fontSize 10.
+const Y_AXIS_WIDTH: Record<ChartUnit, number> = {
+  pct: 40,
+  bps: 56,
+  plain: 40,
+}
 
 function niceMax(series: ChartSeries[], unit: ChartUnit): number {
   if (unit === "pct") return 100
@@ -169,7 +172,7 @@ function MetricChartImpl({
                   tick={{ fontSize: 10 }}
                   tickLine={false}
                   axisLine={false}
-                  width={Y_AXIS_WIDTH}
+                  width={Y_AXIS_WIDTH[unit]}
                   stroke="currentColor"
                   className="text-muted-foreground"
                 />
