@@ -168,7 +168,7 @@ export function HostLogsDialog({
   // The stream. Every query parameter is a dependency: a different
   // source is a different journalctl on the host, not more lines in the
   // same scrollback. Changing one swaps the stream inside the surviving
-  // terminal -- reset, a dim connecting line, then the new backlog.
+  // terminal -- reset, then the new backlog.
   useEffect(() => {
     if (!open || !term) return
 
@@ -190,12 +190,23 @@ export function HostLogsDialog({
       return
     }
 
-    term.write(`\x1b[90m${translate("compute.host.logs.connecting")}\x1b[0m\r\n`)
+    // Plain text means "contains": journalctl -u takes shell-style
+    // globs, so a fragment becomes *fragment*. Input that already
+    // carries a glob is the operator being precise; pass it through.
+    const unit =
+      committed.unit && !committed.unit.includes("*") ? `*${committed.unit}*` : committed.unit
+
+    // A stream that connects and then stays silent is indistinguishable
+    // from a broken one -- a unit filter matching nothing produces zero
+    // bytes forever under follow. Say so once, after a grace period, so
+    // the ordinary backlog burst never sees the hint.
+    let sawData = false
+    let hintTimer: ReturnType<typeof setTimeout> | undefined
 
     const socket = new WebSocket(
       logsUrl({ ws: scopeWs, ns: scopeNs }, hostId, {
         source,
-        unit: committed.unit,
+        unit,
         priority,
         path: committed.path,
         tail,
@@ -209,6 +220,8 @@ export function HostLogsDialog({
       const type = data[0]
       const payload = data.slice(1)
       if (type === MSG_DATA) {
+        sawData = true
+        clearTimeout(hintTimer)
         // Raw bytes, not a decoded string: xterm's stateful UTF-8
         // decoder is what keeps a multibyte character split across two
         // chunks intact. xterm pins the viewport to the bottom only
@@ -228,9 +241,13 @@ export function HostLogsDialog({
         case "connected":
           setStatus("connected")
           term.focus()
+          hintTimer = setTimeout(() => {
+            if (!sawData) term.write(`\x1b[90m${translate("compute.host.logs.empty")}\x1b[0m\r\n`)
+          }, 1500)
           break
         case "error":
           setStatus("error")
+          clearTimeout(hintTimer)
           // Into the terminal, not the badge, so the full sentence
           // survives the badge's nowrap clipping.
           term.write(
@@ -239,10 +256,12 @@ export function HostLogsDialog({
           break
         case "timeout":
           setStatus("closed")
+          clearTimeout(hintTimer)
           term.write(`\r\n\x1b[33m${translate("compute.host.logs.wall")}\x1b[0m\r\n`)
           break
         case "exited":
           setStatus("closed")
+          clearTimeout(hintTimer)
           term.write(
             `\r\n\x1b[90m${parsed.message ?? translate("compute.host.logs.ended")}\x1b[0m\r\n`,
           )
@@ -262,6 +281,7 @@ export function HostLogsDialog({
     }
 
     return () => {
+      clearTimeout(hintTimer)
       socket.onmessage = null
       socket.onclose = null
       socket.onerror = null

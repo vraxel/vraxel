@@ -82,6 +82,13 @@ func TestLogCommandFromParams(t *testing.T) {
 			want:   []string{"journalctl", "--no-pager", "-o", "short-iso", "-n", "500", "-u", "nginx*", "-f"},
 		},
 		{
+			// The viewer sends plain input as *fragment* for a contains
+			// match; a leading star is a glob, never a flag.
+			name:   "unit contains-glob with a leading star",
+			params: map[string]string{"source": "journal", "unit": "*vr*"},
+			want:   []string{"journalctl", "--no-pager", "-o", "short-iso", "-n", "500", "-u", "*vr*", "-f"},
+		},
+		{
 			name:   "kernel is dmesg",
 			params: map[string]string{"source": "kernel"},
 			want:   []string{"journalctl", "--no-pager", "-o", "short-iso", "-n", "500", "-k", "-f"},
