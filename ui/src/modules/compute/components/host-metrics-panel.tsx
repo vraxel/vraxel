@@ -1,15 +1,34 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { formatDateTime } from "@/shared/lib/format"
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card"
 import { Button } from "@/shared/ui/button"
 import { Skeleton } from "@/shared/ui/skeleton"
 import { useTranslation } from "@/i18n"
 import { useApiQuery } from "@/core/query/hooks"
+import { qk } from "@/core/query/keys"
+import { usePermission } from "@/core/permission/use-permission"
+import { buildPermScope } from "@/core/registry/nav-config"
 import type { ScopeRef } from "@/core/registry/resource"
 import type { HostMetrics } from "@/generated/compute"
 import { hostMetricsApi } from "@/modules/compute/api/hosts"
+import { alertRulesApi } from "@/modules/compute/api/alert-rules"
+import { hostAlertRulesDef } from "@/modules/compute/defs"
 import type { Host } from "@/modules/compute/api/types"
 import { MetricChart, type ChartSeries, type ChartUnit } from "./metric-chart"
+
+// Which chart each alert metric belongs on. The keys mirror the
+// server's whitelist (agentgw.AlertMetrics); a metric missing here
+// simply draws no guide line.
+const ALERT_METRIC_CHART: Record<string, string> = {
+  cpu_used_pct: "cpu",
+  mem_used_pct: "mem",
+  disk_used_pct: "fs",
+  load1: "load",
+  load5: "load",
+  load15: "load",
+  net_rx_bps: "net",
+  net_tx_bps: "net",
+}
 
 // The window presets. Steps follow what the agent's ring can answer --
 // 15s exists for the last hour only -- and every preset stays under the
@@ -51,10 +70,41 @@ function pick(
  */
 export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef }) {
   const { t } = useTranslation()
+  const { hasPermission } = usePermission()
   const [win, setWin] = useState<WindowKey>("1h")
   const preset = WINDOWS.find((w) => w.key === win) ?? WINDOWS[0]
+  // Shared across all six charts, so hovering one shows the crosshair at
+  // the same instant on the others -- which is how a CPU spike and the
+  // disk spike that caused it get lined up by eye.
+  const [hoverTs, setHoverTs] = useState<number | null>(null)
 
   const online = host.spec.agentStatus === "online"
+
+  // Alert thresholds drawn as guide lines. Gated on the rules
+  // permission: reading a host must not require the alerting one, so
+  // without it the charts simply carry no guides.
+  const canReadRules = hasPermission(
+    "compute:host-alert-rules:list",
+    buildPermScope(scope.ws, scope.ns),
+  )
+  const rulesQuery = useApiQuery({
+    queryKey: qk.list(hostAlertRulesDef, scope, { page_size: 100 }),
+    queryFn: () => alertRulesApi.list(scope, { page_size: 100 }),
+    enabled: canReadRules,
+  })
+  const thresholds = useMemo(() => {
+    const byChart: Record<string, { label: string; value: number }[]> = {}
+    for (const r of rulesQuery.data?.items ?? []) {
+      if (r.spec.enabled === false) continue
+      const chart = ALERT_METRIC_CHART[r.spec.metric]
+      if (!chart) continue
+      ;(byChart[chart] ??= []).push({
+        label: r.metadata.name,
+        value: r.spec.threshold,
+      })
+    }
+    return byChart
+  }, [rulesQuery.data])
   const query = useApiQuery({
     queryKey: ["host-metrics", host.metadata.id, scope.ws, scope.ns, win],
     queryFn: () => {
@@ -75,13 +125,15 @@ export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef 
   const empty = t("compute.host.metrics.noData")
   const dev = (_: string, labels?: Record<string, string>) => labels?.device ?? "-"
 
-  const charts: { title: string; unit: ChartUnit; series: ChartSeries[] }[] = [
+  const charts: { id: string; title: string; unit: ChartUnit; series: ChartSeries[] }[] = [
     {
+      id: "cpu",
       title: t("compute.host.cpu"),
       unit: "pct",
       series: pick(res, ["cpu.used_pct"], () => t("compute.host.metrics.used")),
     },
     {
+      id: "mem",
       title: t("compute.host.memory"),
       unit: "pct",
       series: pick(res, ["mem.used_pct", "swap.used_pct"], (name) =>
@@ -89,16 +141,19 @@ export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef 
       ),
     },
     {
+      id: "load",
       title: t("compute.host.metrics.load"),
       unit: "plain",
       series: pick(res, ["load.1", "load.5", "load.15"], (name) => name.replace("load.", "load ")),
     },
     {
+      id: "fs",
       title: t("compute.host.metrics.filesystem"),
       unit: "pct",
       series: pick(res, ["fs.used_pct"], (_, labels) => labels?.mountpoint ?? "-"),
     },
     {
+      id: "disk",
       title: t("compute.host.metrics.diskIO"),
       unit: "bps",
       series: pick(
@@ -109,6 +164,7 @@ export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef 
       ),
     },
     {
+      id: "net",
       title: t("compute.host.metrics.network"),
       unit: "bps",
       series: pick(
@@ -161,7 +217,7 @@ export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef 
           <div className="grid gap-3 md:grid-cols-2">
             {charts.map((c) => (
               <MetricChart
-                key={c.title}
+                key={c.id}
                 title={c.title}
                 unit={c.unit}
                 series={c.series}
@@ -169,6 +225,9 @@ export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef 
                 stepSec={res.stepSec}
                 count={res.count}
                 emptyText={empty}
+                thresholds={thresholds[c.id]}
+                hoverTs={hoverTs}
+                onHover={setHoverTs}
               />
             ))}
           </div>

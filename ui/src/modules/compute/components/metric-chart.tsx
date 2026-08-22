@@ -4,6 +4,7 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -19,6 +20,44 @@ export interface ChartSeries {
 const PALETTE = ["#0ea5e9", "#10b981", "#f59e0b", "#8b5cf6", "#f43f5e", "#06b6d4"]
 
 export type ChartUnit = "pct" | "bps" | "plain"
+
+function hashKey(s: string): number {
+  // FNV-1a
+  let h = 2166136261
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return h >>> 0
+}
+
+/**
+ * Colours keyed by series identity rather than array position.
+ *
+ * Position is not stable: the agent omits a series that has no data in
+ * the window, and VictoriaMetrics does not promise an order at all, so
+ * an index-based palette re-coloured the whole network chart every time
+ * a container's veth appeared or aged out. Hashing the key pins each
+ * interface to one colour for as long as it exists.
+ *
+ * Assignment walks the keys in sorted order and probes forward past
+ * taken slots, so a chart whose series fit the palette still gets six
+ * distinct colours -- a pure hash would happily give "load 1" and
+ * "load 5" the same one.
+ */
+function assignColors(keys: string[]): Map<string, string> {
+  const taken = new Array<boolean>(PALETTE.length).fill(false)
+  const out = new Map<string, string>()
+  for (const key of [...keys].sort()) {
+    let slot = hashKey(key) % PALETTE.length
+    for (let probe = 0; probe < PALETTE.length && taken[slot]; probe++) {
+      slot = (slot + 1) % PALETTE.length
+    }
+    taken[slot] = true
+    out.set(key, PALETTE[slot])
+  }
+  return out
+}
 
 // For bps charts, compute a single scale tier from the data max so
 // the title, Y-axis ticks, and tooltip all use the same unit.
@@ -208,6 +247,9 @@ function MetricChartImpl({
   stepSec,
   count,
   emptyText,
+  thresholds,
+  hoverTs,
+  onHover,
 }: {
   title: string
   unit: ChartUnit
@@ -216,6 +258,11 @@ function MetricChartImpl({
   stepSec: number
   count: number
   emptyText: string
+  /** Alert thresholds to draw as horizontal guides on this chart. */
+  thresholds?: { label: string; value: number }[]
+  /** Timestamp the operator is hovering, shared across the panel's charts. */
+  hoverTs?: number | null
+  onHover?: (ts: number | null) => void
 }) {
   const data = useMemo(
     () => toRows(series, fromMs, stepSec, count),
@@ -224,6 +271,8 @@ function MetricChartImpl({
   const max = niceMax(series, unit)
   const hasData = series.some((s) => s.values.some((v) => typeof v === "number"))
   const scale = useMemo(() => bpsScale(max), [max])
+  const colors = useMemo(() => assignColors(series.map((s) => s.key)), [series])
+  const colorOf = (key: string) => colors.get(key) ?? PALETTE[0]
   const gradPrefix = useId().replace(/:/g, "")
   // The plot area's viewport rect, needed to turn recharts' chart-local
   // tooltip coordinate into a page position. Read at tooltip time (not
@@ -269,9 +318,16 @@ function MetricChartImpl({
         <>
           <div ref={plotRef} className="relative h-[160px] cursor-crosshair">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data} margin={{ top: 12, right: 8, bottom: 0, left: 0 }}>
+              <AreaChart
+                data={data}
+                margin={{ top: 12, right: 8, bottom: 0, left: 0 }}
+                onMouseMove={(s) =>
+                  onHover?.(typeof s?.activeLabel === "number" ? s.activeLabel : null)
+                }
+                onMouseLeave={() => onHover?.(null)}
+              >
                 <defs>
-                  {series.map((s, i) => (
+                  {series.map((s) => (
                     <linearGradient
                       key={s.key}
                       id={safeId(gradPrefix, s.key)}
@@ -280,8 +336,8 @@ function MetricChartImpl({
                       x2="0"
                       y2="1"
                     >
-                      <stop offset="0%" stopColor={PALETTE[i % PALETTE.length]} stopOpacity={0.2} />
-                      <stop offset="100%" stopColor={PALETTE[i % PALETTE.length]} stopOpacity={0} />
+                      <stop offset="0%" stopColor={colorOf(s.key)} stopOpacity={0.2} />
+                      <stop offset="100%" stopColor={colorOf(s.key)} stopOpacity={0} />
                     </linearGradient>
                   ))}
                 </defs>
@@ -343,13 +399,40 @@ function MetricChartImpl({
                       />
                     )
                   }}
-                  cursor={{ stroke: "currentColor", strokeOpacity: 0.15, strokeDasharray: "3 3" }}
+                  // The crosshair is drawn as a ReferenceLine instead, so
+                  // that every chart in the panel can show it at the same
+                  // timestamp -- including the ones the cursor is not over.
+                  cursor={false}
                   isAnimationActive={false}
                   wrapperStyle={{ display: "none" }}
                 />
-                {series.map((s, i) => {
+                {hoverTs != null && (
+                  <ReferenceLine
+                    x={hoverTs}
+                    stroke="currentColor"
+                    strokeOpacity={0.3}
+                    strokeDasharray="3 3"
+                    className="text-foreground"
+                  />
+                )}
+                {thresholds?.map((t) => (
+                  <ReferenceLine
+                    key={t.label}
+                    y={t.value}
+                    stroke="var(--destructive)"
+                    strokeOpacity={0.5}
+                    strokeDasharray="4 4"
+                    label={{
+                      value: t.label,
+                      position: "insideTopRight",
+                      fontSize: 9,
+                      fill: "var(--destructive)",
+                    }}
+                  />
+                ))}
+                {series.map((s) => {
                   const isHidden = hidden.has(s.label)
-                  const color = PALETTE[i % PALETTE.length]
+                  const color = colorOf(s.key)
                   return (
                     <Area
                       key={s.key}
@@ -375,9 +458,9 @@ function MetricChartImpl({
 
           <div className="flex min-h-[24px] flex-wrap items-start justify-center gap-x-3 gap-y-1 pt-1 text-xs">
             {series.length > 1 &&
-              series.map((s, i) => {
+              series.map((s) => {
                 const isHidden = hidden.has(s.label)
-                const color = PALETTE[i % PALETTE.length]
+                const color = colorOf(s.key)
                 return (
                   <span
                     key={s.key}
