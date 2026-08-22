@@ -225,7 +225,7 @@ const compute = {
   "compute.host.logs.sourceJournal": "System journal",
   "compute.host.logs.sourceKernel": "Kernel (dmesg)",
   "compute.host.logs.sourceFile": "File",
-  "compute.host.logs.unitPlaceholder": "Filter by unit, e.g. nginx; Enter to apply",
+  "compute.host.logs.unitPlaceholder": "Filter units by fragment, e.g. nginx; Enter to apply",
   "compute.host.logs.pathPlaceholder": "Path under /var/log/; Enter to apply",
   "compute.host.logs.priorityAll": "All levels",
   "compute.host.logs.follow": "Follow",
@@ -237,6 +237,7 @@ const compute = {
   "compute.host.logs.ended": "Log stream ended",
   "compute.host.logs.wall": "Session reached its 30-minute window; refresh to reconnect",
   "compute.host.logs.needPath": "Enter a path under /var/log/ and press Enter to start",
+  "compute.host.logs.empty": "No log output yet",
   "compute.host.logs.needsAgent": "This host has no agent, so its logs cannot be viewed",
 
   // agent identity refusal

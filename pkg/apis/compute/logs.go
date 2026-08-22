@@ -57,11 +57,12 @@ var logPriorities = map[string]bool{
 	"warning": true, "notice": true, "info": true, "debug": true,
 }
 
-// logUnitPattern admits systemd unit names and their globs. The first
-// character is never "-" so a unit can never read as a flag, and the
-// value is one argv element (no shell anywhere), so this is a
+// logUnitPattern admits systemd unit names and their globs, including a
+// leading "*" (the viewer sends contains-matches as *fragment*). The
+// first character is never "-" so a unit can never read as a flag, and
+// the value is one argv element (no shell anywhere), so this is a
 // plausibility check, not an escaping exercise.
-var logUnitPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9@_.:\\*-]*$`)
+var logUnitPattern = regexp.MustCompile(`^[A-Za-z0-9*][A-Za-z0-9@_.:\\*-]*$`)
 
 // logCommandFromParams turns the viewer's query parameters into the
 // argv the agent will exec. Everything the browser sent is validated or

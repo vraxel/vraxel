@@ -216,7 +216,7 @@ const compute = {
   "compute.host.logs.sourceJournal": "系统日志",
   "compute.host.logs.sourceKernel": "内核 (dmesg)",
   "compute.host.logs.sourceFile": "文件",
-  "compute.host.logs.unitPlaceholder": "按 unit 过滤，如 nginx，回车应用",
+  "compute.host.logs.unitPlaceholder": "按 unit 模糊过滤，如 nginx，回车应用",
   "compute.host.logs.pathPlaceholder": "/var/log/ 下的文件路径，回车应用",
   "compute.host.logs.priorityAll": "全部级别",
   "compute.host.logs.follow": "跟随",
@@ -228,6 +228,7 @@ const compute = {
   "compute.host.logs.ended": "日志流已结束",
   "compute.host.logs.wall": "已连续查看 30 分钟，连接已断开，点击刷新重新连接",
   "compute.host.logs.needPath": "输入 /var/log/ 下的文件路径并回车开始查看",
+  "compute.host.logs.empty": "暂无日志输出",
   "compute.host.logs.needsAgent": "该主机尚未接入 agent，无法查看日志",
 
   // agent identity refusal
