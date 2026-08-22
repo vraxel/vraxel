@@ -1,14 +1,6 @@
 import { useState } from "react"
 import { Link, useParams } from "react-router"
-import {
-  ArrowUpDown,
-  EllipsisVertical,
-  Pencil,
-  Plus,
-  ScrollText,
-  SquareTerminal,
-  Trash2,
-} from "lucide-react"
+import { EllipsisVertical, Pencil, Plus, ScrollText, SquareTerminal, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { formatDateTime } from "@/shared/lib/format"
 import { Badge } from "@/shared/ui/badge"
@@ -21,7 +13,6 @@ import {
   DropdownMenuTrigger,
 } from "@/shared/ui/dropdown-menu"
 import { useTranslation } from "@/i18n"
-import { SortIcon } from "@/shared/components/sort-icon"
 import { useListQuery } from "@/frameworks/list/use-list-query"
 import { NameCell } from "@/frameworks/list/name-cell"
 import { ResourceListPage, type ColumnDef } from "@/frameworks/list/resource-list-page"
@@ -92,18 +83,6 @@ export default function HostListPage() {
 
   const base = buildScopedPath("hosts", workspaceId ?? null, namespaceId ?? null)
   const hostPath = (suffix: string) => `${base}/${suffix}`
-
-  // Capacity sorts. The spec column merged into the utilisation gauges,
-  // so these three have no header to hang off -- and "find the biggest
-  // machines" is a real question the list must still answer. They go
-  // through the same handleSort as a header (click again to flip
-  // direction), so a sort set here and a sort set there are one state.
-  const specSorts = [
-    { field: "cpu_cores", label: t("compute.host.sortCores") },
-    { field: "memory_mb", label: t("compute.host.sortMemoryTotal") },
-    { field: "disk_gb", label: t("compute.host.sortDiskTotal") },
-  ]
-  const activeSpecSort = specSorts.find((s) => s.field === query.sortBy)
 
   const columns: ColumnDef<Host>[] = [
     {
@@ -208,25 +187,35 @@ export default function HostListPage() {
         </span>
       ),
     },
+    // Each utilisation column carries two facts -- the reading and the
+    // capacity it is a fraction of -- so its header asks which one to
+    // sort by rather than guessing. This is where the capacity sorts
+    // live now: on the column that shows the capacity.
     {
       key: "cpu",
       header: t("compute.host.cpu"),
-      sortable: true,
-      sortKey: "cpu_used_pct",
+      sortFields: [
+        { field: "cpu_used_pct", label: t("compute.host.sortUsage") },
+        { field: "cpu_cores", label: t("compute.host.sortCores") },
+      ],
       cell: (h) => <HostCpuCell spec={h.spec} />,
     },
     {
       key: "memory",
       header: t("compute.host.memory"),
-      sortable: true,
-      sortKey: "mem_used_pct",
+      sortFields: [
+        { field: "mem_used_pct", label: t("compute.host.sortUsage") },
+        { field: "memory_mb", label: t("compute.host.sortMemoryTotal") },
+      ],
       cell: (h) => <HostMemCell spec={h.spec} />,
     },
     {
       key: "disk",
       header: t("compute.host.disk"),
-      sortable: true,
-      sortKey: "disk_used_pct",
+      sortFields: [
+        { field: "disk_used_pct", label: t("compute.host.sortUsage") },
+        { field: "disk_gb", label: t("compute.host.sortDiskTotal") },
+      ],
       cell: (h) => <HostDiskCell spec={h.spec} />,
     },
     {
@@ -258,30 +247,6 @@ export default function HostListPage() {
       searchPlaceholderKey="compute.host.searchPlaceholder"
       emptyKey="compute.host.empty"
       selectable={false}
-      toolbarExtra={
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="h-9">
-              <ArrowUpDown className="size-4" />
-              {activeSpecSort?.label ?? t("compute.host.sortSpec")}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            {specSorts.map((s) => (
-              <DropdownMenuItem key={s.field} onClick={() => query.handleSort(s.field)}>
-                {s.label}
-                {/* Only the active item carries an arrow: a neutral one on
-                    every row would read as three unsorted affordances. */}
-                {query.sortBy === s.field && (
-                  <span className="ml-auto">
-                    <SortIcon field={s.field} sortBy={query.sortBy} sortOrder={query.sortOrder} />
-                  </span>
-                )}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      }
       createButton={
         <Button asChild>
           <Link to={hostPath("onboard")}>

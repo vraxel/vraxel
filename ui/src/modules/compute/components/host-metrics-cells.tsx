@@ -46,43 +46,50 @@ function isStale(sampledAt?: string): boolean {
 }
 
 /**
- * One utilisation gauge: reading, capacity, bar. Fixed width so the
- * three columns line up as one block the eye can scan down.
+ * One utilisation gauge: the amount, the percentage it works out to, and
+ * a bar. Fixed width so the three columns line up as one block the eye
+ * can scan down.
  *
- * A missing value renders as "-" over an empty rail, never as 0%: a host
- * whose agent has not reported is not a host at 0% CPU. The rail stays
- * (dimmed) so rows with and without a reading keep the same height --
+ * The amount leads because it is the answer to "how big is this host",
+ * which a percentage alone cannot give: 90% of 2 GiB and 90% of 512 GiB
+ * are different problems. The percentage is the signal, so it carries
+ * the colour; the amount stays neutral, being an inventory fact.
+ *
+ * A host with no reading keeps its amount and drops the percentage, over
+ * a dimmed rail -- never a 0% that would read as an idle machine. The
+ * rail stays so rows with and without a reading keep the same height;
  * ragged row heights were what made this column group look broken.
  */
 function UtilGauge({
+  amount,
   value,
-  capacity,
-  capacityMono,
   stale,
 }: {
+  /** Omitted when nothing can honestly be paired with the percentage,
+   *  which then becomes the primary text instead of a suffix. */
+  amount?: ReactNode
   value?: number
-  capacity: ReactNode
-  capacityMono?: boolean
   stale: boolean
 }) {
   const known = typeof value === "number"
   const tone = known && !stale ? toneFor(value) : null
+  const pctTone = tone ? tone.text : "text-muted-foreground/60"
 
   return (
-    <div className="w-28 space-y-1">
-      <div className="flex items-baseline justify-between gap-2">
-        <span
-          className={`text-sm tabular-nums ${
-            tone ? tone.text : known ? "text-muted-foreground/60" : "text-muted-foreground"
-          }`}
-        >
-          {known ? `${Math.round(value)}%` : "-"}
-        </span>
-        <span
-          className={`text-muted-foreground truncate text-xs ${capacityMono ? "font-mono" : ""}`}
-        >
-          {capacity}
-        </span>
+    <div className="w-36 space-y-1">
+      <div className="flex items-baseline gap-1">
+        {amount === undefined ? (
+          <span className={`text-sm tabular-nums ${known ? pctTone : "text-muted-foreground"}`}>
+            {known ? `${Math.round(value)}%` : "-"}
+          </span>
+        ) : (
+          <>
+            <span className="truncate text-sm tabular-nums">{amount}</span>
+            {known && (
+              <span className={`text-xs tabular-nums ${pctTone}`}>({Math.round(value)}%)</span>
+            )}
+          </>
+        )}
       </div>
       <Progress
         value={known ? value : 0}
@@ -93,34 +100,46 @@ function UtilGauge({
   )
 }
 
+// GiB with one decimal. Not fmtStorageBytes: that switches to MiB below
+// 1 GiB, and a used/total pair whose halves carry different units reads
+// as two unrelated numbers.
+const gib = (mb: number) => (mb / 1024).toFixed(1)
+
 export function HostCpuCell({ spec }: { spec: Host["spec"] }) {
   const { t } = useTranslation()
+  // Cores, not "cores in use": a percentage of a core is a number no
+  // operator acts on, and the count is what makes the percentage mean
+  // something.
   return (
     <UtilGauge
+      amount={spec.cpuCores ? `${spec.cpuCores} ${t("compute.host.cores")}` : "-"}
       value={spec.cpuUsedPct}
-      capacity={spec.cpuCores ? `${spec.cpuCores} ${t("compute.host.cores")}` : "-"}
       stale={isStale(spec.metricsSampledAt)}
     />
   )
 }
 
 export function HostMemCell({ spec }: { spec: Host["spec"] }) {
-  return (
-    <UtilGauge
-      value={spec.memUsedPct}
-      capacity={spec.memoryMb ? `${Math.round(spec.memoryMb / 1024)} GiB` : "-"}
-      stale={isStale(spec.metricsSampledAt)}
-    />
-  )
+  const total = spec.memoryMb
+  const pct = spec.memUsedPct
+  // Used is derived, not reported: memUsedPct is 1 - MemAvailable/MemTotal
+  // and memoryMb is that same MemTotal from registration, so the product
+  // is the used figure rather than an estimate of one.
+  const amount = !total
+    ? "-"
+    : typeof pct === "number"
+      ? `${gib((total * pct) / 100)} / ${gib(total)} GiB`
+      : `${gib(total)} GiB`
+  return <UtilGauge amount={amount} value={pct} stale={isStale(spec.metricsSampledAt)} />
 }
 
 export function HostDiskCell({ spec }: { spec: Host["spec"] }) {
-  return (
-    <UtilGauge
-      value={spec.diskUsedPct}
-      capacity={spec.diskUsedPath || "-"}
-      capacityMono
-      stale={isStale(spec.metricsSampledAt)}
-    />
-  )
+  // No amount to pair with the percentage. diskUsedPct is the FULLEST
+  // filesystem (whichever that is), while disk_gb is the size of the
+  // ROOT one -- on a host whose /data is fuller than /, printing them
+  // side by side would state a fraction of the wrong disk. Until the
+  // agent reports the winning filesystem's own size, the percentage
+  // stands alone rather than borrowing a denominator that may not be its
+  // own.
+  return <UtilGauge value={spec.diskUsedPct} stale={isStale(spec.metricsSampledAt)} />
 }
