@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { memo, useCallback, useId, useMemo, useState } from "react"
 import {
   Area,
   AreaChart,
@@ -50,8 +50,6 @@ function niceMax(series: ChartSeries[], unit: ChartUnit): number {
   return max > 0 ? max * 1.15 : 1
 }
 
-// Recharts needs row-oriented data: [{time, "cpu.used_pct": 42, ...}, ...]
-// Null/undefined values produce gaps via connectNulls={false} (the default).
 function toRows(
   series: ChartSeries[],
   fromMs: number,
@@ -74,7 +72,13 @@ function formatTime(ts: number): string {
   return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
 }
 
-export function MetricChart({
+// SVG id must not contain characters like {, }, ", : that appear in
+// JSON-stringified label maps. Replace anything non-alphanumeric.
+function safeId(prefix: string, key: string): string {
+  return `${prefix}-${key.replace(/[^A-Za-z0-9_-]/g, "_")}`
+}
+
+function MetricChartImpl({
   title,
   unit,
   series,
@@ -97,6 +101,48 @@ export function MetricChart({
   )
   const max = niceMax(series, unit)
   const hasData = series.some((s) => s.values.some((v) => typeof v === "number"))
+  const gradPrefix = useId().replace(/:/g, "")
+
+  const [hidden, setHidden] = useState<Set<string>>(() => new Set())
+  const handleLegendClick = useCallback((e: { dataKey?: string; value?: string }) => {
+    const key = e.dataKey || e.value
+    if (!key) return
+    setHidden((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
+
+  const renderLegend = useCallback(
+    (props: { payload?: ReadonlyArray<{ value?: string; color?: string }> }) => {
+      if (!props.payload) return null
+      return (
+        <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 pt-1 text-xs">
+          {props.payload.map((entry) => {
+            const name = entry.value ?? ""
+            const isHidden = hidden.has(name)
+            return (
+              <span
+                key={name}
+                className={`flex cursor-pointer items-center gap-1 select-none ${isHidden ? "line-through opacity-40" : ""}`}
+                onClick={() => handleLegendClick({ value: name })}
+              >
+                <span
+                  className="inline-block h-2.5 w-2.5 rounded-sm"
+                  style={{ backgroundColor: entry.color }}
+                />
+                {name}
+              </span>
+            )
+          })}
+        </div>
+      )
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- hidden is read via closure; handleLegendClick is stable
+    [hidden],
+  )
 
   return (
     <div className="rounded-lg border p-3">
@@ -111,13 +157,26 @@ export function MetricChart({
           <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -8 }}>
             <defs>
               {series.map((s, i) => (
-                <linearGradient key={s.key} id={`grad-${s.key}`} x1="0" y1="0" x2="0" y2="1">
+                <linearGradient
+                  key={s.key}
+                  id={safeId(gradPrefix, s.key)}
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
+                >
                   <stop offset="0%" stopColor={PALETTE[i % PALETTE.length]} stopOpacity={0.2} />
                   <stop offset="100%" stopColor={PALETTE[i % PALETTE.length]} stopOpacity={0} />
                 </linearGradient>
               ))}
             </defs>
-            <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.15} vertical={false} />
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="currentColor"
+              strokeOpacity={0.1}
+              vertical={false}
+              className="text-foreground"
+            />
             <XAxis
               dataKey="_ts"
               type="number"
@@ -127,6 +186,8 @@ export function MetricChart({
               tickLine={false}
               axisLine={false}
               minTickGap={60}
+              stroke="currentColor"
+              className="text-muted-foreground"
             />
             <YAxis
               domain={[0, max]}
@@ -135,10 +196,15 @@ export function MetricChart({
               tickLine={false}
               axisLine={false}
               width={40}
+              stroke="currentColor"
+              className="text-muted-foreground"
             />
             <Tooltip
               labelFormatter={(v) => (typeof v === "number" ? formatTime(v) : String(v))}
-              formatter={(v) => (typeof v === "number" ? formatUnit(v, unit) : "-")}
+              formatter={(v, name) => {
+                if (typeof name === "string" && hidden.has(name)) return [null, null]
+                return [typeof v === "number" ? formatUnit(v, unit) : "-", name]
+              }}
               contentStyle={{
                 fontSize: 12,
                 borderRadius: 6,
@@ -146,35 +212,37 @@ export function MetricChart({
                 background: "var(--popover)",
                 color: "var(--popover-foreground)",
               }}
+              cursor={{ stroke: "currentColor", strokeOpacity: 0.2 }}
               isAnimationActive={false}
             />
-            {series.length > 1 && (
-              <Legend
-                iconType="plainline"
-                iconSize={12}
-                wrapperStyle={{ fontSize: 11, paddingTop: 4 }}
-              />
-            )}
-            {series.map((s, i) => (
-              <Area
-                key={s.key}
-                dataKey={s.key}
-                name={s.label}
-                type="monotone"
-                stroke={PALETTE[i % PALETTE.length]}
-                strokeWidth={1.5}
-                fill={`url(#grad-${s.key})`}
-                dot={false}
-                activeDot={{ r: 3, strokeWidth: 0 }}
-                connectNulls={false}
-                animationDuration={500}
-                animationEasing="ease-out"
-                isAnimationActive={true}
-              />
-            ))}
+            {series.length > 1 && <Legend content={renderLegend} />}
+            {series.map((s, i) => {
+              const isHidden = hidden.has(s.label)
+              const color = PALETTE[i % PALETTE.length]
+              return (
+                <Area
+                  key={s.key}
+                  dataKey={s.key}
+                  name={s.label}
+                  type="monotone"
+                  stroke={isHidden ? "transparent" : color}
+                  strokeWidth={isHidden ? 0 : 1.5}
+                  fill={isHidden ? "transparent" : `url(#${safeId(gradPrefix, s.key)})`}
+                  fillOpacity={isHidden ? 0 : 1}
+                  dot={false}
+                  activeDot={isHidden ? false : { r: 3, strokeWidth: 0, fill: color }}
+                  connectNulls={false}
+                  animationDuration={500}
+                  animationEasing="ease-out"
+                  isAnimationActive={true}
+                />
+              )
+            })}
           </AreaChart>
         </ResponsiveContainer>
       )}
     </div>
   )
 }
+
+export const MetricChart = memo(MetricChartImpl)
