@@ -1,10 +1,8 @@
-import { useRef, useState } from "react"
+import { useId, useRef, useState } from "react"
 
 // A line chart over the fixed grid HostMetrics answers with. Hand-rolled
-// SVG rather than a chart dependency: six charts of polylines on a
-// regular grid need no scales, no animation engine and no bundle weight,
-// and the one interactive behaviour worth having -- reading values off a
-// bucket under the cursor -- is a rect lookup.
+// SVG with cubic Bezier smoothing (Catmull-Rom control points, same
+// algorithm as OpenSurge/trafficChart.ts) and gradient area fill.
 //
 // Null values are gaps in the line, never zeroes: a bucket the agent
 // holds nothing for (it was down, the disk was not mounted yet) must not
@@ -16,8 +14,6 @@ export interface ChartSeries {
   values: (number | null | undefined)[]
 }
 
-// Explicit palette instead of theme tokens: this repo defines no chart
-// colours, and these mid-500s hold up on both themes.
 const PALETTE = ["#0ea5e9", "#10b981", "#f59e0b", "#8b5cf6", "#f43f5e", "#06b6d4"]
 
 const W = 600
@@ -48,8 +44,6 @@ function formatUnit(v: number, unit: ChartUnit): string {
   }
 }
 
-// niceMax pads the data maximum so lines do not kiss the frame, with a
-// floor so an all-zero chart still has a scale.
 function niceMax(series: ChartSeries[], unit: ChartUnit): number {
   if (unit === "pct") return 100
   let max = 0
@@ -59,6 +53,41 @@ function niceMax(series: ChartSeries[], unit: ChartUnit): number {
     }
   }
   return max > 0 ? max * 1.15 : 1
+}
+
+// --- Smooth path generation (Catmull-Rom cubic Bezier) ---
+
+type Pt = { x: number; y: number }
+
+function fmt(n: number): string {
+  return n.toFixed(1)
+}
+
+function smoothPath(points: Pt[]): string {
+  if (points.length === 0) return ""
+  if (points.length === 1) return `M ${fmt(points[0].x)} ${fmt(points[0].y)}`
+  let d = `M ${fmt(points[0].x)} ${fmt(points[0].y)}`
+  for (let i = 0; i < points.length - 1; i++) {
+    const prev = points[Math.max(0, i - 1)]
+    const cur = points[i]
+    const next = points[i + 1]
+    const after = points[Math.min(points.length - 1, i + 2)]
+    const cp1x = cur.x + (next.x - prev.x) / 6
+    const cp1y = cur.y + (next.y - prev.y) / 6
+    const cp2x = next.x - (after.x - cur.x) / 6
+    const cp2y = next.y - (after.y - cur.y) / 6
+    d += ` C ${fmt(cp1x)} ${fmt(cp1y)}, ${fmt(cp2x)} ${fmt(cp2y)}, ${fmt(next.x)} ${fmt(next.y)}`
+  }
+  return d
+}
+
+function buildSegmentPaths(points: Pt[], baseline: number): { linePath: string; areaPath: string } {
+  const linePath = smoothPath(points)
+  if (points.length < 2) return { linePath, areaPath: "" }
+  const first = points[0]
+  const last = points[points.length - 1]
+  const areaPath = `${linePath} L ${fmt(last.x)} ${fmt(baseline)} L ${fmt(first.x)} ${fmt(baseline)} Z`
+  return { linePath, areaPath }
 }
 
 export function MetricChart({
@@ -80,28 +109,30 @@ export function MetricChart({
 }) {
   const boxRef = useRef<HTMLDivElement>(null)
   const [hover, setHover] = useState<number | null>(null)
+  const gradientId = useId().replace(/:/g, "")
 
   const innerW = W - PAD_L - PAD_R
   const innerH = H - PAD_T - PAD_B
   const max = niceMax(series, unit)
-  const x = (i: number) => PAD_L + (count > 1 ? (i / (count - 1)) * innerW : 0)
-  const y = (v: number) => PAD_T + innerH - (Math.min(v, max) / max) * innerH
+  const xAt = (i: number) => PAD_L + (count > 1 ? (i / (count - 1)) * innerW : 0)
+  const yAt = (v: number) => PAD_T + innerH - (Math.min(v, max) / max) * innerH
+  const baseline = PAD_T + innerH
 
-  const paths = series.map((s) => {
-    const segments: string[] = []
-    let current: string[] = []
+  const seriesPaths = series.map((s) => {
+    const segments: { linePath: string; areaPath: string }[] = []
+    let current: Pt[] = []
     s.values.forEach((v, i) => {
       if (typeof v !== "number") {
-        if (current.length > 1) segments.push(current.join(" "))
+        if (current.length >= 2) segments.push(buildSegmentPaths(current, baseline))
         current = []
         return
       }
-      current.push(`${x(i).toFixed(1)},${y(v).toFixed(1)}`)
+      current.push({ x: xAt(i), y: yAt(v) })
     })
-    if (current.length > 1) segments.push(current.join(" "))
+    if (current.length >= 2) segments.push(buildSegmentPaths(current, baseline))
     return segments
   })
-  const hasData = paths.some((p) => p.length > 0)
+  const hasData = seriesPaths.some((p) => p.length > 0)
 
   const timeAt = (i: number) => new Date(fromMs + i * stepSec * 1000)
   const timeLabel = (i: number) =>
@@ -126,7 +157,7 @@ export function MetricChart({
             {series.map((s, i) => (
               <span key={s.key} className="text-muted-foreground inline-flex items-center gap-1">
                 <span
-                  className="inline-block h-0.5 w-3"
+                  className="inline-block h-0.5 w-3 rounded-full"
                   style={{ backgroundColor: PALETTE[i % PALETTE.length] }}
                 />
                 {s.label}
@@ -143,6 +174,15 @@ export function MetricChart({
         onMouseLeave={() => setHover(null)}
       >
         <svg viewBox={`0 0 ${W} ${H}`} className="block w-full" role="img" aria-label={title}>
+          <defs>
+            {series.map((s, i) => (
+              <linearGradient key={s.key} id={`${gradientId}-${i}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor={PALETTE[i % PALETTE.length]} stopOpacity="0.2" />
+                <stop offset="1" stopColor={PALETTE[i % PALETTE.length]} stopOpacity="0" />
+              </linearGradient>
+            ))}
+          </defs>
+
           {gridYs.map((g) => {
             const gy = PAD_T + innerH - g * innerH
             return (
@@ -176,24 +216,41 @@ export function MetricChart({
                 {timeLabel(Math.round(g * (count - 1)))}
               </text>
             ))}
-          {paths.map((segments, i) =>
-            segments.map((points, j) => (
-              <polyline
-                key={`${series[i].key}-${j}`}
-                points={points}
+
+          {seriesPaths.map((segments, i) =>
+            segments.map(
+              (seg, j) =>
+                seg.areaPath && (
+                  <path
+                    key={`area-${series[i].key}-${j}`}
+                    d={seg.areaPath}
+                    fill={`url(#${gradientId}-${i})`}
+                  />
+                ),
+            ),
+          )}
+
+          {seriesPaths.map((segments, i) =>
+            segments.map((seg, j) => (
+              <path
+                key={`line-${series[i].key}-${j}`}
+                d={seg.linePath}
                 fill="none"
                 stroke={PALETTE[i % PALETTE.length]}
                 strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
                 vectorEffect="non-scaling-stroke"
               />
             )),
           )}
+
           {hover !== null && hasData && (
             <line
-              x1={x(hover)}
-              x2={x(hover)}
+              x1={xAt(hover)}
+              x2={xAt(hover)}
               y1={PAD_T}
-              y2={PAD_T + innerH}
+              y2={baseline}
               stroke="currentColor"
               strokeOpacity="0.35"
             />
@@ -211,8 +268,8 @@ export function MetricChart({
             className="bg-popover text-popover-foreground pointer-events-none absolute top-1 z-10 rounded-md border px-2 py-1 text-xs shadow-md"
             style={
               hover < count / 2
-                ? { left: `${(x(hover) / W) * 100}%`, marginLeft: 8 }
-                : { right: `${100 - (x(hover) / W) * 100}%`, marginRight: 8 }
+                ? { left: `${(xAt(hover) / W) * 100}%`, marginLeft: 8 }
+                : { right: `${100 - (xAt(hover) / W) * 100}%`, marginRight: 8 }
             }
           >
             <div className="text-muted-foreground">{timeLabel(hover)}</div>
@@ -221,7 +278,7 @@ export function MetricChart({
               return (
                 <div key={s.key} className="flex items-center gap-1.5">
                   <span
-                    className="inline-block h-0.5 w-3"
+                    className="inline-block h-0.5 w-3 rounded-full"
                     style={{ backgroundColor: PALETTE[i % PALETTE.length] }}
                   />
                   <span>{s.label}</span>

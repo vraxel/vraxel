@@ -28,25 +28,61 @@ function UtilValue({ value, stale }: { value?: number; stale: boolean }) {
   return <span className={`text-sm tabular-nums ${tone}`}>{Math.round(value)}%</span>
 }
 
+type Pt = { x: number; y: number }
+
+function sparkSmooth(points: Pt[]): string {
+  if (points.length < 2) return ""
+  let d = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`
+  for (let i = 0; i < points.length - 1; i++) {
+    const prev = points[Math.max(0, i - 1)]
+    const cur = points[i]
+    const next = points[i + 1]
+    const after = points[Math.min(points.length - 1, i + 2)]
+    const cp1x = cur.x + (next.x - prev.x) / 6
+    const cp1y = cur.y + (next.y - prev.y) / 6
+    const cp2x = next.x - (after.x - cur.x) / 6
+    const cp2y = next.y - (after.y - cur.y) / 6
+    d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${next.x.toFixed(1)} ${next.y.toFixed(1)}`
+  }
+  return d
+}
+
 // The 24h CPU sparkline. Null buckets are gaps in the line, not zeroes:
 // an agent that started an hour ago has 23 hours of honest nothing.
 function CpuSparkline({ trend, stale }: { trend?: (number | undefined)[]; stale: boolean }) {
   if (!trend || trend.length < 2) return null
   const w = 72
   const h = 16
-  const segments: string[] = []
-  let current: string[] = []
+  const segments: { line: string; area: string }[] = []
+  let current: Pt[] = []
+  const baseline = h
   trend.forEach((v, i) => {
     if (typeof v !== "number") {
-      if (current.length > 1) segments.push(current.join(" "))
+      if (current.length >= 2) {
+        const line = sparkSmooth(current)
+        const first = current[0]
+        const last = current[current.length - 1]
+        segments.push({
+          line,
+          area: `${line} L ${last.x.toFixed(1)} ${baseline} L ${first.x.toFixed(1)} ${baseline} Z`,
+        })
+      }
       current = []
       return
     }
     const x = (i / (trend.length - 1)) * w
     const y = h - 1 - (Math.min(Math.max(v, 0), 100) / 100) * (h - 2)
-    current.push(`${x.toFixed(1)},${y.toFixed(1)}`)
+    current.push({ x, y })
   })
-  if (current.length > 1) segments.push(current.join(" "))
+  if (current.length >= 2) {
+    const line = sparkSmooth(current)
+    const first = current[0]
+    const last = current[current.length - 1]
+    segments.push({
+      line,
+      area: `${line} L ${last.x.toFixed(1)} ${baseline} L ${first.x.toFixed(1)} ${baseline} Z`,
+    })
+  }
   if (segments.length === 0) return null
   return (
     <svg
@@ -56,8 +92,11 @@ function CpuSparkline({ trend, stale }: { trend?: (number | undefined)[]; stale:
       className={stale ? "text-muted-foreground/40" : "text-muted-foreground"}
       aria-hidden="true"
     >
-      {segments.map((points, i) => (
-        <polyline key={i} points={points} fill="none" stroke="currentColor" strokeWidth="1" />
+      {segments.map((seg, i) => (
+        <g key={i}>
+          <path d={seg.area} fill="currentColor" fillOpacity="0.1" />
+          <path d={seg.line} fill="none" stroke="currentColor" strokeWidth="1" />
+        </g>
       ))}
     </svg>
   )
