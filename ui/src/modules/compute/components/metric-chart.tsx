@@ -3,7 +3,6 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
-  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -39,6 +38,14 @@ function formatUnit(v: number, unit: ChartUnit): string {
   }
 }
 
+// Fixed Y-axis width per unit type so every chart's plot area starts
+// at the same x regardless of the actual label length.
+const Y_AXIS_WIDTH: Record<ChartUnit, number> = {
+  pct: 44,
+  bps: 64,
+  plain: 52,
+}
+
 function niceMax(series: ChartSeries[], unit: ChartUnit): number {
   if (unit === "pct") return 100
   let max = 0
@@ -72,8 +79,6 @@ function formatTime(ts: number): string {
   return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
 }
 
-// SVG id must not contain characters like {, }, ", : that appear in
-// JSON-stringified label maps. Replace anything non-alphanumeric.
 function safeId(prefix: string, key: string): string {
   return `${prefix}-${key.replace(/[^A-Za-z0-9_-]/g, "_")}`
 }
@@ -102,144 +107,137 @@ function MetricChartImpl({
   const max = niceMax(series, unit)
   const hasData = series.some((s) => s.values.some((v) => typeof v === "number"))
   const gradPrefix = useId().replace(/:/g, "")
+  const yWidth = Y_AXIS_WIDTH[unit]
 
   const [hidden, setHidden] = useState<Set<string>>(() => new Set())
-  const handleLegendClick = useCallback((e: { dataKey?: string; value?: string }) => {
-    const key = e.dataKey || e.value
-    if (!key) return
+  const handleLegendClick = useCallback((label: string) => {
     setHidden((prev) => {
       const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
+      if (next.has(label)) next.delete(label)
+      else next.add(label)
       return next
     })
   }, [])
-
-  const renderLegend = useCallback(
-    (props: { payload?: ReadonlyArray<{ value?: string; color?: string }> }) => {
-      if (!props.payload) return null
-      return (
-        <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 pt-1 text-xs">
-          {props.payload.map((entry) => {
-            const name = entry.value ?? ""
-            const isHidden = hidden.has(name)
-            return (
-              <span
-                key={name}
-                className={`flex cursor-pointer items-center gap-1 select-none ${isHidden ? "line-through opacity-40" : ""}`}
-                onClick={() => handleLegendClick({ value: name })}
-              >
-                <span
-                  className="inline-block h-2.5 w-2.5 rounded-sm"
-                  style={{ backgroundColor: entry.color }}
-                />
-                {name}
-              </span>
-            )
-          })}
-        </div>
-      )
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- hidden is read via closure; handleLegendClick is stable
-    [hidden],
-  )
 
   return (
     <div className="rounded-lg border p-3">
       <div className="mb-1 text-sm font-medium">{title}</div>
 
       {!hasData ? (
-        <div className="text-muted-foreground flex h-[140px] items-center justify-center text-xs">
+        <div className="text-muted-foreground flex h-[160px] items-center justify-center text-xs">
           {emptyText}
         </div>
       ) : (
-        <ResponsiveContainer width="100%" height={160}>
-          <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -8 }}>
-            <defs>
-              {series.map((s, i) => (
-                <linearGradient
-                  key={s.key}
-                  id={safeId(gradPrefix, s.key)}
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
-                  <stop offset="0%" stopColor={PALETTE[i % PALETTE.length]} stopOpacity={0.2} />
-                  <stop offset="100%" stopColor={PALETTE[i % PALETTE.length]} stopOpacity={0} />
-                </linearGradient>
-              ))}
-            </defs>
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="currentColor"
-              strokeOpacity={0.1}
-              vertical={false}
-              className="text-foreground"
-            />
-            <XAxis
-              dataKey="_ts"
-              type="number"
-              domain={["dataMin", "dataMax"]}
-              tickFormatter={formatTime}
-              tick={{ fontSize: 10 }}
-              tickLine={false}
-              axisLine={false}
-              minTickGap={60}
-              stroke="currentColor"
-              className="text-muted-foreground"
-            />
-            <YAxis
-              domain={[0, max]}
-              tickFormatter={(v: number) => formatUnit(v, unit)}
-              tick={{ fontSize: 10 }}
-              tickLine={false}
-              axisLine={false}
-              width={40}
-              stroke="currentColor"
-              className="text-muted-foreground"
-            />
-            <Tooltip
-              labelFormatter={(v) => (typeof v === "number" ? formatTime(v) : String(v))}
-              formatter={(v, name) => {
-                if (typeof name === "string" && hidden.has(name)) return [null, null]
-                return [typeof v === "number" ? formatUnit(v, unit) : "-", name]
-              }}
-              contentStyle={{
-                fontSize: 12,
-                borderRadius: 6,
-                border: "1px solid var(--border)",
-                background: "var(--popover)",
-                color: "var(--popover-foreground)",
-              }}
-              cursor={{ stroke: "currentColor", strokeOpacity: 0.2 }}
-              isAnimationActive={false}
-            />
-            {series.length > 1 && <Legend content={renderLegend} />}
-            {series.map((s, i) => {
-              const isHidden = hidden.has(s.label)
-              const color = PALETTE[i % PALETTE.length]
-              return (
-                <Area
-                  key={s.key}
-                  dataKey={s.key}
-                  name={s.label}
-                  type="monotone"
-                  stroke={isHidden ? "transparent" : color}
-                  strokeWidth={isHidden ? 0 : 1.5}
-                  fill={isHidden ? "transparent" : `url(#${safeId(gradPrefix, s.key)})`}
-                  fillOpacity={isHidden ? 0 : 1}
-                  dot={false}
-                  activeDot={isHidden ? false : { r: 3, strokeWidth: 0, fill: color }}
-                  connectNulls={false}
-                  animationDuration={500}
-                  animationEasing="ease-out"
-                  isAnimationActive={true}
-                />
-              )
-            })}
-          </AreaChart>
-        </ResponsiveContainer>
+        <>
+          <ResponsiveContainer width="100%" height={160}>
+            <AreaChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+              <defs>
+                {series.map((s, i) => (
+                  <linearGradient
+                    key={s.key}
+                    id={safeId(gradPrefix, s.key)}
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop offset="0%" stopColor={PALETTE[i % PALETTE.length]} stopOpacity={0.2} />
+                    <stop offset="100%" stopColor={PALETTE[i % PALETTE.length]} stopOpacity={0} />
+                  </linearGradient>
+                ))}
+              </defs>
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="currentColor"
+                strokeOpacity={0.1}
+                vertical={false}
+                className="text-foreground"
+              />
+              <XAxis
+                dataKey="_ts"
+                type="number"
+                domain={["dataMin", "dataMax"]}
+                tickFormatter={formatTime}
+                tick={{ fontSize: 10 }}
+                tickLine={false}
+                axisLine={false}
+                minTickGap={60}
+                stroke="currentColor"
+                className="text-muted-foreground"
+              />
+              <YAxis
+                domain={[0, max]}
+                tickFormatter={(v: number) => formatUnit(v, unit)}
+                tick={{ fontSize: 10 }}
+                tickLine={false}
+                axisLine={false}
+                width={yWidth}
+                stroke="currentColor"
+                className="text-muted-foreground"
+              />
+              <Tooltip
+                labelFormatter={(v) => (typeof v === "number" ? formatTime(v) : String(v))}
+                formatter={(v, name) => {
+                  if (typeof name === "string" && hidden.has(name)) return [null, null]
+                  return [typeof v === "number" ? formatUnit(v, unit) : "-", name]
+                }}
+                contentStyle={{
+                  fontSize: 12,
+                  borderRadius: 6,
+                  border: "1px solid var(--border)",
+                  background: "var(--popover)",
+                  color: "var(--popover-foreground)",
+                }}
+                cursor={{ stroke: "currentColor", strokeOpacity: 0.2 }}
+                isAnimationActive={false}
+              />
+              {series.map((s, i) => {
+                const isHidden = hidden.has(s.label)
+                const color = PALETTE[i % PALETTE.length]
+                return (
+                  <Area
+                    key={s.key}
+                    dataKey={s.key}
+                    name={s.label}
+                    type="monotone"
+                    stroke={isHidden ? "transparent" : color}
+                    strokeWidth={isHidden ? 0 : 1.5}
+                    fill={isHidden ? "transparent" : `url(#${safeId(gradPrefix, s.key)})`}
+                    fillOpacity={isHidden ? 0 : 1}
+                    dot={false}
+                    activeDot={isHidden ? false : { r: 3, strokeWidth: 0, fill: color }}
+                    connectNulls={false}
+                    animationDuration={500}
+                    animationEasing="ease-out"
+                    isAnimationActive={true}
+                  />
+                )
+              })}
+            </AreaChart>
+          </ResponsiveContainer>
+
+          {series.length > 1 && (
+            <div className="flex min-h-[28px] flex-wrap items-start justify-center gap-x-3 gap-y-1 pt-1.5 text-xs">
+              {series.map((s, i) => {
+                const isHidden = hidden.has(s.label)
+                const color = PALETTE[i % PALETTE.length]
+                return (
+                  <span
+                    key={s.key}
+                    className={`flex cursor-pointer items-center gap-1 select-none ${isHidden ? "line-through opacity-40" : ""}`}
+                    onClick={() => handleLegendClick(s.label)}
+                  >
+                    <span
+                      className="inline-block h-2.5 w-2.5 rounded-sm"
+                      style={{ backgroundColor: color }}
+                    />
+                    {s.label}
+                  </span>
+                )
+              })}
+            </div>
+          )}
+        </>
       )}
     </div>
   )
