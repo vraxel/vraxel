@@ -174,22 +174,37 @@ function MetricChartImpl({
                   className="text-muted-foreground"
                 />
                 <Tooltip
-                  labelFormatter={(v) => (typeof v === "number" ? formatTime(v) : String(v))}
-                  formatter={(v, name) => {
-                    if (typeof name === "string" && hidden.has(name)) return [null, null]
-                    return [typeof v === "number" ? formatUnit(v, unit) : "-", name]
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload?.length) return null
+                    const visible = payload.filter(
+                      (p) => typeof p.name === "string" && !hidden.has(p.name),
+                    )
+                    if (!visible.length) return null
+                    return (
+                      <div className="bg-popover text-popover-foreground max-h-[140px] overflow-y-auto rounded-md border px-2.5 py-1.5 text-xs shadow-md">
+                        <div className="text-muted-foreground mb-1">
+                          {typeof label === "number" ? formatTime(label) : String(label)}
+                        </div>
+                        {visible.map((p) => (
+                          <div key={String(p.name)} className="flex items-center gap-1.5">
+                            <span
+                              className="inline-block h-2 w-2 rounded-full"
+                              style={{ backgroundColor: String(p.color) }}
+                            />
+                            <span className="truncate">{p.name}</span>
+                            <span className="ml-auto pl-2 font-mono tabular-nums">
+                              {typeof p.value === "number" ? formatUnit(p.value, unit) : "-"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )
                   }}
-                  contentStyle={{
-                    fontSize: 12,
-                    borderRadius: 6,
-                    border: "1px solid var(--border)",
-                    background: "var(--popover)",
-                    color: "var(--popover-foreground)",
-                  }}
-                  wrapperStyle={{ pointerEvents: "none", zIndex: 10 }}
                   cursor={{ stroke: "currentColor", strokeOpacity: 0.2 }}
                   isAnimationActive={false}
-                  allowEscapeViewBox={{ x: false, y: true }}
+                  position={{ y: 0 }}
+                  allowEscapeViewBox={{ x: true, y: true }}
+                  wrapperStyle={{ pointerEvents: "none", zIndex: 20 }}
                 />
                 {series.map((s, i) => {
                   const isHidden = hidden.has(s.label)
