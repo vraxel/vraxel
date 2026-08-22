@@ -30,8 +30,9 @@ function UtilValue({ value, stale }: { value?: number; stale: boolean }) {
 
 type Pt = { x: number; y: number }
 
-function sparkSmooth(points: Pt[]): string {
+function sparkSmooth(points: Pt[], yMin: number, yMax: number): string {
   if (points.length < 2) return ""
+  const c = (v: number) => Math.min(Math.max(v, yMin), yMax)
   let d = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`
   for (let i = 0; i < points.length - 1; i++) {
     const prev = points[Math.max(0, i - 1)]
@@ -39,9 +40,9 @@ function sparkSmooth(points: Pt[]): string {
     const next = points[i + 1]
     const after = points[Math.min(points.length - 1, i + 2)]
     const cp1x = cur.x + (next.x - prev.x) / 6
-    const cp1y = cur.y + (next.y - prev.y) / 6
+    const cp1y = c(cur.y + (next.y - prev.y) / 6)
     const cp2x = next.x - (after.x - cur.x) / 6
-    const cp2y = next.y - (after.y - cur.y) / 6
+    const cp2y = c(next.y - (after.y - cur.y) / 6)
     d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${next.x.toFixed(1)} ${next.y.toFixed(1)}`
   }
   return d
@@ -59,7 +60,7 @@ function CpuSparkline({ trend, stale }: { trend?: (number | undefined)[]; stale:
   trend.forEach((v, i) => {
     if (typeof v !== "number") {
       if (current.length >= 2) {
-        const line = sparkSmooth(current)
+        const line = sparkSmooth(current, 0, h)
         const first = current[0]
         const last = current[current.length - 1]
         segments.push({
@@ -75,7 +76,7 @@ function CpuSparkline({ trend, stale }: { trend?: (number | undefined)[]; stale:
     current.push({ x, y })
   })
   if (current.length >= 2) {
-    const line = sparkSmooth(current)
+    const line = sparkSmooth(current, 0, h)
     const first = current[0]
     const last = current[current.length - 1]
     segments.push({

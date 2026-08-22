@@ -1,4 +1,5 @@
-import { useId, useRef, useState } from "react"
+import { useId, useMemo, useRef, useState } from "react"
+import { useAnimatedSeries } from "@/modules/compute/use-animated-series"
 
 // A line chart over the fixed grid HostMetrics answers with. Hand-rolled
 // SVG with cubic Bezier smoothing (Catmull-Rom control points, same
@@ -63,7 +64,11 @@ function fmt(n: number): string {
   return n.toFixed(1)
 }
 
-function smoothPath(points: Pt[]): string {
+function clamp(v: number, lo: number, hi: number): number {
+  return Math.min(Math.max(v, lo), hi)
+}
+
+function smoothPath(points: Pt[], yMin: number, yMax: number): string {
   if (points.length === 0) return ""
   if (points.length === 1) return `M ${fmt(points[0].x)} ${fmt(points[0].y)}`
   let d = `M ${fmt(points[0].x)} ${fmt(points[0].y)}`
@@ -73,16 +78,21 @@ function smoothPath(points: Pt[]): string {
     const next = points[i + 1]
     const after = points[Math.min(points.length - 1, i + 2)]
     const cp1x = cur.x + (next.x - prev.x) / 6
-    const cp1y = cur.y + (next.y - prev.y) / 6
+    const cp1y = clamp(cur.y + (next.y - prev.y) / 6, yMin, yMax)
     const cp2x = next.x - (after.x - cur.x) / 6
-    const cp2y = next.y - (after.y - cur.y) / 6
+    const cp2y = clamp(next.y - (after.y - cur.y) / 6, yMin, yMax)
     d += ` C ${fmt(cp1x)} ${fmt(cp1y)}, ${fmt(cp2x)} ${fmt(cp2y)}, ${fmt(next.x)} ${fmt(next.y)}`
   }
   return d
 }
 
-function buildSegmentPaths(points: Pt[], baseline: number): { linePath: string; areaPath: string } {
-  const linePath = smoothPath(points)
+function buildSegmentPaths(
+  points: Pt[],
+  baseline: number,
+  yMin: number,
+  yMax: number,
+): { linePath: string; areaPath: string } {
+  const linePath = smoothPath(points, yMin, yMax)
   if (points.length < 2) return { linePath, areaPath: "" }
   const first = points[0]
   const last = points[points.length - 1]
@@ -111,25 +121,41 @@ export function MetricChart({
   const [hover, setHover] = useState<number | null>(null)
   const gradientId = useId().replace(/:/g, "")
 
+  // Flatten all series values into one array for a single animation
+  // hook call (hooks cannot be called inside a loop), then slice back.
+  const flat = useMemo(() => series.flatMap((s) => s.values), [series])
+  const animKey = `${fromMs}:${count}:${series.map((s) => s.key).join(",")}`
+  const animatedFlat = useAnimatedSeries(flat, animKey)
+  const animatedSeries = useMemo(() => {
+    const result: ChartSeries[] = []
+    let offset = 0
+    for (const s of series) {
+      result.push({ ...s, values: animatedFlat.slice(offset, offset + s.values.length) })
+      offset += s.values.length
+    }
+    return result
+  }, [series, animatedFlat])
+
   const innerW = W - PAD_L - PAD_R
   const innerH = H - PAD_T - PAD_B
-  const max = niceMax(series, unit)
+  const max = niceMax(animatedSeries, unit)
   const xAt = (i: number) => PAD_L + (count > 1 ? (i / (count - 1)) * innerW : 0)
   const yAt = (v: number) => PAD_T + innerH - (Math.min(v, max) / max) * innerH
   const baseline = PAD_T + innerH
 
-  const seriesPaths = series.map((s) => {
+  const seriesPaths = animatedSeries.map((s) => {
     const segments: { linePath: string; areaPath: string }[] = []
     let current: Pt[] = []
     s.values.forEach((v, i) => {
       if (typeof v !== "number") {
-        if (current.length >= 2) segments.push(buildSegmentPaths(current, baseline))
+        if (current.length >= 2)
+          segments.push(buildSegmentPaths(current, baseline, PAD_T, baseline))
         current = []
         return
       }
       current.push({ x: xAt(i), y: yAt(v) })
     })
-    if (current.length >= 2) segments.push(buildSegmentPaths(current, baseline))
+    if (current.length >= 2) segments.push(buildSegmentPaths(current, baseline, PAD_T, baseline))
     return segments
   })
   const hasData = seriesPaths.some((p) => p.length > 0)
