@@ -118,7 +118,7 @@ function MetricChartImpl({
 
   return (
     <div className="bg-muted/30 rounded-lg border p-3">
-      <div className="mb-1 text-sm font-medium">{title}</div>
+      <div className="mb-2 text-sm font-medium">{title}</div>
 
       {!hasData ? (
         <div className="text-muted-foreground flex h-[160px] items-center justify-center text-xs">
@@ -127,7 +127,7 @@ function MetricChartImpl({
       ) : (
         <>
           <ResponsiveContainer width="100%" height={160}>
-            <AreaChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+            <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
               <defs>
                 {series.map((s, i) => (
                   <linearGradient
