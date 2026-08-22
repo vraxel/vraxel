@@ -56,7 +56,7 @@ export function StepMethod({ method, source, scopeLabel, onMethodChange, onSourc
       <RadioGroup
         value={method}
         onValueChange={(v) => onMethodChange(v as Method)}
-        className="space-y-3"
+        className="space-y-4"
       >
         <MethodOption
           value="agent"

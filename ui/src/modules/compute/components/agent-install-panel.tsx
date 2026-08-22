@@ -70,7 +70,7 @@ export function AgentInstallPanel({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div className="border-warning/25 bg-warning/10 flex items-start gap-3 rounded-lg border p-3">
         <ShieldAlert className="text-warning mt-0.5 size-4 shrink-0" />
         <p className="text-sm">
@@ -104,7 +104,7 @@ export function AgentInstallPanel({
 
       <div className="border-border-subtle rounded-xl border p-4">
         {registeredHost ? (
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="flex items-center gap-2">
               <span className="bg-success/15 text-success flex size-6 items-center justify-center rounded-full">
                 <Check className="size-3.5" />

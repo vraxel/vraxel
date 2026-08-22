@@ -16,7 +16,7 @@ export function SocialLogin({ providers, requestId }: { providers: string[]; req
   if (known.length === 0) return null
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="relative">
         <div className="absolute inset-0 flex items-center">
           <span className="w-full border-t" />

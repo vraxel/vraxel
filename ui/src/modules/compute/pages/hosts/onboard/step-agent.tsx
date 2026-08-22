@@ -37,7 +37,7 @@ export function StepAgent({
   const { t } = useTranslation()
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div className="border-success/25 bg-success/10 flex items-start gap-3 rounded-lg border p-3">
         <span className="bg-success/20 text-success mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full">
           <Check className="size-3" />

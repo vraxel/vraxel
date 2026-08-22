@@ -302,11 +302,11 @@ export default function AuditLogListPage() {
             <DialogDescription>ID: {selectedLog?.spec.id}</DialogDescription>
           </DialogHeader>
           {selectedLog && (
-            <div className="-mx-1 min-h-0 flex-1 space-y-5 overflow-y-auto px-1">
+            <div className="-mx-1 min-h-0 flex-1 space-y-6 overflow-y-auto px-1">
               {/* Two-column: Basic + Resource */}
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 {/* Basic */}
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <h3 className="text-sm font-semibold">{t("audit.detail")}</h3>
                   <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
                     <dt className="text-muted-foreground">{t("audit.username")}</dt>
@@ -331,7 +331,7 @@ export default function AuditLogListPage() {
                 </div>
 
                 {/* Resource */}
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <h3 className="text-sm font-semibold">{t("audit.resourceType")}</h3>
                   <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
                     <dt className="text-muted-foreground">{t("audit.resourceType")}</dt>
@@ -353,7 +353,7 @@ export default function AuditLogListPage() {
               <Separator />
 
               {/* HTTP section - full width, two-column grid */}
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <h3 className="text-sm font-semibold">HTTP</h3>
                 <dl className="grid grid-cols-1 gap-x-8 gap-y-2 text-sm md:grid-cols-2">
                   <div className="grid grid-cols-[auto_1fr] gap-x-4">
@@ -401,7 +401,7 @@ export default function AuditLogListPage() {
               {selectedLog.spec.detail && (
                 <>
                   <Separator />
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     <h3 className="text-sm font-semibold">{t("audit.detail.field")}</h3>
                     <pre className="bg-muted/50 max-h-80 overflow-auto rounded-md border p-4 font-mono text-xs leading-relaxed">
                       {formatJsonDetail(selectedLog.spec.detail)}
@@ -414,7 +414,7 @@ export default function AuditLogListPage() {
               {selectedLog.spec.responseDetail && (
                 <>
                   <Separator />
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     <h3 className="text-sm font-semibold">{t("audit.responseDetail.field")}</h3>
                     <pre className="bg-muted/50 max-h-80 overflow-auto rounded-md border p-4 font-mono text-xs leading-relaxed">
                       {formatJsonDetail(selectedLog.spec.responseDetail)}
