@@ -19,33 +19,49 @@ const PALETTE = ["#0ea5e9", "#10b981", "#f59e0b", "#8b5cf6", "#f43f5e", "#06b6d4
 
 export type ChartUnit = "pct" | "bps" | "plain"
 
+// Full format for tooltips: "210 KB/s", "54.3%"
 function formatUnit(v: number, unit: ChartUnit): string {
   switch (unit) {
     case "pct":
       return `${v >= 10 ? Math.round(v) : v.toFixed(1)}%`
     case "bps": {
-      const units = ["B/s", "KB/s", "MB/s", "GB/s"]
+      const u = ["B/s", "KB/s", "MB/s", "GB/s"]
       let x = v
       let i = 0
-      while (x >= 1024 && i < units.length - 1) {
+      while (x >= 1024 && i < u.length - 1) {
         x /= 1024
         i++
       }
-      return `${x >= 10 || i === 0 ? Math.round(x) : x.toFixed(1)} ${units[i]}`
+      return `${x >= 10 || i === 0 ? Math.round(x) : x.toFixed(1)} ${u[i]}`
     }
     default:
       return v >= 10 ? String(Math.round(v)) : v.toFixed(2)
   }
 }
 
-// Y-axis width per unit type. Uniform within each type so charts of
-// the same kind align; different across types because "100%" and
-// "210 KB/s" have very different pixel widths at fontSize 10.
-const Y_AXIS_WIDTH: Record<ChartUnit, number> = {
-  pct: 40,
-  bps: 56,
-  plain: 40,
+// Short format for Y-axis ticks: "210K", "1.2M", "54%"
+function formatTick(v: number, unit: ChartUnit): string {
+  switch (unit) {
+    case "pct":
+      return `${v >= 10 ? Math.round(v) : v.toFixed(1)}%`
+    case "bps": {
+      const u = ["", "K", "M", "G"]
+      let x = v
+      let i = 0
+      while (x >= 1024 && i < u.length - 1) {
+        x /= 1024
+        i++
+      }
+      return `${x >= 10 || i === 0 ? Math.round(x) : x.toFixed(1)}${u[i]}`
+    }
+    default:
+      return v >= 10 ? String(Math.round(v)) : v.toFixed(2)
+  }
 }
+
+// All charts use the same Y-axis width since ticks now use the short
+// format (pct: "100%", bps: "210K", plain: "0.38") which fits in 40px.
+const Y_AXIS_WIDTH = 40
 
 function niceMax(series: ChartSeries[], unit: ChartUnit): number {
   if (unit === "pct") return 100
@@ -168,11 +184,11 @@ function MetricChartImpl({
                 />
                 <YAxis
                   domain={[0, max]}
-                  tickFormatter={(v: number) => formatUnit(v, unit)}
+                  tickFormatter={(v: number) => formatTick(v, unit)}
                   tick={{ fontSize: 10 }}
                   tickLine={false}
                   axisLine={false}
-                  width={Y_AXIS_WIDTH[unit]}
+                  width={Y_AXIS_WIDTH}
                   stroke="currentColor"
                   className="text-muted-foreground"
                 />
