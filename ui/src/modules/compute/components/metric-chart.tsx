@@ -119,18 +119,19 @@ function MetricChartImpl({
   const gradPrefix = useId().replace(/:/g, "")
 
   const [hidden, setHidden] = useState<Set<string>>(() => new Set())
-  // Isolate mode: click one series = show only that one; click again
-  // (or click when only one is visible) = restore all. One click to
-  // focus instead of N-1 clicks to hide everything else.
+  // Click = toggle that one series. If every series ends up hidden,
+  // restore all (a chart with nothing visible is useless).
   const handleLegendClick = useCallback(
     (label: string) => {
       setHidden((prev) => {
-        const allLabels = series.map((s) => s.label)
-        const visibleCount = allLabels.filter((l) => !prev.has(l)).length
-        if (visibleCount === 1 && !prev.has(label)) {
-          return new Set()
+        const next = new Set(prev)
+        if (next.has(label)) {
+          next.delete(label)
+        } else {
+          next.add(label)
         }
-        const next = new Set(allLabels.filter((l) => l !== label))
+        const allLabels = series.map((s) => s.label)
+        if (allLabels.every((l) => next.has(l))) return new Set()
         return next
       })
     },
@@ -235,9 +236,8 @@ function MetricChartImpl({
                   }}
                   cursor={{ stroke: "currentColor", strokeOpacity: 0.15, strokeDasharray: "3 3" }}
                   isAnimationActive={false}
-                  position={{ y: 0 }}
                   allowEscapeViewBox={{ x: true, y: true }}
-                  wrapperStyle={{ zIndex: 20 }}
+                  wrapperStyle={{ zIndex: 20, overflow: "visible" }}
                 />
                 {series.map((s, i) => {
                   const isHidden = hidden.has(s.label)
