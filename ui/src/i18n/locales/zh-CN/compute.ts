@@ -16,7 +16,6 @@ const compute = {
   "compute.host.ip": "IP 地址",
   "compute.host.os": "操作系统",
   "compute.host.arch": "架构",
-  "compute.host.spec": "规格",
   "compute.host.organization": "组织",
   "compute.host.scopeAll": "全部归属",
   "compute.host.scopePlatform": "平台",

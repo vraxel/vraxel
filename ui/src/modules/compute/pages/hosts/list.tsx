@@ -166,18 +166,6 @@ export default function HostListPage() {
       ),
     },
     {
-      key: "spec",
-      header: t("compute.host.spec"),
-      sortable: true,
-      sortKey: "cpu_cores",
-      cell: (h) => (
-        <span className="text-sm">
-          {h.spec.cpuCores ?? 0} {t("compute.host.cores")} /{" "}
-          {Math.round((h.spec.memoryMb ?? 0) / 1024)} GiB
-        </span>
-      ),
-    },
-    {
       key: "origin",
       header: t("compute.host.origin"),
       sortable: true,

@@ -15,7 +15,6 @@ const compute = {
   "compute.host.ip": "IP address",
   "compute.host.os": "OS",
   "compute.host.arch": "Arch",
-  "compute.host.spec": "Spec",
   "compute.host.organization": "Organization",
   "compute.host.scopeAll": "All scopes",
   "compute.host.scopePlatform": "Platform",
