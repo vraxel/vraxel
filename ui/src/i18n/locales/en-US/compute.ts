@@ -15,7 +15,6 @@ const compute = {
   "compute.host.ip": "IP address",
   "compute.host.os": "OS",
   "compute.host.arch": "Arch",
-  "compute.host.spec": "Spec",
   "compute.host.organization": "Organization",
   "compute.host.scopeAll": "All scopes",
   "compute.host.scopePlatform": "Platform",
@@ -30,6 +29,13 @@ const compute = {
   "compute.host.memory": "Memory",
   "compute.host.disk": "Disk",
   "compute.host.hostname": "Hostname",
+
+  // Spec sorts: capacity has no column of its own (it merged into the
+  // utilisation gauges), so this dropdown is what reaches them.
+  "compute.host.sortSpec": "Sort by spec",
+  "compute.host.sortCores": "CPU cores",
+  "compute.host.sortMemoryTotal": "Total memory",
+  "compute.host.sortDiskTotal": "Total disk",
   "compute.host.agentVersion": "Agent version",
 
   "compute.host.metrics.title": "Metrics",

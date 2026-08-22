@@ -447,8 +447,17 @@ ORDER BY
     CASE WHEN $7::VARCHAR = 'ip' AND $8::VARCHAR = 'desc' THEN h.reported_primary_ip END DESC,
     CASE WHEN $7::VARCHAR = 'os' AND $8::VARCHAR = 'asc' THEN h.os END ASC,
     CASE WHEN $7::VARCHAR = 'os' AND $8::VARCHAR = 'desc' THEN h.os END DESC,
+    -- Capacity sorts. No column carries these any more (the spec column
+    -- merged into the utilisation gauges), so the list's spec dropdown is
+    -- what reaches them. They are host columns, not metrics: a host that
+    -- never reported still has the size it was registered with, so no
+    -- NULLS LAST here -- 0 is a real answer meaning "we were not told".
     CASE WHEN $7::VARCHAR = 'cpu_cores' AND $8::VARCHAR = 'asc' THEN h.cpu_cores END ASC,
     CASE WHEN $7::VARCHAR = 'cpu_cores' AND $8::VARCHAR = 'desc' THEN h.cpu_cores END DESC,
+    CASE WHEN $7::VARCHAR = 'memory_mb' AND $8::VARCHAR = 'asc' THEN h.memory_mb END ASC,
+    CASE WHEN $7::VARCHAR = 'memory_mb' AND $8::VARCHAR = 'desc' THEN h.memory_mb END DESC,
+    CASE WHEN $7::VARCHAR = 'disk_gb' AND $8::VARCHAR = 'asc' THEN h.disk_gb END ASC,
+    CASE WHEN $7::VARCHAR = 'disk_gb' AND $8::VARCHAR = 'desc' THEN h.disk_gb END DESC,
     -- Metric sorts keep agentless hosts (NULL) at the bottom in BOTH
     -- directions: "most loaded first" must not open with a page of
     -- hosts that reported nothing. ASC gets that from PG's default;
