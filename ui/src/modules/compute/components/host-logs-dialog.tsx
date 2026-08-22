@@ -113,6 +113,11 @@ export function HostLogsDialog({
   const scopeWs = scope.ws
   const scopeNs = scope.ns
 
+  // "idle" is never stored: the file source missing its path is a pure
+  // function of the inputs, so the badge derives it instead of the
+  // stream effect writing it back as state.
+  const shownStatus: ConnectionStatus = source === "file" && !committed.path ? "idle" : status
+
   // The terminal, alive from dialog open to dialog close.
   useEffect(() => {
     if (!open) return
@@ -167,8 +172,6 @@ export function HostLogsDialog({
   useEffect(() => {
     if (!open || !term) return
 
-    setStatus("connecting")
-    setErrorMessage("")
     // RIS through the write queue, not term.reset(): reset() is
     // synchronous and bypasses xterm's parse queue, so bytes of the OLD
     // stream still queued (a big tail replay, switched away from
@@ -178,9 +181,11 @@ export function HostLogsDialog({
     term.write("\x1bc")
 
     // The file source has nothing to stream until a path is committed;
-    // say so instead of opening a socket the server would reject.
+    // say so instead of opening a socket the server would reject. The
+    // badge for this case is derived at render, not set here: effects
+    // must not set state synchronously, and it IS a pure function of
+    // the inputs.
     if (source === "file" && !committed.path) {
-      setStatus("idle")
       term.write(`\x1b[90m${translate("compute.host.logs.needPath")}\x1b[0m\r\n`)
       return
     }
@@ -261,6 +266,12 @@ export function HostLogsDialog({
       socket.onclose = null
       socket.onerror = null
       if (socket.readyState !== WebSocket.CLOSED) socket.close()
+      // The next stream (or a reopen) starts life connecting. Set here
+      // and not at the top of the setup, which must not set state
+      // synchronously; status only ever leaves "connecting" through a
+      // socket event, so a run that skips the socket keeps this value.
+      setStatus("connecting")
+      setErrorMessage("")
     }
   }, [open, term, hostId, scopeWs, scopeNs, source, priority, tail, follow, committed])
 
@@ -275,7 +286,7 @@ export function HostLogsDialog({
           <DialogTitle className="truncate">
             {t("compute.host.logs.title")} - {host.metadata.name}
           </DialogTitle>
-          <StatusBadge status={status} message={errorMessage} />
+          <StatusBadge status={shownStatus} message={errorMessage} />
         </DialogHeader>
 
         <div className="flex flex-wrap items-center gap-2">
