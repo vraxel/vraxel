@@ -358,6 +358,57 @@ func TestDataHubRegisterSupersedesAndClosesPrev(t *testing.T) {
 	}
 }
 
+func TestDataHubOpenStreamRetriesPastDeadSession(t *testing.T) {
+	// A registered session can be a corpse: the agent idle-closes its
+	// channel, and an open can land in the window before that close
+	// reaches this side's map. The open must not surface an error -- the
+	// hub drops the corpse, re-triggers the channel, and retries once.
+	reg := NewRegistry(&fakeAgentStore{}, "inst")
+	hub := testHub(reg, &fakeAgentStore{})
+	ctrlSess, ctrlClient := newReadableControlSession(t, "agent-7", 7)
+	reg.Add(context.Background(), ctrlSess, 0)
+
+	dead := liveYamuxClient(t)
+	_ = dead.Close()
+	hub.register(7, dead)
+
+	type result struct {
+		conn net.Conn
+		err  error
+	}
+	done := make(chan result, 1)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		conn, err := hub.OpenStream(ctx, 7, agenttypes.StreamOpen{Kind: agenttypes.StreamKindTCP, Target: "127.0.0.1:9"})
+		done <- result{conn, err}
+	}()
+
+	// The retry must ask for a fresh channel over the control channel.
+	if f := readControlFrame(t, ctrlClient); f.Type != agenttypes.FrameTypeChannelOpen {
+		t.Fatalf("control channel got %q, want %q", f.Type, agenttypes.FrameTypeChannelOpen)
+	}
+
+	gwConn, agentConn := net.Pipe()
+	gwSess, err := yamux.Client(gwConn, testYamuxCfg())
+	if err != nil {
+		t.Fatalf("gateway yamux client: %v", err)
+	}
+	t.Cleanup(func() { gwSess.Close(); gwConn.Close(); agentConn.Close() })
+	gotOpen := make(chan agenttypes.StreamOpen, 1)
+	go fakeAgent(t, agentConn, agenttypes.StreamAccept{Ok: true}, gotOpen)
+	hub.register(7, gwSess)
+
+	res := <-done
+	if res.err != nil {
+		t.Fatalf("OpenStream against a dead session did not recover: %v", res.err)
+	}
+	defer res.conn.Close()
+	if open := <-gotOpen; open.Kind != agenttypes.StreamKindTCP {
+		t.Fatalf("agent saw open %+v, want tcp", open)
+	}
+}
+
 func TestDataHubOpenStreamHonorsContextDuringHandshake(t *testing.T) {
 	// The agent accepts the stream and reads the open header but never
 	// answers. Without ctx enforcement the handshake would block until yamux
