@@ -120,7 +120,7 @@ function MetricChartImpl({
   }, [])
 
   return (
-    <div className="rounded-lg border p-3">
+    <div className="bg-muted/30 rounded-lg border p-3">
       <div className="mb-1 text-sm font-medium">{title}</div>
 
       {!hasData ? (
