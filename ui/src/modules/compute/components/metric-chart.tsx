@@ -53,6 +53,7 @@ function formatTick(v: number, unit: ChartUnit, scale: BpsScale): string {
 }
 
 const Y_AXIS_WIDTH = 40
+const CHART_FONT = 'var(--font-sans, "Inter", sans-serif)'
 
 function niceMax(series: ChartSeries[], unit: ChartUnit): number {
   if (unit === "pct") return 100
@@ -151,7 +152,7 @@ function MetricChartImpl({
         </div>
       ) : (
         <>
-          <div className="relative h-[160px]">
+          <div className="relative h-[160px] cursor-crosshair">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data} margin={{ top: 12, right: 8, bottom: 0, left: 0 }}>
                 <defs>
@@ -181,7 +182,7 @@ function MetricChartImpl({
                   type="number"
                   domain={["dataMin", "dataMax"]}
                   tickFormatter={formatTime}
-                  tick={{ fontSize: 10 }}
+                  tick={{ fontSize: 10, fontFamily: CHART_FONT }}
                   tickLine={false}
                   axisLine={false}
                   minTickGap={60}
@@ -191,7 +192,7 @@ function MetricChartImpl({
                 <YAxis
                   domain={[0, max]}
                   tickFormatter={(v: number) => formatTick(v, unit, scale)}
-                  tick={{ fontSize: 10 }}
+                  tick={{ fontSize: 10, fontFamily: CHART_FONT }}
                   tickLine={false}
                   axisLine={false}
                   width={Y_AXIS_WIDTH}
@@ -232,7 +233,7 @@ function MetricChartImpl({
                       </div>
                     )
                   }}
-                  cursor={{ stroke: "currentColor", strokeOpacity: 0.2 }}
+                  cursor={{ stroke: "currentColor", strokeOpacity: 0.15, strokeDasharray: "3 3" }}
                   isAnimationActive={false}
                   position={{ y: 0 }}
                   allowEscapeViewBox={{ x: true, y: true }}
