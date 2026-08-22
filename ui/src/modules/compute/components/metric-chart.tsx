@@ -19,60 +19,37 @@ const PALETTE = ["#0ea5e9", "#10b981", "#f59e0b", "#8b5cf6", "#f43f5e", "#06b6d4
 
 export type ChartUnit = "pct" | "bps" | "plain"
 
-// Full format for tooltips: "210 KB/s", "54.3%"
-function formatUnit(v: number, unit: ChartUnit): string {
-  switch (unit) {
-    case "pct":
-      return `${v >= 10 ? Math.round(v) : v.toFixed(1)}%`
-    case "bps": {
-      const u = ["B/s", "KB/s", "MB/s", "GB/s"]
-      let x = v
-      let i = 0
-      while (x >= 1024 && i < u.length - 1) {
-        x /= 1024
-        i++
-      }
-      return `${x >= 10 || i === 0 ? Math.round(x) : x.toFixed(1)} ${u[i]}`
-    }
-    default:
-      return v >= 10 ? String(Math.round(v)) : v.toFixed(2)
+// For bps charts, compute a single scale tier from the data max so
+// the title, Y-axis ticks, and tooltip all use the same unit.
+type BpsScale = { divisor: number; label: string }
+const BPS_TIERS: { threshold: number; divisor: number; label: string }[] = [
+  { threshold: 1024 * 1024 * 1024, divisor: 1024 * 1024 * 1024, label: "GB/s" },
+  { threshold: 1024 * 1024, divisor: 1024 * 1024, label: "MB/s" },
+  { threshold: 1024, divisor: 1024, label: "KB/s" },
+]
+function bpsScale(max: number): BpsScale {
+  for (const t of BPS_TIERS) {
+    if (max >= t.threshold) return { divisor: t.divisor, label: t.label }
   }
+  return { divisor: 1, label: "B/s" }
 }
 
-// Y-axis ticks show only the number; the unit is in the title.
-// This keeps ticks short, prevents wrapping, and lets every chart
-// use the same axis width.
-function formatTick(v: number, unit: ChartUnit): string {
-  switch (unit) {
-    case "pct":
-      return `${v >= 10 ? Math.round(v) : v.toFixed(1)}%`
-    case "bps": {
-      const u = ["", "K", "M", "G"]
-      let x = v
-      let i = 0
-      while (x >= 1024 && i < u.length - 1) {
-        x /= 1024
-        i++
-      }
-      return `${x >= 10 || i === 0 ? Math.round(x) : x.toFixed(1)}${u[i]}`
-    }
-    default:
-      return v >= 10 ? String(Math.round(v)) : v.toFixed(2)
-  }
+function fmtNum(v: number): string {
+  return v >= 10 ? String(Math.round(v)) : v.toFixed(1)
 }
 
-// The scale unit label shown in the chart title, e.g. "(KB/s)".
-// Computed from the data max so the tick numbers match.
-function scaleLabel(max: number, unit: ChartUnit): string {
-  if (unit !== "bps") return ""
-  const u = ["B/s", "KB/s", "MB/s", "GB/s"]
-  let x = max
-  let i = 0
-  while (x >= 1024 && i < u.length - 1) {
-    x /= 1024
-    i++
-  }
-  return ` (${u[i]})`
+// Full format for tooltips: "2.5 KB/s", "54.3%"
+function formatValue(v: number, unit: ChartUnit, scale: BpsScale): string {
+  if (unit === "pct") return `${fmtNum(v)}%`
+  if (unit === "bps") return `${fmtNum(v / scale.divisor)} ${scale.label}`
+  return v >= 10 ? String(Math.round(v)) : v.toFixed(2)
+}
+
+// Y-axis ticks: pure number in the chart's scale ("5.6", "2.9")
+function formatTick(v: number, unit: ChartUnit, scale: BpsScale): string {
+  if (unit === "pct") return `${fmtNum(v)}%`
+  if (unit === "bps") return fmtNum(v / scale.divisor)
+  return v >= 10 ? String(Math.round(v)) : v.toFixed(2)
 }
 
 const Y_AXIS_WIDTH = 40
@@ -137,6 +114,7 @@ function MetricChartImpl({
   )
   const max = niceMax(series, unit)
   const hasData = series.some((s) => s.values.some((v) => typeof v === "number"))
+  const scale = useMemo(() => bpsScale(max), [max])
   const gradPrefix = useId().replace(/:/g, "")
 
   const [hidden, setHidden] = useState<Set<string>>(() => new Set())
@@ -153,8 +131,8 @@ function MetricChartImpl({
     <div className="bg-muted/30 rounded-lg border p-3">
       <div className="mb-3 text-sm font-medium">
         {title}
-        {hasData && (
-          <span className="text-muted-foreground ml-1 font-normal">{scaleLabel(max, unit)}</span>
+        {hasData && unit === "bps" && (
+          <span className="text-muted-foreground ml-1 font-normal">({scale.label})</span>
         )}
       </div>
 
@@ -203,7 +181,7 @@ function MetricChartImpl({
                 />
                 <YAxis
                   domain={[0, max]}
-                  tickFormatter={(v: number) => formatTick(v, unit)}
+                  tickFormatter={(v: number) => formatTick(v, unit, scale)}
                   tick={{ fontSize: 10 }}
                   tickLine={false}
                   axisLine={false}
@@ -231,7 +209,9 @@ function MetricChartImpl({
                             />
                             <span className="truncate">{p.name}</span>
                             <span className="ml-auto pl-2 font-mono tabular-nums">
-                              {typeof p.value === "number" ? formatUnit(p.value, unit) : "-"}
+                              {typeof p.value === "number"
+                                ? formatValue(p.value, unit, scale)
+                                : "-"}
                             </span>
                           </div>
                         ))}
