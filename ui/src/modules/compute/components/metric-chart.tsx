@@ -118,14 +118,23 @@ function MetricChartImpl({
   const gradPrefix = useId().replace(/:/g, "")
 
   const [hidden, setHidden] = useState<Set<string>>(() => new Set())
-  const handleLegendClick = useCallback((label: string) => {
-    setHidden((prev) => {
-      const next = new Set(prev)
-      if (next.has(label)) next.delete(label)
-      else next.add(label)
-      return next
-    })
-  }, [])
+  // Isolate mode: click one series = show only that one; click again
+  // (or click when only one is visible) = restore all. One click to
+  // focus instead of N-1 clicks to hide everything else.
+  const handleLegendClick = useCallback(
+    (label: string) => {
+      setHidden((prev) => {
+        const allLabels = series.map((s) => s.label)
+        const visibleCount = allLabels.filter((l) => !prev.has(l)).length
+        if (visibleCount === 1 && !prev.has(label)) {
+          return new Set()
+        }
+        const next = new Set(allLabels.filter((l) => l !== label))
+        return next
+      })
+    },
+    [series],
+  )
 
   return (
     <div className="bg-muted/30 rounded-lg border p-3">
@@ -192,23 +201,28 @@ function MetricChartImpl({
                 <Tooltip
                   content={({ active, payload, label }) => {
                     if (!active || !payload?.length) return null
-                    const visible = payload.filter(
-                      (p) => typeof p.name === "string" && !hidden.has(p.name),
-                    )
+                    const visible = payload
+                      .filter((p) => typeof p.name === "string" && !hidden.has(p.name))
+                      .slice()
+                      .sort((a, b) => {
+                        const va = typeof a.value === "number" ? a.value : 0
+                        const vb = typeof b.value === "number" ? b.value : 0
+                        return vb - va
+                      })
                     if (!visible.length) return null
                     return (
-                      <div className="bg-popover text-popover-foreground max-h-[140px] overflow-y-auto rounded-md border px-2.5 py-1.5 text-xs shadow-md">
+                      <div className="bg-popover text-popover-foreground max-h-[200px] max-w-[360px] overflow-y-auto rounded-md border px-2.5 py-1.5 text-xs shadow-md">
                         <div className="text-muted-foreground mb-1">
                           {typeof label === "number" ? formatTime(label) : String(label)}
                         </div>
                         {visible.map((p) => (
                           <div key={String(p.name)} className="flex items-center gap-1.5">
                             <span
-                              className="inline-block h-2 w-2 rounded-full"
+                              className="inline-block h-2 w-2 shrink-0 rounded-full"
                               style={{ backgroundColor: String(p.color) }}
                             />
-                            <span className="truncate">{p.name}</span>
-                            <span className="ml-auto pl-2 font-mono tabular-nums">
+                            <span className="min-w-0 truncate">{p.name}</span>
+                            <span className="ml-auto shrink-0 pl-2 font-mono tabular-nums">
                               {typeof p.value === "number"
                                 ? formatValue(p.value, unit, scale)
                                 : "-"}
@@ -222,7 +236,7 @@ function MetricChartImpl({
                   isAnimationActive={false}
                   position={{ y: 0 }}
                   allowEscapeViewBox={{ x: true, y: true }}
-                  wrapperStyle={{ pointerEvents: "none", zIndex: 20 }}
+                  wrapperStyle={{ zIndex: 20 }}
                 />
                 {series.map((s, i) => {
                   const isHidden = hidden.has(s.label)
