@@ -38,13 +38,11 @@ function formatUnit(v: number, unit: ChartUnit): string {
   }
 }
 
-// Fixed Y-axis width per unit type so every chart's plot area starts
-// at the same x regardless of the actual label length.
-const Y_AXIS_WIDTH: Record<ChartUnit, number> = {
-  pct: 44,
-  bps: 64,
-  plain: 52,
-}
+// Every chart uses the same Y-axis width so plot areas align across
+// all panels in the 2-column grid. 64px accommodates the widest label
+// (bps: "999 MB/s"); pct and plain waste a few pixels but the visual
+// consistency is worth it.
+const Y_AXIS_WIDTH = 64
 
 function niceMax(series: ChartSeries[], unit: ChartUnit): number {
   if (unit === "pct") return 100
@@ -107,7 +105,6 @@ function MetricChartImpl({
   const max = niceMax(series, unit)
   const hasData = series.some((s) => s.values.some((v) => typeof v === "number"))
   const gradPrefix = useId().replace(/:/g, "")
-  const yWidth = Y_AXIS_WIDTH[unit]
 
   const [hidden, setHidden] = useState<Set<string>>(() => new Set())
   const handleLegendClick = useCallback((label: string) => {
@@ -171,7 +168,7 @@ function MetricChartImpl({
                 tick={{ fontSize: 10 }}
                 tickLine={false}
                 axisLine={false}
-                width={yWidth}
+                width={Y_AXIS_WIDTH}
                 stroke="currentColor"
                 className="text-muted-foreground"
               />
@@ -216,9 +213,9 @@ function MetricChartImpl({
             </AreaChart>
           </ResponsiveContainer>
 
-          {series.length > 1 && (
-            <div className="flex min-h-[28px] flex-wrap items-start justify-center gap-x-3 gap-y-1 pt-1.5 text-xs">
-              {series.map((s, i) => {
+          <div className="flex min-h-[28px] flex-wrap items-start justify-center gap-x-3 gap-y-1 pt-1.5 text-xs">
+            {series.length > 1 &&
+              series.map((s, i) => {
                 const isHidden = hidden.has(s.label)
                 const color = PALETTE[i % PALETTE.length]
                 return (
@@ -235,8 +232,7 @@ function MetricChartImpl({
                   </span>
                 )
               })}
-            </div>
-          )}
+          </div>
         </>
       )}
     </div>
