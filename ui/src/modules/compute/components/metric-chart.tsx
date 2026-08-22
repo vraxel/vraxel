@@ -39,7 +39,9 @@ function formatUnit(v: number, unit: ChartUnit): string {
   }
 }
 
-// Short format for Y-axis ticks: "210K", "1.2M", "54%"
+// Y-axis ticks show only the number; the unit is in the title.
+// This keeps ticks short, prevents wrapping, and lets every chart
+// use the same axis width.
 function formatTick(v: number, unit: ChartUnit): string {
   switch (unit) {
     case "pct":
@@ -59,8 +61,20 @@ function formatTick(v: number, unit: ChartUnit): string {
   }
 }
 
-// All charts use the same Y-axis width since ticks now use the short
-// format (pct: "100%", bps: "210K", plain: "0.38") which fits in 40px.
+// The scale unit label shown in the chart title, e.g. "(KB/s)".
+// Computed from the data max so the tick numbers match.
+function scaleLabel(max: number, unit: ChartUnit): string {
+  if (unit !== "bps") return ""
+  const u = ["B/s", "KB/s", "MB/s", "GB/s"]
+  let x = max
+  let i = 0
+  while (x >= 1024 && i < u.length - 1) {
+    x /= 1024
+    i++
+  }
+  return ` (${u[i]})`
+}
+
 const Y_AXIS_WIDTH = 40
 
 function niceMax(series: ChartSeries[], unit: ChartUnit): number {
@@ -137,7 +151,12 @@ function MetricChartImpl({
 
   return (
     <div className="bg-muted/30 rounded-lg border p-3">
-      <div className="mb-3 text-sm font-medium">{title}</div>
+      <div className="mb-3 text-sm font-medium">
+        {title}
+        {hasData && (
+          <span className="text-muted-foreground ml-1 font-normal">{scaleLabel(max, unit)}</span>
+        )}
+      </div>
 
       {!hasData ? (
         <div className="text-muted-foreground flex h-[160px] items-center justify-center text-xs">
