@@ -216,7 +216,7 @@ const compute = {
   "compute.host.logs.sourceJournal": "系统日志",
   "compute.host.logs.sourceKernel": "内核 (dmesg)",
   "compute.host.logs.sourceFile": "文件",
-  "compute.host.logs.unitPlaceholder": "按 unit 模糊过滤，如 nginx，回车应用",
+  "compute.host.logs.unitPlaceholder": "按 unit 模糊过滤，如 nginx",
   "compute.host.logs.pathPlaceholder": "/var/log/ 下的文件路径，回车应用",
   "compute.host.logs.priorityAll": "全部级别",
   "compute.host.logs.follow": "跟随",

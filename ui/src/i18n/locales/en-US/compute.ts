@@ -225,7 +225,7 @@ const compute = {
   "compute.host.logs.sourceJournal": "System journal",
   "compute.host.logs.sourceKernel": "Kernel (dmesg)",
   "compute.host.logs.sourceFile": "File",
-  "compute.host.logs.unitPlaceholder": "Filter units by fragment, e.g. nginx; Enter to apply",
+  "compute.host.logs.unitPlaceholder": "Filter units by fragment, e.g. nginx",
   "compute.host.logs.pathPlaceholder": "Path under /var/log/; Enter to apply",
   "compute.host.logs.priorityAll": "All levels",
   "compute.host.logs.follow": "Follow",
