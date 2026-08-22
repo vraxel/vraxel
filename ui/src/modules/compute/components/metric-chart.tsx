@@ -39,10 +39,10 @@ function formatUnit(v: number, unit: ChartUnit): string {
 }
 
 // Every chart uses the same Y-axis width so plot areas align across
-// all panels in the 2-column grid. 64px accommodates the widest label
-// (bps: "999 MB/s"); pct and plain waste a few pixels but the visual
-// consistency is worth it.
-const Y_AXIS_WIDTH = 64
+// all panels in the 2-column grid. 48px fits the widest realistic
+// label ("210 KB/s" at fontSize 10) without pushing the Y-axis away
+// from the title.
+const Y_AXIS_WIDTH = 48
 
 function niceMax(series: ChartSeries[], unit: ChartUnit): number {
   if (unit === "pct") return 100
