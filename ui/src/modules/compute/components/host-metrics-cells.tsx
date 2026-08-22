@@ -24,10 +24,21 @@ import type { Host } from "@/modules/compute/api/types"
 // see, as long as it stops looking current.
 const staleAfterMs = 60_000
 
-// Above this, the reading and its gauge turn destructive. One threshold,
-// matching what the numbers used to do on their own; the alert rules own
-// the per-host thresholds and a list cell cannot cheaply know them.
+// Two thresholds, shared by the reading and its gauge so the colour is
+// one signal rather than two that can disagree. These are fixed and
+// generic on purpose: the alert rules own the per-host thresholds that
+// actually page someone, and a list cell cannot cheaply know them --
+// this is the "worth a second look while scanning" tier, not an alert.
+const warnPct = 75
 const hotPct = 90
+
+// The tone for a live reading. Stale and unknown are handled by the
+// caller: both mean "do not read this as the current colour".
+function toneFor(value: number): { text: string; bar: string } {
+  if (value >= hotPct) return { text: "text-destructive", bar: "bg-destructive" }
+  if (value >= warnPct) return { text: "text-warning", bar: "bg-warning" }
+  return { text: "", bar: "bg-primary" }
+}
 
 function isStale(sampledAt?: string): boolean {
   if (!sampledAt) return true
@@ -55,20 +66,14 @@ function UtilGauge({
   stale: boolean
 }) {
   const known = typeof value === "number"
-  const hot = known && value >= hotPct
+  const tone = known && !stale ? toneFor(value) : null
 
   return (
     <div className="w-28 space-y-1">
       <div className="flex items-baseline justify-between gap-2">
         <span
           className={`text-sm tabular-nums ${
-            !known
-              ? "text-muted-foreground"
-              : stale
-                ? "text-muted-foreground/60"
-                : hot
-                  ? "text-destructive"
-                  : ""
+            tone ? tone.text : known ? "text-muted-foreground/60" : "text-muted-foreground"
           }`}
         >
           {known ? `${Math.round(value)}%` : "-"}
@@ -82,9 +87,7 @@ function UtilGauge({
       <Progress
         value={known ? value : 0}
         className={known ? "h-1.5" : "bg-muted/50 h-1.5"}
-        indicatorClassName={
-          stale ? "bg-muted-foreground/40" : hot ? "bg-destructive" : "bg-primary"
-        }
+        indicatorClassName={tone ? tone.bar : "bg-muted-foreground/40"}
       />
     </div>
   )

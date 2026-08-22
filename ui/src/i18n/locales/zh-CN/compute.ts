@@ -32,6 +32,12 @@ const compute = {
   "compute.host.hostname": "主机名",
   "compute.host.agentVersion": "Agent 版本",
 
+  // 规格排序：容量没有独立列（已并入使用率），下拉是到达它们的入口
+  "compute.host.sortSpec": "规格排序",
+  "compute.host.sortCores": "核数",
+  "compute.host.sortMemoryTotal": "内存总量",
+  "compute.host.sortDiskTotal": "磁盘总量",
+
   "compute.host.metrics.title": "监控",
   "compute.host.metrics.load": "负载",
   "compute.host.metrics.filesystem": "文件系统",
