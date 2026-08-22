@@ -222,10 +222,17 @@ function MetricChartImpl({
                       })
                     if (!visible.length) return null
                     const { x: mx, y: my } = mouseRef.current
+                    const tipH = 200
+                    const spaceBelow = window.innerHeight - my
+                    const above = spaceBelow < tipH + 24
                     return createPortal(
                       <div
                         className="bg-popover text-popover-foreground pointer-events-none fixed z-50 max-h-[200px] max-w-[360px] overflow-y-auto rounded-md border px-2.5 py-1.5 text-xs shadow-md"
-                        style={{ left: mx + 16, top: my - 12 }}
+                        style={
+                          above
+                            ? { left: mx + 16, bottom: window.innerHeight - my + 12 }
+                            : { left: mx + 16, top: my + 12 }
+                        }
                       >
                         <div className="text-muted-foreground mb-1">
                           {typeof label === "number" ? formatTime(label) : String(label)}
