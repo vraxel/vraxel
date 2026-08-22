@@ -60,12 +60,15 @@ function logsUrl(
  * A read-only live view of a host's logs -- journalctl or a file tail
  * run by the agent, streamed over the host's own outbound connection.
  *
- * Same single-effect shape as the terminal dialog, for the same reason:
- * the xterm instance and the socket are one resource, and a socket that
- * outlived the dialog would hold a follow process on a real machine.
- * Every stream parameter is an effect dependency, so changing one tears
- * the old stream down and starts a fresh one -- a different source is a
- * different stream, not more lines in the same scrollback.
+ * Unlike the terminal dialog, the xterm and the socket have different
+ * lifetimes here. The terminal is the viewer and lives as long as the
+ * dialog is open; each query is a stream INTO it. Coupling them (this
+ * dialog's first shape) meant every condition change disposed and
+ * rebuilt the whole terminal -- a visible flash and a main-thread stall
+ * per Select click -- when the reconnect itself takes single-digit
+ * milliseconds. A different source is still a different stream, so every
+ * stream parameter stays a dependency of the stream effect; the terminal
+ * just stops being collateral.
  */
 export function HostLogsDialog({
   host,
@@ -81,6 +84,11 @@ export function HostLogsDialog({
   const containerRef = useRef<HTMLDivElement>(null)
   const [status, setStatus] = useState<ConnectionStatus>("connecting")
   const [errorMessage, setErrorMessage] = useState("")
+  // The live xterm instance, held in state so the stream effect reruns
+  // when it appears: creation is deferred a frame past dialog open (the
+  // container needs layout before the first fit), so the instance is not
+  // there yet when the stream effect first runs.
+  const [term, setTerm] = useState<Terminal | null>(null)
   const { t } = useTranslation()
 
   const [source, setSource] = useState<LogSource>("journal")
@@ -105,18 +113,16 @@ export function HostLogsDialog({
   const scopeWs = scope.ws
   const scopeNs = scope.ns
 
+  // The terminal, alive from dialog open to dialog close.
   useEffect(() => {
     if (!open) return
 
     let terminal: Terminal | null = null
-    let socket: WebSocket | null = null
-    let fitAddon: FitAddon | null = null
     let resizeObserver: ResizeObserver | null = null
-    let onWindowResize: (() => void) | null = null
 
-    // Deferred to the next frame for the same reason as the terminal:
-    // the container exists but has no layout yet, and the first fit
-    // decides the width the first lines wrap at.
+    // Deferred to the next frame for the same reason as the terminal
+    // dialog: the container exists but has no layout yet, and the first
+    // fit decides the width the first lines wrap at.
     const frame = requestAnimationFrame(() => {
       const container = containerRef.current
       if (!container) return
@@ -132,110 +138,131 @@ export function HostLogsDialog({
         scrollback: 10000,
         theme: terminalTheme,
       })
-      fitAddon = new FitAddon()
+      const fitAddon = new FitAddon()
       terminal.loadAddon(fitAddon)
       terminal.attachCustomKeyEventHandler(xtermClipboardHandler(terminal))
       terminal.open(container)
       fit(fitAddon)
 
-      onWindowResize = () => fit(fitAddon)
-      window.addEventListener("resize", onWindowResize)
+      // Window resizes reach the container through the dialog's layout,
+      // so observing the container covers them too.
       resizeObserver = new ResizeObserver(() => fit(fitAddon))
       resizeObserver.observe(container)
 
-      // The file source has nothing to stream until a path is committed;
-      // say so instead of opening a socket the server would reject.
-      if (source === "file" && !committed.path) {
-        setStatus("idle")
-        terminal.write(`\x1b[90m${translate("compute.host.logs.needPath")}\x1b[0m\r\n`)
-        return
-      }
-
-      socket = new WebSocket(
-        logsUrl({ ws: scopeWs, ns: scopeNs }, hostId, {
-          source,
-          unit: committed.unit,
-          priority,
-          path: committed.path,
-          tail,
-          follow,
-        }),
-      )
-      socket.binaryType = "arraybuffer"
-
-      socket.onmessage = (event) => {
-        const data = new Uint8Array(event.data as ArrayBuffer)
-        const type = data[0]
-        const payload = data.slice(1)
-        if (type === MSG_DATA) {
-          // Raw bytes, not a decoded string: xterm's stateful UTF-8
-          // decoder is what keeps a multibyte character split across two
-          // chunks intact. xterm pins the viewport to the bottom only
-          // while it is already there, so a reader who scrolled up is
-          // not yanked back down by new lines.
-          terminal?.write(payload)
-          return
-        }
-        if (type !== MSG_STATUS) return
-        let parsed: { status?: string; message?: string }
-        try {
-          parsed = JSON.parse(new TextDecoder().decode(payload))
-        } catch {
-          return
-        }
-        switch (parsed.status) {
-          case "connected":
-            setStatus("connected")
-            terminal?.focus()
-            break
-          case "error":
-            setStatus("error")
-            // Into the terminal, not the badge, so the full sentence
-            // survives the badge's nowrap clipping.
-            terminal?.write(
-              `\r\n\x1b[31m${parsed.message ?? translate("compute.host.logs.failed")}\x1b[0m\r\n`,
-            )
-            break
-          case "timeout":
-            setStatus("closed")
-            terminal?.write(`\r\n\x1b[33m${translate("compute.host.logs.wall")}\x1b[0m\r\n`)
-            break
-          case "exited":
-            setStatus("closed")
-            terminal?.write(
-              `\r\n\x1b[90m${parsed.message ?? translate("compute.host.logs.ended")}\x1b[0m\r\n`,
-            )
-            break
-        }
-      }
-
-      socket.onclose = () => {
-        setStatus((prev) =>
-          prev === "connecting" ? "error" : prev === "connected" ? "closed" : prev,
-        )
-        setErrorMessage((prev) => prev || translate("compute.host.logs.closed"))
-      }
-      socket.onerror = () => {
-        setStatus("error")
-        setErrorMessage(translate("compute.host.logs.failed"))
-      }
+      setTerm(terminal)
     })
 
     return () => {
       cancelAnimationFrame(frame)
-      if (onWindowResize) window.removeEventListener("resize", onWindowResize)
       resizeObserver?.disconnect()
-      if (socket) {
-        socket.onmessage = null
-        socket.onclose = null
-        socket.onerror = null
-        if (socket.readyState !== WebSocket.CLOSED) socket.close()
-      }
+      setTerm(null)
       terminal?.dispose()
-      setStatus("connecting")
-      setErrorMessage("")
     }
-  }, [open, hostId, scopeWs, scopeNs, source, priority, tail, follow, committed])
+  }, [open])
+
+  // The stream. Every query parameter is a dependency: a different
+  // source is a different journalctl on the host, not more lines in the
+  // same scrollback. Changing one swaps the stream inside the surviving
+  // terminal -- reset, a dim connecting line, then the new backlog.
+  useEffect(() => {
+    if (!open || !term) return
+
+    setStatus("connecting")
+    setErrorMessage("")
+    // RIS through the write queue, not term.reset(): reset() is
+    // synchronous and bypasses xterm's parse queue, so bytes of the OLD
+    // stream still queued (a big tail replay, switched away from
+    // mid-parse) would flush after it, on top of the new stream. ESC c
+    // is the same full reset but ordered behind them -- it also clears
+    // the half-parsed multibyte state a mid-chunk kill can leave.
+    term.write("\x1bc")
+
+    // The file source has nothing to stream until a path is committed;
+    // say so instead of opening a socket the server would reject.
+    if (source === "file" && !committed.path) {
+      setStatus("idle")
+      term.write(`\x1b[90m${translate("compute.host.logs.needPath")}\x1b[0m\r\n`)
+      return
+    }
+
+    term.write(`\x1b[90m${translate("compute.host.logs.connecting")}\x1b[0m\r\n`)
+
+    const socket = new WebSocket(
+      logsUrl({ ws: scopeWs, ns: scopeNs }, hostId, {
+        source,
+        unit: committed.unit,
+        priority,
+        path: committed.path,
+        tail,
+        follow,
+      }),
+    )
+    socket.binaryType = "arraybuffer"
+
+    socket.onmessage = (event) => {
+      const data = new Uint8Array(event.data as ArrayBuffer)
+      const type = data[0]
+      const payload = data.slice(1)
+      if (type === MSG_DATA) {
+        // Raw bytes, not a decoded string: xterm's stateful UTF-8
+        // decoder is what keeps a multibyte character split across two
+        // chunks intact. xterm pins the viewport to the bottom only
+        // while it is already there, so a reader who scrolled up is
+        // not yanked back down by new lines.
+        term.write(payload)
+        return
+      }
+      if (type !== MSG_STATUS) return
+      let parsed: { status?: string; message?: string }
+      try {
+        parsed = JSON.parse(new TextDecoder().decode(payload))
+      } catch {
+        return
+      }
+      switch (parsed.status) {
+        case "connected":
+          setStatus("connected")
+          term.focus()
+          break
+        case "error":
+          setStatus("error")
+          // Into the terminal, not the badge, so the full sentence
+          // survives the badge's nowrap clipping.
+          term.write(
+            `\r\n\x1b[31m${parsed.message ?? translate("compute.host.logs.failed")}\x1b[0m\r\n`,
+          )
+          break
+        case "timeout":
+          setStatus("closed")
+          term.write(`\r\n\x1b[33m${translate("compute.host.logs.wall")}\x1b[0m\r\n`)
+          break
+        case "exited":
+          setStatus("closed")
+          term.write(
+            `\r\n\x1b[90m${parsed.message ?? translate("compute.host.logs.ended")}\x1b[0m\r\n`,
+          )
+          break
+      }
+    }
+
+    socket.onclose = () => {
+      setStatus((prev) =>
+        prev === "connecting" ? "error" : prev === "connected" ? "closed" : prev,
+      )
+      setErrorMessage((prev) => prev || translate("compute.host.logs.closed"))
+    }
+    socket.onerror = () => {
+      setStatus("error")
+      setErrorMessage(translate("compute.host.logs.failed"))
+    }
+
+    return () => {
+      socket.onmessage = null
+      socket.onclose = null
+      socket.onerror = null
+      if (socket.readyState !== WebSocket.CLOSED) socket.close()
+    }
+  }, [open, term, hostId, scopeWs, scopeNs, source, priority, tail, follow, committed])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
