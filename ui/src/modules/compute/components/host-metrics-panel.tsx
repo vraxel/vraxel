@@ -3,7 +3,7 @@ import { formatDateTime } from "@/shared/lib/format"
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card"
 import { Button } from "@/shared/ui/button"
 import { Skeleton } from "@/shared/ui/skeleton"
-import { useTranslation } from "@/i18n"
+import { translate, useTranslation } from "@/i18n"
 import { useApiQuery } from "@/core/query/hooks"
 import { qk } from "@/core/query/keys"
 import { usePermission } from "@/core/permission/use-permission"
@@ -15,6 +15,7 @@ import { alertRulesApi } from "@/modules/compute/api/alert-rules"
 import { hostAlertRulesDef } from "@/modules/compute/defs"
 import type { Host } from "@/modules/compute/api/types"
 import { MetricChart, type ChartSeries, type ChartUnit } from "./metric-chart"
+import { HoverTsContext } from "./chart-hover-context"
 
 // Which chart each alert metric belongs on. The keys mirror the
 // server's whitelist (agentgw.AlertMetrics); a metric missing here
@@ -69,7 +70,7 @@ function pick(
  * last when it opened.
  */
 export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef }) {
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const { hasPermission } = usePermission()
   const [win, setWin] = useState<WindowKey>("1h")
   const preset = WINDOWS.find((w) => w.key === win) ?? WINDOWS[0]
@@ -125,55 +126,69 @@ export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef 
   const empty = t("compute.host.metrics.noData")
   const dev = (_: string, labels?: Record<string, string>) => labels?.device ?? "-"
 
-  const charts: { id: string; title: string; unit: ChartUnit; series: ChartSeries[] }[] = [
-    {
-      id: "cpu",
-      title: t("compute.host.cpu"),
-      unit: "pct",
-      series: pick(res, ["cpu.used_pct"], () => t("compute.host.metrics.used")),
-    },
-    {
-      id: "mem",
-      title: t("compute.host.memory"),
-      unit: "pct",
-      series: pick(res, ["mem.used_pct", "swap.used_pct"], (name) =>
-        name === "swap.used_pct" ? "swap" : t("compute.host.metrics.used"),
-      ),
-    },
-    {
-      id: "load",
-      title: t("compute.host.metrics.load"),
-      unit: "plain",
-      series: pick(res, ["load.1", "load.5", "load.15"], (name) => name.replace("load.", "load ")),
-    },
-    {
-      id: "fs",
-      title: t("compute.host.metrics.filesystem"),
-      unit: "pct",
-      series: pick(res, ["fs.used_pct"], (_, labels) => labels?.mountpoint ?? "-"),
-    },
-    {
-      id: "disk",
-      title: t("compute.host.metrics.diskIO"),
-      unit: "bps",
-      series: pick(
-        res,
-        ["disk.read_bps", "disk.write_bps"],
-        (name, labels) =>
-          `${labels?.device ?? "-"} ${name === "disk.read_bps" ? t("compute.host.metrics.read") : t("compute.host.metrics.write")}`,
-      ),
-    },
-    {
-      id: "net",
-      title: t("compute.host.metrics.network"),
-      unit: "bps",
-      series: pick(
-        res,
-        ["net.rx_bps", "net.tx_bps"],
-        (name, labels) => `${dev(name, labels)} ${name === "net.rx_bps" ? "rx" : "tx"}`,
-      ),
-    },
-  ]
+  // Memoised on the response: without this, every mousemove would run
+  // pick() six times over the whole series list, which was half of what
+  // made the shared crosshair stutter. Labels go through the non-hook
+  // translator so the memo does not depend on `t`, which is rebuilt on
+  // every render; `locale` is what actually changes them.
+  const charts = useMemo<{ id: string; title: string; unit: ChartUnit; series: ChartSeries[] }[]>(
+    () => [
+      {
+        id: "cpu",
+        title: translate("compute.host.cpu"),
+        unit: "pct",
+        series: pick(res, ["cpu.used_pct"], () => translate("compute.host.metrics.used")),
+      },
+      {
+        id: "mem",
+        title: translate("compute.host.memory"),
+        unit: "pct",
+        series: pick(res, ["mem.used_pct", "swap.used_pct"], (name) =>
+          name === "swap.used_pct" ? "swap" : translate("compute.host.metrics.used"),
+        ),
+      },
+      {
+        id: "load",
+        title: translate("compute.host.metrics.load"),
+        unit: "plain",
+        series: pick(res, ["load.1", "load.5", "load.15"], (name) =>
+          name.replace("load.", "load "),
+        ),
+      },
+      {
+        id: "fs",
+        title: translate("compute.host.metrics.filesystem"),
+        unit: "pct",
+        series: pick(res, ["fs.used_pct"], (_, labels) => labels?.mountpoint ?? "-"),
+      },
+      {
+        id: "disk",
+        title: translate("compute.host.metrics.diskIO"),
+        unit: "bps",
+        series: pick(
+          res,
+          ["disk.read_bps", "disk.write_bps"],
+          (name, labels) =>
+            `${labels?.device ?? "-"} ${name === "disk.read_bps" ? translate("compute.host.metrics.read") : translate("compute.host.metrics.write")}`,
+        ),
+      },
+      {
+        id: "net",
+        title: translate("compute.host.metrics.network"),
+        unit: "bps",
+        series: pick(
+          res,
+          ["net.rx_bps", "net.tx_bps"],
+          (name, labels) => `${dev(name, labels)} ${name === "net.rx_bps" ? "rx" : "tx"}`,
+        ),
+      },
+    ],
+    // translate() reads the locale from the store at call time, so the
+    // rule cannot see that these labels depend on it; drop locale and
+    // the titles would stay in the old language until the next poll.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [res, locale],
+  )
 
   return (
     <Card>
@@ -214,23 +229,24 @@ export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef 
             ))}
           </div>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2">
-            {charts.map((c) => (
-              <MetricChart
-                key={c.id}
-                title={c.title}
-                unit={c.unit}
-                series={c.series}
-                fromMs={res.fromMs}
-                stepSec={res.stepSec}
-                count={res.count}
-                emptyText={empty}
-                thresholds={thresholds[c.id]}
-                hoverTs={hoverTs}
-                onHover={setHoverTs}
-              />
-            ))}
-          </div>
+          <HoverTsContext.Provider value={hoverTs}>
+            <div className="grid gap-3 md:grid-cols-2">
+              {charts.map((c) => (
+                <MetricChart
+                  key={c.id}
+                  title={c.title}
+                  unit={c.unit}
+                  series={c.series}
+                  fromMs={res.fromMs}
+                  stepSec={res.stepSec}
+                  count={res.count}
+                  emptyText={empty}
+                  thresholds={thresholds[c.id]}
+                  onHover={setHoverTs}
+                />
+              ))}
+            </div>
+          </HoverTsContext.Provider>
         )}
       </CardContent>
     </Card>

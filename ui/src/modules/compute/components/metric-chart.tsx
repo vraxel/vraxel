@@ -1,5 +1,15 @@
-import { memo, useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from "react"
+import {
+  memo,
+  useCallback,
+  useContext,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import { createPortal } from "react-dom"
+import { HoverTsContext } from "./chart-hover-context"
 import {
   Area,
   AreaChart,
@@ -142,6 +152,36 @@ interface TipRow {
 
 const TIP_GAP = 12
 
+// Chart geometry that the crosshair has to agree with. The plot area
+// starts after the Y axis and ends before the right margin; vertically
+// it runs from the top margin down to the X axis labels.
+const CHART_MARGIN_RIGHT = 8
+const CHART_MARGIN_TOP = 12
+const X_AXIS_HEIGHT = 30
+
+/**
+ * The shared crosshair, drawn as a plain absolutely-positioned rule
+ * rather than a recharts ReferenceLine so that moving it never re-runs
+ * the chart. Its x comes from CSS calc over the plot area, so no
+ * measurement or resize listener is needed.
+ */
+function Crosshair({ fromMs, stepSec, count }: { fromMs: number; stepSec: number; count: number }) {
+  const hoverTs = useContext(HoverTsContext)
+  if (hoverTs == null || count < 2) return null
+  const span = (count - 1) * stepSec * 1000
+  const frac = Math.min(Math.max((hoverTs - fromMs) / span, 0), 1)
+  return (
+    <div
+      className="border-foreground/30 pointer-events-none absolute w-px border-l border-dashed"
+      style={{
+        left: `calc(${Y_AXIS_WIDTH}px + (100% - ${Y_AXIS_WIDTH + CHART_MARGIN_RIGHT}px) * ${frac})`,
+        top: CHART_MARGIN_TOP,
+        bottom: X_AXIS_HEIGHT,
+      }}
+    />
+  )
+}
+
 /**
  * The hover tooltip, rendered into document.body so it can never
  * affect the page's layout, and positioned from its own MEASURED size
@@ -248,7 +288,6 @@ function MetricChartImpl({
   count,
   emptyText,
   thresholds,
-  hoverTs,
   onHover,
 }: {
   title: string
@@ -260,8 +299,6 @@ function MetricChartImpl({
   emptyText: string
   /** Alert thresholds to draw as horizontal guides on this chart. */
   thresholds?: { label: string; value: number }[]
-  /** Timestamp the operator is hovering, shared across the panel's charts. */
-  hoverTs?: number | null
   onHover?: (ts: number | null) => void
 }) {
   const data = useMemo(
@@ -406,15 +443,6 @@ function MetricChartImpl({
                   isAnimationActive={false}
                   wrapperStyle={{ display: "none" }}
                 />
-                {hoverTs != null && (
-                  <ReferenceLine
-                    x={hoverTs}
-                    stroke="currentColor"
-                    strokeOpacity={0.3}
-                    strokeDasharray="3 3"
-                    className="text-foreground"
-                  />
-                )}
                 {thresholds?.map((t) => (
                   <ReferenceLine
                     key={t.label}
@@ -454,6 +482,7 @@ function MetricChartImpl({
                 })}
               </AreaChart>
             </ResponsiveContainer>
+            <Crosshair fromMs={fromMs} stepSec={stepSec} count={count} />
           </div>
 
           <div className="flex min-h-[24px] flex-wrap items-start justify-center gap-x-3 gap-y-1 pt-1 text-xs">
