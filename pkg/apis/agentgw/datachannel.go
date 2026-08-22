@@ -2,6 +2,7 @@ package agentgw
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -143,6 +144,23 @@ func (h *DataHub) unregister(hostID int64, sess *yamux.Session) {
 // the cross-module dialer expects.
 func (h *DataHub) OpenStream(ctx context.Context, hostID int64, open agenttypes.StreamOpen) (net.Conn, error) {
 	sess, err := h.await(ctx, hostID)
+	if err != nil {
+		return nil, err
+	}
+	conn, err := h.openOn(ctx, sess, hostID, open)
+	var rejected *StreamRejected
+	if err == nil || errors.As(err, &rejected) || !sess.IsClosed() || ctx.Err() != nil {
+		return conn, err
+	}
+	// The registered session was a corpse: the agent idle-closes its
+	// channel after five minutes without a stream, and an open can land in
+	// the window before that close reaches this side's map. The caller's
+	// click should not be the casualty, so ask for a fresh channel and try
+	// once more. Only once, and only when the session is actually closed.
+	// A rejection never retries, even if the session died right after: the
+	// agent answered, and repeating the question gets the same answer.
+	h.unregister(hostID, sess)
+	sess, err = h.await(ctx, hostID)
 	if err != nil {
 		return nil, err
 	}
