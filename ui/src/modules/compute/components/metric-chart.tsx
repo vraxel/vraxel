@@ -126,92 +126,96 @@ function MetricChartImpl({
         </div>
       ) : (
         <>
-          <ResponsiveContainer width="100%" height={160}>
-            <AreaChart data={data} margin={{ top: 12, right: 8, bottom: 0, left: 0 }}>
-              <defs>
-                {series.map((s, i) => (
-                  <linearGradient
-                    key={s.key}
-                    id={safeId(gradPrefix, s.key)}
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    y2="1"
-                  >
-                    <stop offset="0%" stopColor={PALETTE[i % PALETTE.length]} stopOpacity={0.2} />
-                    <stop offset="100%" stopColor={PALETTE[i % PALETTE.length]} stopOpacity={0} />
-                  </linearGradient>
-                ))}
-              </defs>
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="currentColor"
-                strokeOpacity={0.1}
-                vertical={false}
-                className="text-foreground"
-              />
-              <XAxis
-                dataKey="_ts"
-                type="number"
-                domain={["dataMin", "dataMax"]}
-                tickFormatter={formatTime}
-                tick={{ fontSize: 10 }}
-                tickLine={false}
-                axisLine={false}
-                minTickGap={60}
-                stroke="currentColor"
-                className="text-muted-foreground"
-              />
-              <YAxis
-                domain={[0, max]}
-                tickFormatter={(v: number) => formatUnit(v, unit)}
-                tick={{ fontSize: 10 }}
-                tickLine={false}
-                axisLine={false}
-                width={Y_AXIS_WIDTH}
-                stroke="currentColor"
-                className="text-muted-foreground"
-              />
-              <Tooltip
-                labelFormatter={(v) => (typeof v === "number" ? formatTime(v) : String(v))}
-                formatter={(v, name) => {
-                  if (typeof name === "string" && hidden.has(name)) return [null, null]
-                  return [typeof v === "number" ? formatUnit(v, unit) : "-", name]
-                }}
-                contentStyle={{
-                  fontSize: 12,
-                  borderRadius: 6,
-                  border: "1px solid var(--border)",
-                  background: "var(--popover)",
-                  color: "var(--popover-foreground)",
-                }}
-                cursor={{ stroke: "currentColor", strokeOpacity: 0.2 }}
-                isAnimationActive={false}
-              />
-              {series.map((s, i) => {
-                const isHidden = hidden.has(s.label)
-                const color = PALETTE[i % PALETTE.length]
-                return (
-                  <Area
-                    key={s.key}
-                    dataKey={s.key}
-                    name={s.label}
-                    type="monotone"
-                    stroke={isHidden ? "transparent" : color}
-                    strokeWidth={isHidden ? 0 : 1.5}
-                    fill={isHidden ? "transparent" : `url(#${safeId(gradPrefix, s.key)})`}
-                    fillOpacity={isHidden ? 0 : 1}
-                    dot={false}
-                    activeDot={isHidden ? false : { r: 3, strokeWidth: 0, fill: color }}
-                    connectNulls={false}
-                    animationDuration={500}
-                    animationEasing="ease-out"
-                    isAnimationActive={true}
-                  />
-                )
-              })}
-            </AreaChart>
-          </ResponsiveContainer>
+          <div className="relative h-[160px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data} margin={{ top: 12, right: 8, bottom: 0, left: 0 }}>
+                <defs>
+                  {series.map((s, i) => (
+                    <linearGradient
+                      key={s.key}
+                      id={safeId(gradPrefix, s.key)}
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
+                      <stop offset="0%" stopColor={PALETTE[i % PALETTE.length]} stopOpacity={0.2} />
+                      <stop offset="100%" stopColor={PALETTE[i % PALETTE.length]} stopOpacity={0} />
+                    </linearGradient>
+                  ))}
+                </defs>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="currentColor"
+                  strokeOpacity={0.1}
+                  vertical={false}
+                  className="text-foreground"
+                />
+                <XAxis
+                  dataKey="_ts"
+                  type="number"
+                  domain={["dataMin", "dataMax"]}
+                  tickFormatter={formatTime}
+                  tick={{ fontSize: 10 }}
+                  tickLine={false}
+                  axisLine={false}
+                  minTickGap={60}
+                  stroke="currentColor"
+                  className="text-muted-foreground"
+                />
+                <YAxis
+                  domain={[0, max]}
+                  tickFormatter={(v: number) => formatUnit(v, unit)}
+                  tick={{ fontSize: 10 }}
+                  tickLine={false}
+                  axisLine={false}
+                  width={Y_AXIS_WIDTH}
+                  stroke="currentColor"
+                  className="text-muted-foreground"
+                />
+                <Tooltip
+                  labelFormatter={(v) => (typeof v === "number" ? formatTime(v) : String(v))}
+                  formatter={(v, name) => {
+                    if (typeof name === "string" && hidden.has(name)) return [null, null]
+                    return [typeof v === "number" ? formatUnit(v, unit) : "-", name]
+                  }}
+                  contentStyle={{
+                    fontSize: 12,
+                    borderRadius: 6,
+                    border: "1px solid var(--border)",
+                    background: "var(--popover)",
+                    color: "var(--popover-foreground)",
+                  }}
+                  wrapperStyle={{ pointerEvents: "none", zIndex: 10 }}
+                  cursor={{ stroke: "currentColor", strokeOpacity: 0.2 }}
+                  isAnimationActive={false}
+                  allowEscapeViewBox={{ x: false, y: true }}
+                />
+                {series.map((s, i) => {
+                  const isHidden = hidden.has(s.label)
+                  const color = PALETTE[i % PALETTE.length]
+                  return (
+                    <Area
+                      key={s.key}
+                      dataKey={s.key}
+                      name={s.label}
+                      type="monotone"
+                      stroke={isHidden ? "transparent" : color}
+                      strokeWidth={isHidden ? 0 : 1.5}
+                      fill={isHidden ? "transparent" : `url(#${safeId(gradPrefix, s.key)})`}
+                      fillOpacity={isHidden ? 0 : 1}
+                      dot={false}
+                      activeDot={isHidden ? false : { r: 3, strokeWidth: 0, fill: color }}
+                      connectNulls={false}
+                      animationDuration={500}
+                      animationEasing="ease-out"
+                      isAnimationActive={true}
+                    />
+                  )
+                })}
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
 
           <div className="flex min-h-[24px] flex-wrap items-start justify-center gap-x-3 gap-y-1 pt-1 text-xs">
             {series.length > 1 &&
