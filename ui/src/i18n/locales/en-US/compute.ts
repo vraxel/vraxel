@@ -32,10 +32,10 @@ const compute = {
 
   // Spec sorts: capacity has no column of its own (it merged into the
   // utilisation gauges), so this dropdown is what reaches them.
-  "compute.host.sortSpec": "Sort by spec",
+  "compute.host.sortUsage": "Usage",
   "compute.host.sortCores": "CPU cores",
   "compute.host.sortMemoryTotal": "Total memory",
-  "compute.host.sortDiskTotal": "Total disk",
+  "compute.host.sortDiskTotal": "Root disk size",
   "compute.host.agentVersion": "Agent version",
 
   "compute.host.metrics.title": "Metrics",

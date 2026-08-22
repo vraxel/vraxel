@@ -8,6 +8,7 @@ import { Checkbox } from "@/shared/ui/checkbox"
 import { Skeleton } from "@/shared/ui/skeleton"
 import { SortIcon } from "@/shared/components/sort-icon"
 import { FilterTableHead, type FilterOption } from "@/shared/components/filter-table-head"
+import { SortMenuTableHead } from "@/shared/components/sort-menu-table-head"
 import { TruncateCell } from "@/shared/components/truncate-cell"
 import { EmptyState } from "@/shared/components/empty-state"
 import { Pagination } from "@/shared/components/pagination"
@@ -27,6 +28,15 @@ export interface ColumnDef<T> {
   sortable?: boolean
   /** Overrides `key` as the value sent in sort_by. */
   sortKey?: string
+  /**
+   * Turns the header into a sort menu over several fields instead of a
+   * single toggle. For a column that shows more than one fact -- a
+   * reading and the capacity it is a fraction of -- where "sort this
+   * column" is ambiguous until the operator says which fact. Each entry
+   * goes through the same handleSort, so direction toggles on re-pick
+   * and a menu sort and a header sort are one state.
+   */
+  sortFields?: { field: string; label: string }[]
   /** When present the header shows a filter dropdown bound to `filterKey`. */
   filter?: FilterOption[]
   filterKey?: string
@@ -156,6 +166,17 @@ export function ResourceListPage<T extends ListRow>({
                   >
                     {col.header}
                   </FilterTableHead>
+                ) : col.sortFields ? (
+                  <SortMenuTableHead
+                    key={col.key}
+                    fields={col.sortFields}
+                    sortBy={query.sortBy}
+                    sortOrder={query.sortOrder}
+                    onSort={query.handleSort}
+                    className={col.headClassName}
+                  >
+                    {col.header}
+                  </SortMenuTableHead>
                 ) : (
                   <TableHead key={col.key} className={col.headClassName}>
                     {col.sortable ? (
