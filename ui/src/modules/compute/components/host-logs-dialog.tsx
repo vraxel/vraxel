@@ -95,8 +95,9 @@ export function HostLogsDialog({
   const [priority, setPriority] = useState("")
   const [tail, setTail] = useState<string>("500")
   const [follow, setFollow] = useState(true)
-  // The text fields commit on Enter or the refresh button, not per
-  // keystroke: every committed change restarts the stream on the host.
+  // The unit box is a live filter (it applies itself, debounced); the
+  // path box commits on Enter, because a half-typed path is not a
+  // partial answer but a different, failing file to tail.
   const [unitInput, setUnitInput] = useState("")
   const [pathInput, setPathInput] = useState("")
   // The committed values live in one object because its identity is the
@@ -108,6 +109,21 @@ export function HostLogsDialog({
   const applyAndReconnect = () => {
     setCommitted({ unit: unitInput.trim(), path: pathInput.trim() })
   }
+
+  // Debounced self-apply for the unit filter. Every apply restarts a
+  // journalctl on a real machine, so a typing pause is the unit of work,
+  // not a keystroke. The identity guard matters: committed's identity is
+  // the reconnect signal, so returning prev for unchanged text is what
+  // keeps the timer from restarting a stream that already matches.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setCommitted((prev) => {
+        const unit = unitInput.trim()
+        return prev.unit === unit ? prev : { ...prev, unit }
+      })
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [unitInput])
 
   const hostId = host.metadata.id
   const scopeWs = scope.ws
