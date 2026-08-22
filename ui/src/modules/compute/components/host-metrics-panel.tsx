@@ -42,6 +42,10 @@ const WINDOWS = [
 
 type WindowKey = (typeof WINDOWS)[number]["key"]
 
+// The device dimension for network series labels. Module-level so the
+// charts memo does not close over a per-render function.
+const dev = (_: string, labels?: Record<string, string>) => labels?.device ?? "-"
+
 // One chart's worth of the response: series picked by name, labelled by
 // their distinguishing dimension.
 function pick(
@@ -92,6 +96,9 @@ export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef 
     queryKey: qk.list(hostAlertRulesDef, scope, { page_size: 100 }),
     queryFn: () => alertRulesApi.list(scope, { page_size: 100 }),
     enabled: canReadRules,
+    // A failure here only means no guide lines -- nothing on screen
+    // refers to this query, so a global toast would point at nothing.
+    meta: { skipGlobalError: true },
   })
   const thresholds = useMemo(() => {
     const byChart: Record<string, { label: string; value: number }[]> = {}
@@ -120,11 +127,14 @@ export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef 
     // from, and the panel says so instead of polling into an error.
     enabled: online,
     refetchInterval: 30_000,
+    // Failures render inline on the card. Without this, the 30s poll
+    // against a briefly unreachable agent raises a toast per attempt --
+    // a sustained storm for as long as the page stays open.
+    meta: { skipGlobalError: true },
   })
 
   const res = query.data
   const empty = t("compute.host.metrics.noData")
-  const dev = (_: string, labels?: Record<string, string>) => labels?.device ?? "-"
 
   // Memoised on the response: without this, every mousemove would run
   // pick() six times over the whole series list, which was half of what
@@ -225,7 +235,7 @@ export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef 
         ) : !res ? (
           <div className="grid gap-3 md:grid-cols-2">
             {charts.map((c) => (
-              <Skeleton key={c.title} className="h-[180px]" />
+              <Skeleton key={c.id} className="h-[180px]" />
             ))}
           </div>
         ) : (

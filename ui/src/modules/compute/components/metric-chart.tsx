@@ -47,13 +47,17 @@ function hashKey(s: string): number {
  * Position is not stable: the agent omits a series that has no data in
  * the window, and VictoriaMetrics does not promise an order at all, so
  * an index-based palette re-coloured the whole network chart every time
- * a container's veth appeared or aged out. Hashing the key pins each
- * interface to one colour for as long as it exists.
+ * a container's veth appeared or aged out. Hashing the key pins a
+ * series to its colour independently of what else exists.
  *
  * Assignment walks the keys in sorted order and probes forward past
  * taken slots, so a chart whose series fit the palette still gets six
  * distinct colours -- a pure hash would happily give "load 1" and
- * "load 5" the same one.
+ * "load 5" the same one. The probing does mean a hash collision among
+ * the first six sorted keys can shift a colour when the set changes;
+ * past the sixth key every slot is taken, so those series land on
+ * their pure hash slot and never move -- which covers the many-series
+ * chart the stability matters for.
  */
 function assignColors(keys: string[]): Map<string, string> {
   const taken = new Array<boolean>(PALETTE.length).fill(false)
@@ -436,9 +440,9 @@ function MetricChartImpl({
                       />
                     )
                   }}
-                  // The crosshair is drawn as a ReferenceLine instead, so
-                  // that every chart in the panel can show it at the same
-                  // timestamp -- including the ones the cursor is not over.
+                  // No recharts cursor: the shared Crosshair overlay draws
+                  // the hover line on every chart in the panel at the same
+                  // timestamp, and a second line here would double it.
                   cursor={false}
                   isAnimationActive={false}
                   wrapperStyle={{ display: "none" }}
