@@ -1,4 +1,4 @@
-import { memo, useCallback, useId, useMemo, useRef, useState } from "react"
+import { memo, useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import {
   Area,
@@ -93,6 +93,113 @@ function safeId(prefix: string, key: string): string {
   return `${prefix}-${key.replace(/[^A-Za-z0-9_-]/g, "_")}`
 }
 
+interface TipRow {
+  name: string
+  color: string
+  /** Numeric value, kept only to sort rows; NEGATIVE_INFINITY for gaps. */
+  raw: number
+  value: string
+}
+
+const TIP_GAP = 12
+
+/**
+ * The hover tooltip, rendered into document.body so it can never
+ * affect the page's layout, and positioned from its own MEASURED size
+ * rather than a guessed one -- guessing is what made earlier versions
+ * clip their last rows or flip when they did not need to. This is
+ * Grafana's approach for chart tooltips (portal + fixed + measured
+ * size); it deliberately does not use a floating-ui reference element,
+ * because the anchor here is a cursor position, not a DOM node.
+ */
+function ChartTooltip({
+  x,
+  y,
+  time,
+  rows,
+}: {
+  x: number
+  y: number
+  time: string
+  rows: TipRow[]
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [size, setSize] = useState({ w: 0, h: 0 })
+
+  // Layout effect, not effect: the measurement has to land before the
+  // browser paints, or the first frame shows the tooltip at the
+  // unclamped position.
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const measure = () => {
+      const r = el.getBoundingClientRect()
+      setSize((prev) =>
+        Math.abs(prev.w - r.width) < 1 && Math.abs(prev.h - r.height) < 1
+          ? prev
+          : { w: r.width, h: r.height },
+      )
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  // Never taller than the viewport; the body scrolls inside instead.
+  const maxHeight = vh - TIP_GAP * 2
+
+  // Preferred placement is below-right of the cursor. If it does not
+  // fit, try the other side; if neither fits (a tooltip taller than
+  // the space on both sides), pin it against the edge. Clamping rather
+  // than flipping keeps the position continuous as the cursor moves,
+  // so there is no jump at the threshold.
+  let left = x + TIP_GAP
+  let top = y + TIP_GAP
+  if (size.w > 0) {
+    if (left + size.w > vw - TIP_GAP) {
+      const mirrored = x - TIP_GAP - size.w
+      left = mirrored >= TIP_GAP ? mirrored : Math.max(TIP_GAP, vw - TIP_GAP - size.w)
+    }
+  }
+  if (size.h > 0) {
+    if (top + size.h > vh - TIP_GAP) {
+      const mirrored = y - TIP_GAP - size.h
+      top = mirrored >= TIP_GAP ? mirrored : Math.max(TIP_GAP, vh - TIP_GAP - size.h)
+    }
+  }
+
+  return createPortal(
+    <div
+      ref={ref}
+      className="bg-popover text-popover-foreground pointer-events-none fixed z-50 max-w-[360px] overflow-y-auto rounded-md border px-2.5 py-1.5 text-xs shadow-md"
+      style={{
+        left,
+        top,
+        maxHeight,
+        // Hidden for the single frame before the size is known, so the
+        // uncorrected position is never painted.
+        visibility: size.h === 0 ? "hidden" : "visible",
+      }}
+    >
+      <div className="text-muted-foreground mb-1">{time}</div>
+      {rows.map((r) => (
+        <div key={r.name} className="flex items-center gap-1.5">
+          <span
+            className="inline-block h-2 w-2 shrink-0 rounded-full"
+            style={{ backgroundColor: r.color }}
+          />
+          <span className="min-w-0 truncate">{r.name}</span>
+          <span className="ml-auto shrink-0 pl-2 font-mono tabular-nums">{r.value}</span>
+        </div>
+      ))}
+    </div>,
+    document.body,
+  )
+}
+
 function MetricChartImpl({
   title,
   unit,
@@ -118,7 +225,10 @@ function MetricChartImpl({
   const hasData = series.some((s) => s.values.some((v) => typeof v === "number"))
   const scale = useMemo(() => bpsScale(max), [max])
   const gradPrefix = useId().replace(/:/g, "")
-  const mouseRef = useRef({ x: 0, y: 0 })
+  // The plot area's viewport rect, needed to turn recharts' chart-local
+  // tooltip coordinate into a page position. Read at tooltip time (not
+  // cached) so scrolling the page does not misplace it.
+  const plotRef = useRef<HTMLDivElement>(null)
 
   const [hidden, setHidden] = useState<Set<string>>(() => new Set())
   // Click = isolate (show only this); Ctrl/Cmd+click = toggle one.
@@ -157,12 +267,7 @@ function MetricChartImpl({
         </div>
       ) : (
         <>
-          <div
-            className="relative h-[160px] cursor-crosshair"
-            onMouseMove={(e) => {
-              mouseRef.current = { x: e.clientX, y: e.clientY }
-            }}
-          >
+          <div ref={plotRef} className="relative h-[160px] cursor-crosshair">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data} margin={{ top: 12, right: 8, bottom: 0, left: 0 }}>
                 <defs>
@@ -210,53 +315,32 @@ function MetricChartImpl({
                   className="text-muted-foreground"
                 />
                 <Tooltip
-                  content={({ active, payload, label }) => {
-                    if (!active || !payload?.length) return null
-                    const visible = payload
+                  content={({ active, payload, label, coordinate }) => {
+                    if (!active || !payload?.length || !coordinate) return null
+                    const rows: TipRow[] = payload
                       .filter((p) => typeof p.name === "string" && !hidden.has(p.name))
-                      .slice()
-                      .sort((a, b) => {
-                        const va = typeof a.value === "number" ? a.value : 0
-                        const vb = typeof b.value === "number" ? b.value : 0
-                        return vb - va
-                      })
-                    if (!visible.length) return null
-                    const { x: mx, y: my } = mouseRef.current
-                    const gap = 12
-                    const spaceBelow = window.innerHeight - my - gap
-                    const spaceAbove = my - gap
-                    const above = spaceBelow < 120 && spaceAbove > spaceBelow
-                    const maxH = Math.max(100, (above ? spaceAbove : spaceBelow) - gap)
-                    return createPortal(
-                      <div
-                        className="bg-popover text-popover-foreground pointer-events-none fixed z-50 max-w-[360px] overflow-y-auto rounded-md border px-2.5 py-1.5 text-xs shadow-md"
-                        style={{
-                          left: mx + 16,
-                          maxHeight: maxH,
-                          ...(above
-                            ? { bottom: window.innerHeight - my + gap }
-                            : { top: my + gap }),
-                        }}
-                      >
-                        <div className="text-muted-foreground mb-1">
-                          {typeof label === "number" ? formatTime(label) : String(label)}
-                        </div>
-                        {visible.map((p) => (
-                          <div key={String(p.name)} className="flex items-center gap-1.5">
-                            <span
-                              className="inline-block h-2 w-2 shrink-0 rounded-full"
-                              style={{ backgroundColor: String(p.color) }}
-                            />
-                            <span className="min-w-0 truncate">{p.name}</span>
-                            <span className="ml-auto shrink-0 pl-2 font-mono tabular-nums">
-                              {typeof p.value === "number"
-                                ? formatValue(p.value, unit, scale)
-                                : "-"}
-                            </span>
-                          </div>
-                        ))}
-                      </div>,
-                      document.body,
+                      .map((p) => ({
+                        name: String(p.name),
+                        color: String(p.color),
+                        raw: typeof p.value === "number" ? p.value : Number.NEGATIVE_INFINITY,
+                        value:
+                          typeof p.value === "number" ? formatValue(p.value, unit, scale) : "-",
+                      }))
+                      // Biggest first: with twenty interfaces, the ones
+                      // carrying traffic must not be buried under zeroes.
+                      .sort((a, b) => b.raw - a.raw)
+                    if (!rows.length) return null
+                    // coordinate is chart-local; the plot rect turns it
+                    // into the page position the portal needs.
+                    const rect = plotRef.current?.getBoundingClientRect()
+                    if (!rect) return null
+                    return (
+                      <ChartTooltip
+                        x={rect.left + (coordinate.x ?? 0)}
+                        y={rect.top + (coordinate.y ?? 0)}
+                        time={typeof label === "number" ? formatTime(label) : String(label)}
+                        rows={rows}
+                      />
                     )
                   }}
                   cursor={{ stroke: "currentColor", strokeOpacity: 0.15, strokeDasharray: "3 3" }}
