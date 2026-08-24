@@ -177,7 +177,8 @@ func TestNormaliseProductUUIDRejectsFirmwareDefaults(t *testing.T) {
 func TestVerifyMachineRefusesCopiedCredential(t *testing.T) {
 	r := row(7, "agent-12", uuidNode12, sharedMachineID, nil)
 
-	if got := VerifyMachine(&r, fp(uuidNode15, sharedMachineID)); got != VerdictForeignMachine {
+	// Different UUID AND different machine-id: a true foreign machine.
+	if got := VerifyMachine(&r, fp(uuidNode15, "foreignMachineID")); got != VerdictForeignMachine {
 		t.Fatalf("verdict = %v, want VerdictForeignMachine", got)
 	}
 }
@@ -189,6 +190,22 @@ func TestVerifyMachineAdmitsMachineIDReset(t *testing.T) {
 
 	if got := VerifyMachine(&r, fp(uuidNode12, "0d5b3f0e5f2b4a2f8b7c1d9e6a3f0c11")); got != VerdictMachineIDReset {
 		t.Fatalf("verdict = %v, want VerdictMachineIDReset", got)
+	}
+}
+
+func TestVerifyMachineAdmitsHardwareChange(t *testing.T) {
+	r := row(7, "agent-12", uuidNode12, sharedMachineID, nil)
+
+	if got := VerifyMachine(&r, fp(uuidNode15, sharedMachineID)); got != VerdictHardwareChanged {
+		t.Fatalf("verdict = %v, want VerdictHardwareChanged", got)
+	}
+}
+
+func TestVerifyMachineRefusesTrueForeignMachine(t *testing.T) {
+	r := row(7, "agent-12", uuidNode12, sharedMachineID, nil)
+
+	if got := VerifyMachine(&r, fp(uuidNode15, "differentMachineID")); got != VerdictForeignMachine {
+		t.Fatalf("verdict = %v, want VerdictForeignMachine", got)
 	}
 }
 
@@ -348,7 +365,7 @@ func TestForeignMachineIsRecordedNotJustLogged(t *testing.T) {
 	admitted := h.verifyMachine(context.Background(), &r, &agenttypes.Frame{
 		Fingerprint: agenttypes.MachineFingerprint{
 			ProductUUID: uuidNode15,
-			MachineID:   sharedMachineID,
+			MachineID:   "foreignMachineID",
 		},
 	})
 	if admitted {
@@ -406,7 +423,7 @@ func TestEveryRefusalIsRecorded(t *testing.T) {
 	h := &protocolHandler{agents: store}
 	r := row(7, "agent-12", uuidNode12, sharedMachineID, nil)
 	hello := &agenttypes.Frame{Fingerprint: agenttypes.MachineFingerprint{
-		ProductUUID: uuidNode15, MachineID: sharedMachineID,
+		ProductUUID: uuidNode15, MachineID: "foreignMachineID",
 	}}
 
 	for i := range 3 {

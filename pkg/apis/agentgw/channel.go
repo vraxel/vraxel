@@ -466,18 +466,16 @@ func (h *protocolHandler) verifyMachine(ctx context.Context, row *gwstore.AgentR
 		}
 		return false
 	case VerdictMachineIDReset:
-		// The machine kept its hardware identity and changed its image
-		// identity: someone ran systemd-machine-id-setup, which is what we
-		// ask the operator of a cloned host to do. Record it so the host
-		// stops being grouped with the image it was cloned from, and so
-		// the conflict flag clears.
 		if err := h.agents.RefreshFingerprint(ctx, row.HostID, fp.ToStore(row.IdentitySource)); err != nil {
-			// Non-fatal: the machine is who it claims to be either way,
-			// and refusing it over a bookkeeping write would take a host
-			// offline for no safety gain.
 			logger.Warnf("agentgw channel: record machine-id reset for host %d: %v", row.HostID, err)
 		}
 		logger.Infof("agentgw channel: host %d reset its machine id (%s -> %s)", row.HostID, row.MachineID, fp.MachineID)
+	case VerdictHardwareChanged:
+		if err := h.agents.RefreshFingerprint(ctx, row.HostID, fp.ToStore(row.IdentitySource)); err != nil {
+			logger.Warnf("agentgw channel: record hardware change for host %d: %v", row.HostID, err)
+		}
+		logger.Infof("agentgw channel: host %d hardware identity changed (%s -> %s), machine-id unchanged",
+			row.HostID, row.ProductUUID, fp.ProductUUID)
 	}
 	return true
 }

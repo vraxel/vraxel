@@ -336,6 +336,11 @@ const (
 	// the fix we tell the operator of a cloned host to apply, so it must
 	// be admitted -- refusing it would make our own remedy a dead end.
 	VerdictMachineIDReset
+	// VerdictHardwareChanged: the machine kept its /etc/machine-id but
+	// its SMBIOS UUID changed. A VM that was migrated, restored from a
+	// snapshot, or rebooted under a hypervisor that reassigns UUIDs.
+	// Admitted and the stored UUID is updated to the new one.
+	VerdictHardwareChanged
 	// VerdictForeignMachine: the credential is valid but the machine
 	// holding it is not the one it was issued to. A copied agent.json,
 	// or a disk moved into different hardware.
@@ -360,13 +365,21 @@ func VerifyMachine(row *gwstore.AgentRow, fp Fingerprint) MachineVerdict {
 	if row.ProductUUID == "" || fp.ProductUUID == "" {
 		return VerdictUnverifiable
 	}
-	if !sameProductUUID(fp.ProductUUID, row.ProductUUID) {
-		return VerdictForeignMachine
+	if sameProductUUID(fp.ProductUUID, row.ProductUUID) {
+		if fp.MachineID != "" && row.MachineID != "" && fp.MachineID != row.MachineID {
+			return VerdictMachineIDReset
+		}
+		return VerdictSameMachine
 	}
-	if fp.MachineID != "" && row.MachineID != "" && fp.MachineID != row.MachineID {
-		return VerdictMachineIDReset
+	// UUID differs. If both sides have a machine-id and they match, the
+	// machine is the same one whose hardware identity changed -- a VM
+	// migrated, restored from snapshot, or rebooted under a hypervisor
+	// that reassigns SMBIOS UUIDs. Refusing this would lock a running
+	// host out until someone reinstalls the agent, which is unreasonable.
+	if fp.MachineID != "" && row.MachineID != "" && fp.MachineID == row.MachineID {
+		return VerdictHardwareChanged
 	}
-	return VerdictSameMachine
+	return VerdictForeignMachine
 }
 
 // --- image-group findings ---
