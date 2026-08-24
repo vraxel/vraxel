@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/di
 import { Badge } from "@/shared/ui/badge"
 import { terminalTheme } from "@/shared/lib/terminal-theme"
 import { xtermClipboardHandler } from "@/shared/lib/xterm-clipboard"
+import { refreshTokenOnce } from "@/core/api/client"
 import { translate, useTranslation } from "@/i18n"
 import type { ScopeRef } from "@/core/registry/resource"
 import type { Host } from "@/modules/compute/api/types"
@@ -110,74 +111,80 @@ export function HostTerminalDialog({
       terminal.open(container)
       fit(fitAddon)
 
-      socket = new WebSocket(
-        terminalUrl({ ws: scopeWs, ns: scopeNs }, hostId, terminal.cols, terminal.rows),
-      )
-      socket.binaryType = "arraybuffer"
-
-      socket.onmessage = (event) => {
-        const data = new Uint8Array(event.data as ArrayBuffer)
-        const type = data[0]
-        const payload = data.slice(1)
-        if (type === MSG_DATA) {
-          terminal?.write(payload)
-          return
-        }
-        if (type !== MSG_STATUS) return
-        let parsed: { status?: string; message?: string }
-        try {
-          parsed = JSON.parse(new TextDecoder().decode(payload))
-        } catch {
-          return
-        }
-        switch (parsed.status) {
-          case "connected":
-            setStatus("connected")
-            terminal?.focus()
-            break
-          case "error":
-            setStatus("error")
-            // Into the terminal, not the badge: a Badge is
-            // whitespace-nowrap + overflow-hidden, so "could not open a
-            // terminal on this host" would be clipped to a few words and
-            // the operator would never learn what went wrong.
-            terminal?.write(
-              `\r\n\x1b[31m${parsed.message ?? translate("compute.host.terminal.failed")}\x1b[0m\r\n`,
-            )
-            break
-          case "timeout":
-            setStatus("closed")
-            terminal?.write(`\r\n\x1b[33m${translate("compute.host.terminal.idle")}\x1b[0m\r\n`)
-            break
-          case "exited":
-            setStatus("closed")
-            terminal?.write(`\r\n\x1b[90m${parsed.message ?? ""}\x1b[0m\r\n`)
-            break
-        }
-      }
-
-      // A close before any status frame means the upgrade itself failed
-      // (no permission, host gone). After "connected" it is the ordinary
-      // end of a session and says nothing worth showing.
-      socket.onclose = () => {
-        setStatus((prev) =>
-          prev === "connecting" ? "error" : prev === "connected" ? "closed" : prev,
+      // The access token lives in an HttpOnly cookie. HTTP requests
+      // auto-refresh on 401, but a WebSocket upgrade has no such path.
+      const localTerminal = terminal
+      refreshTokenOnce().finally(() => {
+        if (!localTerminal) return
+        socket = new WebSocket(
+          terminalUrl({ ws: scopeWs, ns: scopeNs }, hostId, localTerminal.cols, localTerminal.rows),
         )
-        setErrorMessage((prev) => prev || translate("compute.host.terminal.closed"))
-      }
-      socket.onerror = () => {
-        setStatus("error")
-        setErrorMessage(translate("compute.host.terminal.failed"))
-      }
+        socket.binaryType = "arraybuffer"
+
+        socket.onmessage = (event: MessageEvent) => {
+          const data = new Uint8Array(event.data as ArrayBuffer)
+          const type = data[0]
+          const payload = data.slice(1)
+          if (type === MSG_DATA) {
+            terminal?.write(payload)
+            return
+          }
+          if (type !== MSG_STATUS) return
+          let parsed: { status?: string; message?: string }
+          try {
+            parsed = JSON.parse(new TextDecoder().decode(payload))
+          } catch {
+            return
+          }
+          switch (parsed.status) {
+            case "connected":
+              setStatus("connected")
+              terminal?.focus()
+              break
+            case "error":
+              setStatus("error")
+              // Into the terminal, not the badge: a Badge is
+              // whitespace-nowrap + overflow-hidden, so "could not open a
+              // terminal on this host" would be clipped to a few words and
+              // the operator would never learn what went wrong.
+              terminal?.write(
+                `\r\n\x1b[31m${parsed.message ?? translate("compute.host.terminal.failed")}\x1b[0m\r\n`,
+              )
+              break
+            case "timeout":
+              setStatus("closed")
+              terminal?.write(`\r\n\x1b[33m${translate("compute.host.terminal.idle")}\x1b[0m\r\n`)
+              break
+            case "exited":
+              setStatus("closed")
+              terminal?.write(`\r\n\x1b[90m${parsed.message ?? ""}\x1b[0m\r\n`)
+              break
+          }
+        }
+
+        // A close before any status frame means the upgrade itself failed
+        // (no permission, host gone). After "connected" it is the ordinary
+        // end of a session and says nothing worth showing.
+        socket.onclose = () => {
+          setStatus((prev) =>
+            prev === "connecting" ? "error" : prev === "connected" ? "closed" : prev,
+          )
+          setErrorMessage((prev) => prev || translate("compute.host.terminal.closed"))
+        }
+        socket.onerror = () => {
+          setStatus("error")
+          setErrorMessage(translate("compute.host.terminal.failed"))
+        }
+      })
 
       disposables.push(
-        terminal.onData((input) => {
+        localTerminal.onData((input) => {
           if (socket?.readyState !== WebSocket.OPEN) return
           socket.send(encodeMessage(MSG_DATA, new TextEncoder().encode(input)))
         }),
       )
       disposables.push(
-        terminal.onResize(({ cols, rows }) => {
+        localTerminal.onResize(({ cols, rows }) => {
           if (socket?.readyState !== WebSocket.OPEN) return
           socket.send(
             encodeMessage(MSG_RESIZE, new TextEncoder().encode(JSON.stringify({ cols, rows }))),

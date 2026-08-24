@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/shared/ui/switch"
 import { terminalTheme } from "@/shared/lib/terminal-theme"
 import { xtermClipboardHandler } from "@/shared/lib/xterm-clipboard"
+import { refreshTokenOnce } from "@/core/api/client"
 import { translate, useTranslation } from "@/i18n"
 import type { ScopeRef } from "@/core/registry/resource"
 import type { Host } from "@/modules/compute/api/types"
@@ -218,20 +219,35 @@ export function HostLogsDialog({
     // the ordinary backlog burst never sees the hint.
     let sawData = false
     let hintTimer: ReturnType<typeof setTimeout> | undefined
+    let socket: WebSocket | null = null
+    let cancelled = false
 
-    const socket = new WebSocket(
-      logsUrl({ ws: scopeWs, ns: scopeNs }, hostId, {
-        source,
-        unit,
-        priority,
-        path: committed.path,
-        tail,
-        follow,
-      }),
-    )
-    socket.binaryType = "arraybuffer"
+    // The access token lives in an HttpOnly cookie. HTTP requests
+    // auto-refresh on 401 (ky afterResponse), but a WebSocket upgrade
+    // has no such path -- the browser sends the cookie as-is, and a
+    // stale one turns into a 401 the WS spec surfaces only as "failed".
+    // Refreshing before dialling ensures the cookie is current.
+    refreshTokenOnce().finally(() => {
+      if (cancelled) return
 
-    socket.onmessage = (event) => {
+      socket = new WebSocket(
+        logsUrl({ ws: scopeWs, ns: scopeNs }, hostId, {
+          source,
+          unit,
+          priority,
+          path: committed.path,
+          tail,
+          follow,
+        }),
+      )
+      socket.binaryType = "arraybuffer"
+
+      socket.onmessage = onMessage
+      socket.onclose = onClose
+      socket.onerror = onError
+    })
+
+    const onMessage = (event: MessageEvent) => {
       const data = new Uint8Array(event.data as ArrayBuffer)
       const type = data[0]
       const payload = data.slice(1)
@@ -285,23 +301,26 @@ export function HostLogsDialog({
       }
     }
 
-    socket.onclose = () => {
+    const onClose = () => {
       setStatus((prev) =>
         prev === "connecting" ? "error" : prev === "connected" ? "closed" : prev,
       )
       setErrorMessage((prev) => prev || translate("compute.host.logs.closed"))
     }
-    socket.onerror = () => {
+    const onError = () => {
       setStatus("error")
       setErrorMessage(translate("compute.host.logs.failed"))
     }
 
     return () => {
+      cancelled = true
       clearTimeout(hintTimer)
-      socket.onmessage = null
-      socket.onclose = null
-      socket.onerror = null
-      if (socket.readyState !== WebSocket.CLOSED) socket.close()
+      if (socket) {
+        socket.onmessage = null
+        socket.onclose = null
+        socket.onerror = null
+        if (socket.readyState !== WebSocket.CLOSED) socket.close()
+      }
       // The next stream (or a reopen) starts life connecting. Set here
       // and not at the top of the setup, which must not set state
       // synchronously; status only ever leaves "connecting" through a

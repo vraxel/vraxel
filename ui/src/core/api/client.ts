@@ -27,7 +27,7 @@ export class ApiError extends Error {
 /** Deduplicate concurrent 401 token refresh attempts. */
 let refreshPromise: Promise<boolean> | null = null
 
-async function refreshTokenOnce(): Promise<boolean> {
+export async function refreshTokenOnce(): Promise<boolean> {
   if (refreshPromise) return refreshPromise
   refreshPromise = refreshAccessToken().finally(() => {
     refreshPromise = null
