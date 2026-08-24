@@ -1,4 +1,4 @@
-import { Users, Building2, FolderKanban, Shield, ScrollText, Server, BellRing } from "lucide-react"
+import { Users, Building2, FolderKanban, Shield, ScrollText, Server } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
 export type ScopeLevel = "platform" | "workspace" | "namespace"
@@ -42,15 +42,6 @@ export const NAV_ITEMS: NavItemConfig[] = [
     permission: "compute:hosts:list",
     labelKey: "nav.hosts",
     icon: Server,
-    group: "nav.compute",
-    scopes: ["platform", "workspace", "namespace"],
-  },
-  {
-    resource: "host-alert-rules",
-    module: "compute",
-    permission: "compute:host-alert-rules:list",
-    labelKey: "nav.hostAlertRules",
-    icon: BellRing,
     group: "nav.compute",
     scopes: ["platform", "workspace", "namespace"],
   },

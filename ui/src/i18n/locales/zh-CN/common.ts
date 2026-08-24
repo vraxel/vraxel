@@ -81,7 +81,6 @@ const common = {
   "nav.auditLogs": "审计日志",
   "nav.kube": "Kubernetes",
   "nav.hosts": "主机",
-  "nav.hostAlertRules": "告警规则",
   "nav.apiDocs": "API 文档",
   "nav.searchPlaceholder": "搜索菜单 ({key})",
   "nav.searchNoMatch": "无匹配",

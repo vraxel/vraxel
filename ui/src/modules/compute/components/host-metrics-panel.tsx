@@ -6,31 +6,12 @@ import { Button } from "@/shared/ui/button"
 import { Skeleton } from "@/shared/ui/skeleton"
 import { translate, useTranslation } from "@/i18n"
 import { useApiQuery } from "@/core/query/hooks"
-import { qk } from "@/core/query/keys"
-import { usePermission } from "@/core/permission/use-permission"
-import { buildPermScope } from "@/core/registry/nav-config"
 import type { ScopeRef } from "@/core/registry/resource"
 import type { HostMetrics } from "@/generated/compute"
 import { hostMetricsApi } from "@/modules/compute/api/hosts"
-import { alertRulesApi } from "@/modules/compute/api/alert-rules"
-import { hostAlertRulesDef } from "@/modules/compute/defs"
 import type { Host } from "@/modules/compute/api/types"
 import { MetricChart, type ChartSeries, type ChartUnit } from "./metric-chart"
 import { HoverTsContext } from "./chart-hover-context"
-
-// Which chart each alert metric belongs on. The keys mirror the
-// server's whitelist (agentgw.AlertMetrics); a metric missing here
-// simply draws no guide line.
-const ALERT_METRIC_CHART: Record<string, string> = {
-  cpu_used_pct: "cpu",
-  mem_used_pct: "mem",
-  disk_used_pct: "fs",
-  load1: "load",
-  load5: "load",
-  load15: "load",
-  net_rx_bps: "net",
-  net_tx_bps: "net",
-}
 
 // The window presets. Steps follow what the agent's ring can answer --
 // 15s exists for the last hour only -- and every preset stays under the
@@ -76,7 +57,6 @@ function pick(
  */
 export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef }) {
   const { t, locale } = useTranslation()
-  const { hasPermission } = usePermission()
   const [win, setWin] = useState<WindowKey>("1h")
   const preset = WINDOWS.find((w) => w.key === win) ?? WINDOWS[0]
   // Shared across all six charts, so hovering one shows the crosshair at
@@ -86,34 +66,6 @@ export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef 
 
   const online = host.spec.agentStatus === "online"
 
-  // Alert thresholds drawn as guide lines. Gated on the rules
-  // permission: reading a host must not require the alerting one, so
-  // without it the charts simply carry no guides.
-  const canReadRules = hasPermission(
-    "compute:host-alert-rules:list",
-    buildPermScope(scope.ws, scope.ns),
-  )
-  const rulesQuery = useApiQuery({
-    queryKey: qk.list(hostAlertRulesDef, scope, { page_size: 100 }),
-    queryFn: () => alertRulesApi.list(scope, { page_size: 100 }),
-    enabled: canReadRules,
-    // A failure here only means no guide lines -- nothing on screen
-    // refers to this query, so a global toast would point at nothing.
-    meta: { skipGlobalError: true },
-  })
-  const thresholds = useMemo(() => {
-    const byChart: Record<string, { label: string; value: number }[]> = {}
-    for (const r of rulesQuery.data?.items ?? []) {
-      if (r.spec.enabled === false) continue
-      const chart = ALERT_METRIC_CHART[r.spec.metric]
-      if (!chart) continue
-      ;(byChart[chart] ??= []).push({
-        label: r.metadata.name,
-        value: r.spec.threshold,
-      })
-    }
-    return byChart
-  }, [rulesQuery.data])
   const query = useApiQuery({
     queryKey: ["host-metrics", host.metadata.id, scope.ws, scope.ns, win],
     queryFn: () => {
@@ -225,9 +177,6 @@ export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef 
       </CardHeader>
       <CardContent>
         {!online ? (
-          // Not an empty grid of axes: the honest state is a sentence.
-          // The list row's last snapshot (greyed) is the freshest data
-          // that exists for this host.
           <div className="text-muted-foreground py-8 text-center text-sm">
             {t("compute.host.metrics.offline")}
             {host.spec.metricsSampledAt
@@ -246,8 +195,6 @@ export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef 
           </div>
         ) : (
           <HoverTsContext.Provider value={hoverTs}>
-            {/* Dimmed while the charts still show the previous window,
-                so keeping them on screen does not read as "loaded". */}
             <div
               className={`grid gap-3 transition-opacity md:grid-cols-2 ${
                 query.isPlaceholderData ? "opacity-50" : ""
@@ -263,7 +210,6 @@ export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef 
                   stepSec={res.stepSec}
                   count={res.count}
                   emptyText={empty}
-                  thresholds={thresholds[c.id]}
                   onHover={setHoverTs}
                 />
               ))}

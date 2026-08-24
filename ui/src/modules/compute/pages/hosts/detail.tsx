@@ -205,26 +205,6 @@ export default function HostDetailPage() {
         </div>
       )}
 
-      {(host.spec.firingAlerts?.length ?? 0) > 0 && (
-        <div className="border-destructive/25 bg-destructive/10 mb-6 rounded-lg border p-3 text-sm">
-          <p className="font-medium">
-            {t("compute.alertRule.firingOn", { count: host.spec.firingAlerts?.length ?? 0 })}
-          </p>
-          <ul className="mt-1 space-y-0.5">
-            {host.spec.firingAlerts?.map((a) => (
-              <li key={a.ruleId} className="text-muted-foreground text-xs">
-                <span className="text-foreground font-medium">{a.ruleName}</span>{" "}
-                {t(`compute.alertRule.metrics.${a.metric}`)} {t(`compute.alertRule.ops.${a.op}`)}{" "}
-                {a.threshold}
-                {" · "}
-                {t("compute.alertRule.firedAt", { value: Math.round(a.value * 100) / 100 })}
-                {a.since ? ` · ${formatDateTime(a.since)}` : ""}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>

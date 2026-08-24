@@ -3,7 +3,6 @@ import { Link, useParams } from "react-router"
 import { EllipsisVertical, Pencil, Plus, ScrollText, SquareTerminal, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { formatDateTime } from "@/shared/lib/format"
-import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import {
   DropdownMenu,
@@ -101,18 +100,11 @@ export default function HostListPage() {
           displayName={h.spec.displayName}
           name={h.metadata.name}
           trailing={
-            <span className="flex items-center gap-1">
-              <AgentStatusBadge
-                status={h.spec.agentStatus}
-                conflictAt={h.spec.agentConflictAt}
-                foreignMachineAt={h.spec.agentForeignMachineAt}
-              />
-              {(h.spec.alertsFiring ?? 0) > 0 && (
-                <Badge variant="destructive">
-                  {t("compute.alertRule.firingBadge", { count: h.spec.alertsFiring ?? 0 })}
-                </Badge>
-              )}
-            </span>
+            <AgentStatusBadge
+              status={h.spec.agentStatus}
+              conflictAt={h.spec.agentConflictAt}
+              foreignMachineAt={h.spec.agentForeignMachineAt}
+            />
           }
         />
       ),
