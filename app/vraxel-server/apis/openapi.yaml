@@ -4109,6 +4109,12 @@ components:
         diskGb:
           type: integer
           format: int64
+        diskTotalBytes:
+          type: integer
+          format: int64
+        diskUsedBytes:
+          type: integer
+          format: int64
         diskUsedPath:
           type: string
         diskUsedPct:

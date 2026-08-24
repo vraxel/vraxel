@@ -407,12 +407,17 @@ func (h *protocolHandler) recordMetrics(ctx context.Context, sess *Session, m *a
 		MemUsedPct:   m.MemUsedPct,
 		DiskUsedPct:  m.DiskUsedPct,
 		DiskUsedPath: m.DiskUsedPath,
-		Load1:        m.Load1,
-		Load5:        m.Load5,
-		Load15:       m.Load15,
-		NetRxBps:     m.NetRxBps,
-		NetTxBps:     m.NetTxBps,
-		CPUTrend:     trend,
+		// Zero here means the agent predates these fields (or found no
+		// filesystem, which on Linux it does not). Either way the honest
+		// store is NULL, not a host with no disk.
+		DiskUsedBytes:  nonZero(m.DiskUsedBytes),
+		DiskTotalBytes: nonZero(m.DiskTotalBytes),
+		Load1:          m.Load1,
+		Load5:          m.Load5,
+		Load15:         m.Load15,
+		NetRxBps:       m.NetRxBps,
+		NetTxBps:       m.NetTxBps,
+		CPUTrend:       trend,
 	}); err != nil {
 		logger.Warnf("agentgw: record metrics for host %d: %v", sess.HostID, err)
 	}
@@ -475,4 +480,14 @@ func (h *protocolHandler) verifyMachine(ctx context.Context, row *gwstore.AgentR
 		logger.Infof("agentgw channel: host %d reset its machine id (%s -> %s)", row.HostID, row.MachineID, fp.MachineID)
 	}
 	return true
+}
+
+// nonZero turns an absent-or-zero wire number into a NULL for the store.
+// The summary is a fixed struct with no way to say "I did not measure
+// this", so zero is the only spelling an older agent has for it.
+func nonZero(v int64) *int64 {
+	if v == 0 {
+		return nil
+	}
+	return &v
 }

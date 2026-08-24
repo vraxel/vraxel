@@ -35,7 +35,7 @@ const compute = {
   "compute.host.sortUsage": "Usage",
   "compute.host.sortCores": "CPU cores",
   "compute.host.sortMemoryTotal": "Total memory",
-  "compute.host.sortDiskTotal": "Root disk size",
+  "compute.host.sortDiskTotal": "Total disk",
   "compute.host.agentVersion": "Agent version",
 
   "compute.host.metrics.title": "Metrics",

@@ -95,12 +95,19 @@ type HostSpec struct {
 	DiskUsedPct      *float64   `json:"diskUsedPct,omitempty"`
 	// DiskUsedPath names the mountpoint DiskUsedPct describes -- the
 	// fullest real filesystem, not necessarily /.
-	DiskUsedPath string   `json:"diskUsedPath,omitempty"`
-	Load1        *float64 `json:"load1,omitempty"`
-	Load5        *float64 `json:"load5,omitempty"`
-	Load15       *float64 `json:"load15,omitempty"`
-	NetRxBps     *float64 `json:"netRxBps,omitempty"`
-	NetTxBps     *float64 `json:"netTxBps,omitempty"`
+	DiskUsedPath string `json:"diskUsedPath,omitempty"`
+	// DiskUsedBytes / DiskTotalBytes are the host's whole disk footprint,
+	// summed over the same real filesystems (each device counted once).
+	// This is what the list column shows: DiskUsedPct answers "is
+	// anything filling up" and cannot be paired with a size, because the
+	// filesystem it describes varies from beat to beat.
+	DiskUsedBytes  *int64   `json:"diskUsedBytes,omitempty"`
+	DiskTotalBytes *int64   `json:"diskTotalBytes,omitempty"`
+	Load1          *float64 `json:"load1,omitempty"`
+	Load5          *float64 `json:"load5,omitempty"`
+	Load15         *float64 `json:"load15,omitempty"`
+	NetRxBps       *float64 `json:"netRxBps,omitempty"`
+	NetTxBps       *float64 `json:"netTxBps,omitempty"`
 	// CPUTrend is the list sparkline: CPU used % over roughly the last
 	// 24h in 48 half-hour buckets, oldest first; null entries are buckets
 	// the agent holds nothing for.
