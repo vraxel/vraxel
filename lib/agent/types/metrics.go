@@ -45,6 +45,20 @@ type MetricsSummary struct {
 	DiskUsedPct  float64 `json:"diskUsedPct"`
 	DiskUsedPath string  `json:"diskUsedPath,omitempty"`
 
+	// DiskUsedBytes / DiskTotalBytes are the host's whole disk footprint:
+	// used and total summed over the SAME real filesystems DiskUsedPct
+	// chooses its maximum from. The pair answers "how much disk does this
+	// machine have, and how much of it is gone" -- inventory, where
+	// DiskUsedPct is a warning. Both are kept because neither can stand
+	// in for the other: a full 1 GiB /boot vanishes inside a 600 GiB
+	// total, and a 92% /data says nothing about how big the host is.
+	//
+	// Zero means the agent found no real filesystem to measure, which on
+	// Linux does not happen; an agent too old to send these fields omits
+	// them and the server stores NULL rather than a fabricated zero.
+	DiskUsedBytes  int64 `json:"diskUsedBytes,omitempty"`
+	DiskTotalBytes int64 `json:"diskTotalBytes,omitempty"`
+
 	Load1  float64 `json:"load1"`
 	Load5  float64 `json:"load5"`
 	Load15 float64 `json:"load15"`

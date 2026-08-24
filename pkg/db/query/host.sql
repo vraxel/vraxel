@@ -61,6 +61,8 @@ SELECT h.*,
     m.mem_used_pct   AS metrics_mem_used_pct,
     m.disk_used_pct  AS metrics_disk_used_pct,
     m.disk_used_path AS metrics_disk_used_path,
+    m.disk_used_bytes  AS metrics_disk_used_bytes,
+    m.disk_total_bytes AS metrics_disk_total_bytes,
     m.load1          AS metrics_load1,
     m.load5          AS metrics_load5,
     m.load15         AS metrics_load15,
@@ -154,6 +156,8 @@ SELECT h.*,
     m.mem_used_pct   AS metrics_mem_used_pct,
     m.disk_used_pct  AS metrics_disk_used_pct,
     m.disk_used_path AS metrics_disk_used_path,
+    m.disk_used_bytes  AS metrics_disk_used_bytes,
+    m.disk_total_bytes AS metrics_disk_total_bytes,
     m.load1          AS metrics_load1,
     m.load5          AS metrics_load5,
     m.load15         AS metrics_load15,
@@ -210,6 +214,12 @@ ORDER BY
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'memory_mb' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN h.memory_mb END DESC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'disk_gb' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN h.disk_gb END ASC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'disk_gb' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN h.disk_gb END DESC,
+    -- Reported disk totals sort with the metric sorts below, not with
+    -- the host columns above: they come from a heartbeat, so a host that
+    -- has not reported has no size to compare and belongs at the bottom
+    -- either way.
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'disk_total_bytes' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN m.disk_total_bytes END ASC,
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'disk_total_bytes' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN m.disk_total_bytes END DESC NULLS LAST,
     -- Metric sorts keep agentless hosts (NULL) at the bottom in BOTH
     -- directions: "most loaded first" must not open with a page of
     -- hosts that reported nothing. ASC gets that from PG's default;
@@ -220,6 +230,12 @@ ORDER BY
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'mem_used_pct' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN m.mem_used_pct END DESC NULLS LAST,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'disk_used_pct' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN m.disk_used_pct END ASC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'disk_used_pct' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN m.disk_used_pct END DESC NULLS LAST,
+    -- The host's whole-disk ratio, which is what the list column shows.
+    -- Computed rather than stored: the two byte counts are the facts, and
+    -- a third column holding their quotient would be one more thing that
+    -- can disagree with them.
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'disk_used_ratio' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN m.disk_used_bytes::float8 / NULLIF(m.disk_total_bytes, 0) END ASC,
+    CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'disk_used_ratio' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN m.disk_used_bytes::float8 / NULLIF(m.disk_total_bytes, 0) END DESC NULLS LAST,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'organization' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN COALESCE(NULLIF(w.display_name, ''), w.name, '') END ASC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'organization' AND sqlc.arg('sort_order')::VARCHAR = 'asc' THEN COALESCE(NULLIF(ns.display_name, ''), ns.name, '') END ASC,
     CASE WHEN sqlc.arg('sort_field')::VARCHAR = 'organization' AND sqlc.arg('sort_order')::VARCHAR = 'desc' THEN COALESCE(NULLIF(w.display_name, ''), w.name, '') END DESC,

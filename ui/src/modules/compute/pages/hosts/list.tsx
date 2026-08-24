@@ -213,8 +213,8 @@ export default function HostListPage() {
       key: "disk",
       header: t("compute.host.disk"),
       sortFields: [
-        { field: "disk_used_pct", label: t("compute.host.sortUsage") },
-        { field: "disk_gb", label: t("compute.host.sortDiskTotal") },
+        { field: "disk_used_ratio", label: t("compute.host.sortUsage") },
+        { field: "disk_total_bytes", label: t("compute.host.sortDiskTotal") },
       ],
       cell: (h) => <HostDiskCell spec={h.spec} />,
     },

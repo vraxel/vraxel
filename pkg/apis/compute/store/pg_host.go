@@ -78,6 +78,8 @@ type HostRow struct {
 	MemUsedPct       *float64
 	DiskUsedPct      *float64
 	DiskUsedPath     string
+	DiskUsedBytes    *int64
+	DiskTotalBytes   *int64
 	Load1            *float64
 	Load5            *float64
 	Load15           *float64
@@ -340,6 +342,8 @@ func listRowToDomain(r *generated.ListHostsRow) HostRow {
 		MemUsedPct:              f64(r.MetricsMemUsedPct),
 		DiskUsedPct:             f64(r.MetricsDiskUsedPct),
 		DiskUsedPath:            strOr(r.MetricsDiskUsedPath),
+		DiskUsedBytes:           r.MetricsDiskUsedBytes,
+		DiskTotalBytes:          r.MetricsDiskTotalBytes,
 		Load1:                   f64(r.MetricsLoad1),
 		Load5:                   f64(r.MetricsLoad5),
 		Load15:                  f64(r.MetricsLoad15),
@@ -375,6 +379,8 @@ func getRowToDomain(r *generated.GetHostByIDRow) HostRow {
 		MemUsedPct:              f64(r.MetricsMemUsedPct),
 		DiskUsedPct:             f64(r.MetricsDiskUsedPct),
 		DiskUsedPath:            strOr(r.MetricsDiskUsedPath),
+		DiskUsedBytes:           r.MetricsDiskUsedBytes,
+		DiskTotalBytes:          r.MetricsDiskTotalBytes,
 		Load1:                   f64(r.MetricsLoad1),
 		Load5:                   f64(r.MetricsLoad5),
 		Load15:                  f64(r.MetricsLoad15),

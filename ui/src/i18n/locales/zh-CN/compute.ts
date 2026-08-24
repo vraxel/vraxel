@@ -36,7 +36,7 @@ const compute = {
   "compute.host.sortUsage": "使用率",
   "compute.host.sortCores": "核数",
   "compute.host.sortMemoryTotal": "内存总量",
-  "compute.host.sortDiskTotal": "系统盘容量",
+  "compute.host.sortDiskTotal": "磁盘总量",
 
   "compute.host.metrics.title": "监控",
   "compute.host.metrics.load": "负载",

@@ -63,11 +63,45 @@ func TestSummary(t *testing.T) {
 	if !close(s.DiskUsedPct, 80) || s.DiskUsedPath != "/" {
 		t.Fatalf("disk must be the fullest REAL mount: %v at %q", s.DiskUsedPct, s.DiskUsedPath)
 	}
+	// Aggregate: / has size 100, used 80; /data has size 1000, used 100.
+	// tmpfs (size 10, full) is excluded. Total across two devices = 1100,
+	// used = 180.
+	if s.DiskTotalBytes != 1100 || s.DiskUsedBytes != 180 {
+		t.Fatalf("disk aggregate: used=%d total=%d, want 180/1100", s.DiskUsedBytes, s.DiskTotalBytes)
+	}
 	if s.Load1 != 1.5 || s.Load5 != 1.0 || s.Load15 != 0.5 {
 		t.Fatalf("load: %v %v %v", s.Load1, s.Load5, s.Load15)
 	}
 	if !close(s.NetRxBps, 1000) || !close(s.NetTxBps, 2000) {
 		t.Fatalf("net must exclude lo and veth: rx=%v tx=%v", s.NetRxBps, s.NetTxBps)
+	}
+}
+
+func TestSummaryDiskAggregateDedupsDevice(t *testing.T) {
+	// A bind mount and an overlay both backed by /dev/sda1 must be
+	// counted once. Without dedup the total would be 200, not 100.
+	r := NewRing(0)
+	root := []Label{{Name: lDevice, Value: "/dev/sda1"}, {Name: lFSType, Value: "ext4"}, {Name: lMountpoint, Value: "/"}}
+	bind := []Label{{Name: lDevice, Value: "/dev/sda1"}, {Name: lFSType, Value: "ext4"}, {Name: lMountpoint, Value: "/mnt/bind"}}
+	for i := 0; i <= 2; i++ {
+		f := float64(i)
+		r.Add(Sample{AtMs: int64(i) * stepMs, Points: []Point{
+			{Name: mCPU, Labels: []Label{{Name: "cpu", Value: "0"}, {Name: lMode, Value: modeIdle}}, Kind: Counter, Value: 5 * f},
+			{Name: mCPU, Labels: []Label{{Name: "cpu", Value: "0"}, {Name: lMode, Value: "user"}}, Kind: Counter, Value: 10 * f},
+			{Name: mMemTotal, Kind: Gauge, Value: 1000},
+			{Name: mMemAvail, Kind: Gauge, Value: 500},
+			{Name: mFSSize, Labels: root, Kind: Gauge, Value: 100},
+			{Name: mFSAvail, Labels: root, Kind: Gauge, Value: 40},
+			{Name: mFSSize, Labels: bind, Kind: Gauge, Value: 100},
+			{Name: mFSAvail, Labels: bind, Kind: Gauge, Value: 40},
+		}})
+	}
+	s := r.Summary()
+	if s == nil {
+		t.Fatal("summary nil")
+	}
+	if s.DiskTotalBytes != 100 || s.DiskUsedBytes != 60 {
+		t.Fatalf("bind dedup: used=%d total=%d, want 60/100", s.DiskUsedBytes, s.DiskTotalBytes)
 	}
 }
 

@@ -377,18 +377,20 @@ func (s *pgAgentStore) UpsertMetrics(ctx context.Context, hostID int64, in Metri
 		trend = []byte("[]")
 	}
 	err := s.Q().UpsertHostMetricsLatest(ctx, generated.UpsertHostMetricsLatestParams{
-		HostID:       hostID,
-		SampledAt:    in.SampledAt,
-		CpuUsedPct:   float32(in.CPUUsedPct),
-		MemUsedPct:   float32(in.MemUsedPct),
-		DiskUsedPct:  float32(in.DiskUsedPct),
-		DiskUsedPath: in.DiskUsedPath,
-		Load1:        float32(in.Load1),
-		Load5:        float32(in.Load5),
-		Load15:       float32(in.Load15),
-		NetRxBps:     float32(in.NetRxBps),
-		NetTxBps:     float32(in.NetTxBps),
-		CpuTrend:     trend,
+		HostID:         hostID,
+		SampledAt:      in.SampledAt,
+		CpuUsedPct:     float32(in.CPUUsedPct),
+		MemUsedPct:     float32(in.MemUsedPct),
+		DiskUsedPct:    float32(in.DiskUsedPct),
+		DiskUsedPath:   in.DiskUsedPath,
+		DiskUsedBytes:  in.DiskUsedBytes,
+		DiskTotalBytes: in.DiskTotalBytes,
+		Load1:          float32(in.Load1),
+		Load5:          float32(in.Load5),
+		Load15:         float32(in.Load15),
+		NetRxBps:       float32(in.NetRxBps),
+		NetTxBps:       float32(in.NetTxBps),
+		CpuTrend:       trend,
 	})
 	if err != nil {
 		return fmt.Errorf("upsert host metrics: %w", err)

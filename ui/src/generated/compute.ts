@@ -108,6 +108,15 @@ export interface HostSpec {
    * fullest real filesystem, not necessarily /.
    */
   diskUsedPath?: string;
+  /**
+   * DiskUsedBytes / DiskTotalBytes are the host's whole disk footprint,
+   * summed over the same real filesystems (each device counted once).
+   * This is what the list column shows: DiskUsedPct answers "is
+   * anything filling up" and cannot be paired with a size, because the
+   * filesystem it describes varies from beat to beat.
+   */
+  diskUsedBytes?: number /* int64 */;
+  diskTotalBytes?: number /* int64 */;
   load1?: number /* float64 */;
   load5?: number /* float64 */;
   load15?: number /* float64 */;

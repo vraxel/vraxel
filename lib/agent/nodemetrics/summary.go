@@ -88,7 +88,7 @@ func (r *Ring) Summary() *agenttypes.MetricsSummary {
 	}
 	out.MemUsedPct = clampPct(100 * (t - a) / t)
 
-	out.DiskUsedPct, out.DiskUsedPath = r.summaryDisk(g)
+	out.DiskUsedPct, out.DiskUsedPath, out.DiskUsedBytes, out.DiskTotalBytes = r.summaryDisk(g)
 	out.Load1 = zeroNaN(gaugeOf(r.find(mLoad1), g))
 	out.Load5 = zeroNaN(gaugeOf(r.find(mLoad5), g))
 	out.Load15 = zeroNaN(gaugeOf(r.find(mLoad15), g))
@@ -124,11 +124,26 @@ func (r *Ring) cpuTrend() []agenttypes.MetricValue {
 	return cpuUsedValues(g.count, rises, totals)
 }
 
-// summaryDisk is the fullest real filesystem and where it is mounted.
-func (r *Ring) summaryDisk(g grid) (float64, string) {
+// summaryDisk walks the real filesystems once and answers both disk
+// questions from that walk: the fullest one and where it is mounted (the
+// warning), and used/total summed across all of them (the inventory).
+//
+// One walk rather than two because the two answers must agree on what
+// counts as a filesystem: if the sum included a tmpfs the maximum
+// excludes, a host could show more disk than it has.
+//
+// The sum counts each DEVICE once, the maximum every mountpoint. A bind
+// mount and a btrfs subvolume appear as separate mountpoints backed by
+// the same device and the same blocks, so adding them would report a
+// host with more disk than it owns -- while for "is anything filling
+// up" seeing the same filesystem twice changes nothing. Mountpoints
+// arrive sorted, so the survivor is the shortest path on each device,
+// which is the one an operator would name.
+func (r *Ring) summaryDisk(g grid) (worst float64, at string, usedBytes, totalBytes int64) {
 	sizes, mounts := r.group(mFSSize, lMountpoint)
 	avails, _ := r.group(mFSAvail, lMountpoint)
-	worst, at := 0.0, ""
+	usedSum, totalSum := 0.0, 0.0
+	counted := map[string]struct{}{}
 	for _, mp := range mounts {
 		size := sizes[mp]
 		if _, skip := summaryFSTypes[size.Label(lFSType)]; skip {
@@ -142,11 +157,17 @@ func (r *Ring) summaryDisk(g grid) (float64, string) {
 		if math.IsNaN(t) || math.IsNaN(a) || t <= 0 {
 			continue
 		}
+		dev := size.Label(lDevice)
+		if _, seen := counted[dev]; !seen || dev == "" {
+			counted[dev] = struct{}{}
+			usedSum += t - a
+			totalSum += t
+		}
 		if pct := clampPct(100 * (t - a) / t); pct > worst || at == "" {
 			worst, at = pct, mp
 		}
 	}
-	return worst, at
+	return worst, at, int64(usedSum), int64(totalSum)
 }
 
 // summaryNet is the per-second byte rate summed over the real

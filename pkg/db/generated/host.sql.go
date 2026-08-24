@@ -191,6 +191,8 @@ SELECT h.id, h.name, h.display_name, h.description, h.hostname, h.os, h.arch, h.
     m.mem_used_pct   AS metrics_mem_used_pct,
     m.disk_used_pct  AS metrics_disk_used_pct,
     m.disk_used_path AS metrics_disk_used_path,
+    m.disk_used_bytes  AS metrics_disk_used_bytes,
+    m.disk_total_bytes AS metrics_disk_total_bytes,
     m.load1          AS metrics_load1,
     m.load5          AS metrics_load5,
     m.load15         AS metrics_load15,
@@ -282,6 +284,8 @@ type GetHostByIDRow struct {
 	MetricsMemUsedPct       *float32        `json:"metrics_mem_used_pct"`
 	MetricsDiskUsedPct      *float32        `json:"metrics_disk_used_pct"`
 	MetricsDiskUsedPath     *string         `json:"metrics_disk_used_path"`
+	MetricsDiskUsedBytes    *int64          `json:"metrics_disk_used_bytes"`
+	MetricsDiskTotalBytes   *int64          `json:"metrics_disk_total_bytes"`
 	MetricsLoad1            *float32        `json:"metrics_load1"`
 	MetricsLoad5            *float32        `json:"metrics_load5"`
 	MetricsLoad15           *float32        `json:"metrics_load15"`
@@ -342,6 +346,8 @@ func (q *Queries) GetHostByID(ctx context.Context, arg GetHostByIDParams) (GetHo
 		&i.MetricsMemUsedPct,
 		&i.MetricsDiskUsedPct,
 		&i.MetricsDiskUsedPath,
+		&i.MetricsDiskUsedBytes,
+		&i.MetricsDiskTotalBytes,
 		&i.MetricsLoad1,
 		&i.MetricsLoad5,
 		&i.MetricsLoad15,
@@ -402,6 +408,8 @@ SELECT h.id, h.name, h.display_name, h.description, h.hostname, h.os, h.arch, h.
     m.mem_used_pct   AS metrics_mem_used_pct,
     m.disk_used_pct  AS metrics_disk_used_pct,
     m.disk_used_path AS metrics_disk_used_path,
+    m.disk_used_bytes  AS metrics_disk_used_bytes,
+    m.disk_total_bytes AS metrics_disk_total_bytes,
     m.load1          AS metrics_load1,
     m.load5          AS metrics_load5,
     m.load15         AS metrics_load15,
@@ -458,6 +466,12 @@ ORDER BY
     CASE WHEN $7::VARCHAR = 'memory_mb' AND $8::VARCHAR = 'desc' THEN h.memory_mb END DESC,
     CASE WHEN $7::VARCHAR = 'disk_gb' AND $8::VARCHAR = 'asc' THEN h.disk_gb END ASC,
     CASE WHEN $7::VARCHAR = 'disk_gb' AND $8::VARCHAR = 'desc' THEN h.disk_gb END DESC,
+    -- Reported disk totals sort with the metric sorts below, not with
+    -- the host columns above: they come from a heartbeat, so a host that
+    -- has not reported has no size to compare and belongs at the bottom
+    -- either way.
+    CASE WHEN $7::VARCHAR = 'disk_total_bytes' AND $8::VARCHAR = 'asc' THEN m.disk_total_bytes END ASC,
+    CASE WHEN $7::VARCHAR = 'disk_total_bytes' AND $8::VARCHAR = 'desc' THEN m.disk_total_bytes END DESC NULLS LAST,
     -- Metric sorts keep agentless hosts (NULL) at the bottom in BOTH
     -- directions: "most loaded first" must not open with a page of
     -- hosts that reported nothing. ASC gets that from PG's default;
@@ -468,6 +482,12 @@ ORDER BY
     CASE WHEN $7::VARCHAR = 'mem_used_pct' AND $8::VARCHAR = 'desc' THEN m.mem_used_pct END DESC NULLS LAST,
     CASE WHEN $7::VARCHAR = 'disk_used_pct' AND $8::VARCHAR = 'asc' THEN m.disk_used_pct END ASC,
     CASE WHEN $7::VARCHAR = 'disk_used_pct' AND $8::VARCHAR = 'desc' THEN m.disk_used_pct END DESC NULLS LAST,
+    -- The host's whole-disk ratio, which is what the list column shows.
+    -- Computed rather than stored: the two byte counts are the facts, and
+    -- a third column holding their quotient would be one more thing that
+    -- can disagree with them.
+    CASE WHEN $7::VARCHAR = 'disk_used_ratio' AND $8::VARCHAR = 'asc' THEN m.disk_used_bytes::float8 / NULLIF(m.disk_total_bytes, 0) END ASC,
+    CASE WHEN $7::VARCHAR = 'disk_used_ratio' AND $8::VARCHAR = 'desc' THEN m.disk_used_bytes::float8 / NULLIF(m.disk_total_bytes, 0) END DESC NULLS LAST,
     CASE WHEN $7::VARCHAR = 'organization' AND $8::VARCHAR = 'asc' THEN COALESCE(NULLIF(w.display_name, ''), w.name, '') END ASC,
     CASE WHEN $7::VARCHAR = 'organization' AND $8::VARCHAR = 'asc' THEN COALESCE(NULLIF(ns.display_name, ''), ns.name, '') END ASC,
     CASE WHEN $7::VARCHAR = 'organization' AND $8::VARCHAR = 'desc' THEN COALESCE(NULLIF(w.display_name, ''), w.name, '') END DESC,
@@ -542,6 +562,8 @@ type ListHostsRow struct {
 	MetricsMemUsedPct       *float32        `json:"metrics_mem_used_pct"`
 	MetricsDiskUsedPct      *float32        `json:"metrics_disk_used_pct"`
 	MetricsDiskUsedPath     *string         `json:"metrics_disk_used_path"`
+	MetricsDiskUsedBytes    *int64          `json:"metrics_disk_used_bytes"`
+	MetricsDiskTotalBytes   *int64          `json:"metrics_disk_total_bytes"`
 	MetricsLoad1            *float32        `json:"metrics_load1"`
 	MetricsLoad5            *float32        `json:"metrics_load5"`
 	MetricsLoad15           *float32        `json:"metrics_load15"`
@@ -618,6 +640,8 @@ func (q *Queries) ListHosts(ctx context.Context, arg ListHostsParams) ([]ListHos
 			&i.MetricsMemUsedPct,
 			&i.MetricsDiskUsedPct,
 			&i.MetricsDiskUsedPath,
+			&i.MetricsDiskUsedBytes,
+			&i.MetricsDiskTotalBytes,
 			&i.MetricsLoad1,
 			&i.MetricsLoad5,
 			&i.MetricsLoad15,

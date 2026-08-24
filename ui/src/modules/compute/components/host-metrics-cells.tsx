@@ -104,6 +104,7 @@ function UtilGauge({
 // 1 GiB, and a used/total pair whose halves carry different units reads
 // as two unrelated numbers.
 const gib = (mb: number) => (mb / 1024).toFixed(1)
+const gibBytes = (b: number) => (b / (1024 * 1024 * 1024)).toFixed(1)
 
 export function HostCpuCell({ spec }: { spec: Host["spec"] }) {
   const { t } = useTranslation()
@@ -134,12 +135,16 @@ export function HostMemCell({ spec }: { spec: Host["spec"] }) {
 }
 
 export function HostDiskCell({ spec }: { spec: Host["spec"] }) {
-  // No amount to pair with the percentage. diskUsedPct is the FULLEST
-  // filesystem (whichever that is), while disk_gb is the size of the
-  // ROOT one -- on a host whose /data is fuller than /, printing them
-  // side by side would state a fraction of the wrong disk. Until the
-  // agent reports the winning filesystem's own size, the percentage
-  // stands alone rather than borrowing a denominator that may not be its
-  // own.
-  return <UtilGauge value={spec.diskUsedPct} stale={isStale(spec.metricsSampledAt)} />
+  const used = spec.diskUsedBytes
+  const total = spec.diskTotalBytes
+  const stale = isStale(spec.metricsSampledAt)
+  // The agent sums used/total across the same real filesystems that
+  // decide diskUsedPct (each device counted once), so the percentage
+  // displayed here is the host's overall disk pressure, not the single
+  // fullest mount. Old agents that do not report these fields render
+  // the percentage alone, which is what they always did.
+  const hasPair = typeof used === "number" && typeof total === "number" && total > 0
+  const pct = hasPair ? (used / total) * 100 : undefined
+  const amount = hasPair ? `${gibBytes(used)} / ${gibBytes(total)} GiB` : undefined
+  return <UtilGauge amount={amount} value={pct} stale={stale} />
 }

@@ -250,6 +250,7 @@ func hostToAPI(r *modstore.HostRow) Host {
 	h.Spec.MemUsedPct = r.MemUsedPct
 	h.Spec.DiskUsedPct = r.DiskUsedPct
 	h.Spec.DiskUsedPath = r.DiskUsedPath
+	h.Spec.DiskUsedBytes, h.Spec.DiskTotalBytes = r.DiskUsedBytes, r.DiskTotalBytes
 	h.Spec.Load1, h.Spec.Load5, h.Spec.Load15 = r.Load1, r.Load5, r.Load15
 	h.Spec.NetRxBps, h.Spec.NetTxBps = r.NetRxBps, r.NetTxBps
 	// The trend travelled as JSON from the agent's heartbeat into jsonb

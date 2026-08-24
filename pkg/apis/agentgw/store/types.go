@@ -83,12 +83,16 @@ type MetricsInput struct {
 	MemUsedPct   float64
 	DiskUsedPct  float64
 	DiskUsedPath string
-	Load1        float64
-	Load5        float64
-	Load15       float64
-	NetRxBps     float64
-	NetTxBps     float64
-	CPUTrend     []byte
+	// Nil for an agent too old to report them: the column stays NULL
+	// rather than claiming the host has no disk.
+	DiskUsedBytes  *int64
+	DiskTotalBytes *int64
+	Load1          float64
+	Load5          float64
+	Load15         float64
+	NetRxBps       float64
+	NetTxBps       float64
+	CPUTrend       []byte
 }
 
 // BindInput is one machine claiming one host row.
