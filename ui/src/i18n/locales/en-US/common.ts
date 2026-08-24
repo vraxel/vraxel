@@ -81,7 +81,6 @@ const common = {
   "nav.auditLogs": "Audit Logs",
   "nav.kube": "Kubernetes",
   "nav.hosts": "Hosts",
-  "nav.hostAlertRules": "Alert rules",
   "nav.apiDocs": "API Docs",
   "nav.searchPlaceholder": "Search menu ({key})",
   "nav.searchNoMatch": "No match",

@@ -22,12 +22,3 @@ export const agentJoinTokensDef = defineResource({
   name: "agent-join-tokens",
   scopes: ["platform", "workspace", "namespace"],
 })
-
-// Threshold alert rules over the heartbeat snapshots. Evaluated
-// server-side; this page only writes what the evaluator reads.
-export const hostAlertRulesDef = defineResource({
-  module: "compute",
-  name: "host-alert-rules",
-  scopes: ["platform", "workspace", "namespace"],
-  detailParam: "ruleId",
-})
