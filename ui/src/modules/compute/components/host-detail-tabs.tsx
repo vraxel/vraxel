@@ -376,10 +376,17 @@ export function HostStorageTab({ host }: { host: Host }) {
                               </span>
                             )}
                           </div>
+                          {/* An unreadable size (a statfs that failed) is not
+                              an empty filesystem. Drawn as a dimmed rail
+                              rather than a full-colour 0% bar, which reads as
+                              "this mount is empty" -- the same distinction the
+                              list's gauge makes. */}
                           <Progress
                             value={pct ?? 0}
-                            className="h-1.5"
-                            indicatorClassName={barTone(pct ?? 0)}
+                            className={pct === undefined ? "bg-muted/50 h-1.5" : "h-1.5"}
+                            indicatorClassName={
+                              pct === undefined ? "bg-muted-foreground/40" : barTone(pct)
+                            }
                           />
                         </div>
                       </TableCell>
@@ -395,9 +402,13 @@ export function HostStorageTab({ host }: { host: Host }) {
   )
 }
 
-// Says WHY the tab is empty. An agent reports its inventory once per
-// session, so the gap between a host coming online and this arriving is
-// real -- and a host that has never had an agent will never fill it.
+// Says WHY the tab is empty, and names the case waiting does not fix.
+//
+// An agent older than this feature connects, heartbeats and looks
+// perfectly healthy while never sending an inventory -- so "the agent
+// will report it once it connects" would be a promise the page cannot
+// keep, and an operator would wait on a host that is already doing
+// everything it is going to do.
 function EmptyFacts() {
   const { t } = useTranslation()
   return <div className="text-muted-foreground p-6 text-sm">{t("compute.host.noFacts")}</div>

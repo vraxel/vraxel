@@ -95,7 +95,8 @@ const compute = {
   "compute.host.timezone": "时区",
   "compute.host.bootAt": "启动时间",
   "compute.host.factsReportedAt": "硬件信息上报",
-  "compute.host.noFacts": "还没有收到这台主机的硬件信息。Agent 连接后会自动上报。",
+  "compute.host.noFacts":
+    "还没有收到这台主机的硬件信息。硬件信息由 Agent 在线时上报，较早版本的 Agent 不上报，重装 Agent 即可。",
   "compute.host.cpuModel": "型号",
   "compute.host.logicalCpus": "逻辑处理器",
   "compute.host.cpuTopology": "拓扑",
