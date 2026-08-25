@@ -98,7 +98,7 @@ const compute = {
   "compute.host.bootAt": "Booted at",
   "compute.host.factsReportedAt": "Inventory reported",
   "compute.host.noFacts":
-    "No hardware inventory for this host yet. The agent reports it once it connects.",
+    "No hardware inventory for this host yet. An online agent reports it; agents older than this feature do not, so reinstall the agent if it stays empty.",
   "compute.host.cpuModel": "Model",
   "compute.host.logicalCpus": "Logical CPUs",
   "compute.host.cpuTopology": "Topology",
