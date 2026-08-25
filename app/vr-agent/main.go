@@ -132,6 +132,7 @@ func main() {
 		// /etc/machine-id is what an operator does to a cloned host, and
 		// the server only learns it happened if the next hello says so.
 		Fingerprint:    func() agenttypes.MachineFingerprint { return hostinfo.Collect().Fingerprint() },
+		Facts:          hostinfo.Facts,
 		ServerURL:      st.ServerURL,
 		AgentToken:     func() string { return st.AgentToken },
 		Version:        version,

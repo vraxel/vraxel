@@ -265,5 +265,32 @@ func hostToAPI(r *modstore.HostRow) Host {
 	if len(r.FiringAlerts) > 0 {
 		_ = json.Unmarshal(r.FiringAlerts, &h.Spec.FiringAlerts)
 	}
+
+	h.Spec.Virtualization = r.Virtualization
+	h.Spec.CPUModel = r.CPUModel
+	h.Spec.CPUSockets = r.CPUSockets
+	h.Spec.CPUCoresPerSocket = r.CPUCoresPerSocket
+	h.Spec.CPUThreadsPerCore = r.CPUThreadsPerCore
+	h.Spec.KernelVersion = r.KernelVersion
+	h.Spec.SystemVendor = r.SystemVendor
+	h.Spec.ProductName = r.ProductName
+	h.Spec.BIOSVersion = r.BIOSVersion
+	h.Spec.SerialNumber = r.SerialNumber
+	h.Spec.Timezone = r.Timezone
+	h.Spec.BootAt = r.BootAt
+	h.Spec.FactsReportedAt = r.FactsReportedAt
+	// Same round trip as CPUTrend above: agent JSON into jsonb and out
+	// again, decoded here only because the API type is concrete for the
+	// schema generators. Nil on the list, where the query does not join
+	// host_facts at all.
+	if len(r.FactsNICs) > 0 {
+		_ = json.Unmarshal(r.FactsNICs, &h.Spec.NICs)
+	}
+	if len(r.FactsFilesystems) > 0 {
+		_ = json.Unmarshal(r.FactsFilesystems, &h.Spec.Filesystems)
+	}
+	if len(r.FactsBlockDevices) > 0 {
+		_ = json.Unmarshal(r.FactsBlockDevices, &h.Spec.BlockDevices)
+	}
 	return h
 }

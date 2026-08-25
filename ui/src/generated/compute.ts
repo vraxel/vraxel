@@ -138,6 +138,99 @@ export interface HostSpec {
    * carries the count and nothing else.
    */
   firingAlerts?: HostFiringAlert[];
+  /**
+   * --- machine inventory, read-only ---
+   * Reported by the agent on its own cadence, not on every beat: these
+   * describe what the machine IS. The scalars come back on the list too
+   * (they are hosts columns, and the fleet questions worth asking --
+   * which hypervisor, which kernel -- are asked across hosts); the three
+   * lists below are detail-only.
+   */
+  virtualization?: string;
+  cpuModel?: string;
+  cpuSockets?: number /* int32 */;
+  cpuCoresPerSocket?: number /* int32 */;
+  cpuThreadsPerCore?: number /* int32 */;
+  kernelVersion?: string;
+  systemVendor?: string;
+  productName?: string;
+  biosVersion?: string;
+  /**
+   * SerialNumber is the DMI product serial: an asset identifier on
+   * physical hardware, and a restatement of the SMBIOS UUID on a guest.
+   * The UI shows it only when Virtualization says "physical".
+   */
+  serialNumber?: string;
+  /**
+   * Timezone is the IANA name the machine is configured with. Worth a
+   * field of its own because a host in the wrong zone produces logs
+   * nobody can line up against anything else.
+   */
+  timezone?: string;
+  /**
+   * BootAt is when the machine last booted, dated by the SERVER's clock
+   * from the uptime counter the agent reports -- so it stays right on a
+   * host whose own clock is hours out.
+   */
+  bootAt?: string;
+  /**
+   * Detail-only. The list does not join the table these come from,
+   * which is the whole reason they live in one.
+   */
+  nics?: HostNIC[];
+  filesystems?: HostFilesystem[];
+  blockDevices?: HostBlockDevice[];
+  /**
+   * FactsReportedAt is when the agent last SENT an inventory, which it
+   * does only when the content changed. Stale here means "nothing has
+   * changed", not "nobody is looking".
+   */
+  factsReportedAt?: string;
+}
+/**
+ * HostNIC is one of the machine's network interfaces. Container and
+ * bridge plumbing (veth, docker0) is filtered out at the agent.
+ * +openapi:description=主机网卡：agent 上报，已过滤容器/网桥虚拟接口。
+ */
+export interface HostNIC {
+  name: string;
+  mac?: string;
+  /**
+   * IPv4 / IPv6 are in CIDR form.
+   */
+  ipv4?: string[];
+  ipv6?: string[];
+  /**
+   * SpeedMbps is absent on a down link and on drivers that do not
+   * report one, which includes most virtual NICs.
+   */
+  speedMbps?: number /* int32 */;
+  mtu?: number /* int32 */;
+  state?: string;
+}
+/**
+ * HostFilesystem is one mounted real filesystem. tmpfs and the kernel's
+ * bookkeeping filesystems are excluded, by the same rule that shapes the
+ * disk gauge -- so these rows add up to the number beside them.
+ * +openapi:description=主机文件系统：真实存储挂载点，已排除 tmpfs 等伪文件系统。
+ */
+export interface HostFilesystem {
+  mount: string;
+  device?: string;
+  fstype?: string;
+  sizeBytes?: number /* int64 */;
+  usedBytes?: number /* int64 */;
+}
+/**
+ * HostBlockDevice is one whole disk. Partitions and removable media are
+ * excluded.
+ * +openapi:description=主机块设备：整盘，已排除分区与可移动介质。
+ */
+export interface HostBlockDevice {
+  name: string;
+  sizeBytes?: number /* int64 */;
+  rotational?: boolean;
+  model?: string;
 }
 /**
  * HostAlertRuleSpec is one threshold over the heartbeat snapshot.

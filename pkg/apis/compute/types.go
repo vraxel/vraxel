@@ -119,6 +119,82 @@ type HostSpec struct {
 	// FiringAlerts names them, on the detail response only -- the list
 	// carries the count and nothing else.
 	FiringAlerts []HostFiringAlert `json:"firingAlerts,omitempty"`
+
+	// --- machine inventory, read-only ---
+	// Reported by the agent on its own cadence, not on every beat: these
+	// describe what the machine IS. The scalars come back on the list too
+	// (they are hosts columns, and the fleet questions worth asking --
+	// which hypervisor, which kernel -- are asked across hosts); the three
+	// lists below are detail-only.
+	Virtualization    string `json:"virtualization,omitempty"`
+	CPUModel          string `json:"cpuModel,omitempty"`
+	CPUSockets        int32  `json:"cpuSockets,omitempty"`
+	CPUCoresPerSocket int32  `json:"cpuCoresPerSocket,omitempty"`
+	CPUThreadsPerCore int32  `json:"cpuThreadsPerCore,omitempty"`
+	KernelVersion     string `json:"kernelVersion,omitempty"`
+	SystemVendor      string `json:"systemVendor,omitempty"`
+	ProductName       string `json:"productName,omitempty"`
+	BIOSVersion       string `json:"biosVersion,omitempty"`
+	// SerialNumber is the DMI product serial: an asset identifier on
+	// physical hardware, and a restatement of the SMBIOS UUID on a guest.
+	// The UI shows it only when Virtualization says "physical".
+	SerialNumber string `json:"serialNumber,omitempty"`
+	// Timezone is the IANA name the machine is configured with. Worth a
+	// field of its own because a host in the wrong zone produces logs
+	// nobody can line up against anything else.
+	Timezone string `json:"timezone,omitempty"`
+	// BootAt is when the machine last booted, dated by the SERVER's clock
+	// from the uptime counter the agent reports -- so it stays right on a
+	// host whose own clock is hours out.
+	BootAt *time.Time `json:"bootAt,omitempty"`
+
+	// Detail-only. The list does not join the table these come from,
+	// which is the whole reason they live in one.
+	NICs         []HostNIC         `json:"nics,omitempty"`
+	Filesystems  []HostFilesystem  `json:"filesystems,omitempty"`
+	BlockDevices []HostBlockDevice `json:"blockDevices,omitempty"`
+	// FactsReportedAt is when the agent last SENT an inventory, which it
+	// does only when the content changed. Stale here means "nothing has
+	// changed", not "nobody is looking".
+	FactsReportedAt *time.Time `json:"factsReportedAt,omitempty"`
+}
+
+// HostNIC is one of the machine's network interfaces. Container and
+// bridge plumbing (veth, docker0) is filtered out at the agent.
+// +openapi:description=主机网卡：agent 上报，已过滤容器/网桥虚拟接口。
+type HostNIC struct {
+	Name string `json:"name"`
+	MAC  string `json:"mac,omitempty"`
+	// IPv4 / IPv6 are in CIDR form.
+	IPv4 []string `json:"ipv4,omitempty"`
+	IPv6 []string `json:"ipv6,omitempty"`
+	// SpeedMbps is absent on a down link and on drivers that do not
+	// report one, which includes most virtual NICs.
+	SpeedMbps int32  `json:"speedMbps,omitempty"`
+	MTU       int32  `json:"mtu,omitempty"`
+	State     string `json:"state,omitempty"`
+}
+
+// HostFilesystem is one mounted real filesystem. tmpfs and the kernel's
+// bookkeeping filesystems are excluded, by the same rule that shapes the
+// disk gauge -- so these rows add up to the number beside them.
+// +openapi:description=主机文件系统：真实存储挂载点，已排除 tmpfs 等伪文件系统。
+type HostFilesystem struct {
+	Mount     string `json:"mount"`
+	Device    string `json:"device,omitempty"`
+	FSType    string `json:"fstype,omitempty"`
+	SizeBytes int64  `json:"sizeBytes,omitempty"`
+	UsedBytes int64  `json:"usedBytes,omitempty"`
+}
+
+// HostBlockDevice is one whole disk. Partitions and removable media are
+// excluded.
+// +openapi:description=主机块设备：整盘，已排除分区与可移动介质。
+type HostBlockDevice struct {
+	Name       string `json:"name"`
+	SizeBytes  int64  `json:"sizeBytes,omitempty"`
+	Rotational bool   `json:"rotational,omitempty"`
+	Model      string `json:"model,omitempty"`
 }
 
 // HostAlertRuleSpec is one threshold over the heartbeat snapshot.

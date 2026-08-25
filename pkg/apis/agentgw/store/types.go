@@ -95,6 +95,26 @@ type MetricsInput struct {
 	CPUTrend       []byte
 }
 
+// FactsInput is one host.facts report, ready to store: the scalars that
+// become hosts columns, and the three lists that go to host_facts as
+// jsonb the server never interprets.
+type FactsInput struct {
+	Virtualization    string
+	CPUModel          string
+	CPUSockets        int32
+	CPUCoresPerSocket int32
+	CPUThreadsPerCore int32
+	KernelVersion     string
+	SystemVendor      string
+	ProductName       string
+	BIOSVersion       string
+	SerialNumber      string
+	Timezone          string
+	NICs              []byte
+	Filesystems       []byte
+	BlockDevices      []byte
+}
+
 // BindInput is one machine claiming one host row.
 type BindInput struct {
 	HostID  int64

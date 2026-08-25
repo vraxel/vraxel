@@ -348,6 +348,8 @@ func (h *protocolHandler) handleFrame(ctx context.Context, sess *Session, f *age
 		// A second hello on an established channel is harmless; treat it
 		// as a heartbeat so a reconnect-confused agent still stays fresh.
 		h.touch(ctx, sess, clockSkew(f.ClockUnixMs))
+	case agenttypes.FrameTypeHostFacts:
+		h.recordFacts(ctx, sess, f.Facts)
 	case agenttypes.FrameTypeJobAck:
 		// The agent accepted a dispatched job: flip it to running so the
 		// driver stops re-dispatching and starts its timeout clock.
@@ -421,6 +423,56 @@ func (h *protocolHandler) recordMetrics(ctx context.Context, sess *Session, m *a
 	}); err != nil {
 		logger.Warnf("agentgw: record metrics for host %d: %v", sess.HostID, err)
 	}
+}
+
+// recordFacts persists the machine's inventory.
+//
+// Like recordMetrics, a failed write is logged and swallowed: the agent
+// resends its whole inventory on the next reconnect, so the worst case is
+// a detail page showing yesterday's hardware, and no display concern may
+// be able to take a control channel down.
+//
+// The three lists are re-marshalled rather than passed through: the frame
+// was decoded into typed structs, so what goes to the jsonb column is
+// this server's own encoding of a shape it understands, not whatever
+// bytes a host put on the wire.
+func (h *protocolHandler) recordFacts(ctx context.Context, sess *Session, facts *agenttypes.HostFacts) {
+	if facts == nil {
+		return
+	}
+	in := gwstore.FactsInput{
+		Virtualization:    facts.Virtualization,
+		CPUModel:          facts.CPUModel,
+		CPUSockets:        facts.CPUSockets,
+		CPUCoresPerSocket: facts.CPUCoresPerSocket,
+		CPUThreadsPerCore: facts.CPUThreadsPerCore,
+		KernelVersion:     facts.KernelVersion,
+		SystemVendor:      facts.SystemVendor,
+		ProductName:       facts.ProductName,
+		BIOSVersion:       facts.BIOSVersion,
+		SerialNumber:      facts.SerialNumber,
+		Timezone:          facts.Timezone,
+		NICs:              marshalList(facts.NICs),
+		Filesystems:       marshalList(facts.Filesystems),
+		BlockDevices:      marshalList(facts.BlockDevices),
+	}
+	if err := h.agents.UpsertFacts(ctx, sess.HostID, in); err != nil {
+		logger.Warnf("agentgw: record facts for host %d: %v", sess.HostID, err)
+	}
+}
+
+// marshalList encodes one inventory list, rendering an empty or
+// unencodable one as [] rather than as JSON null -- valid jsonb, but a
+// second spelling of "nothing here" every reader would have to know.
+func marshalList[T any](items []T) []byte {
+	if len(items) == 0 {
+		return []byte("[]")
+	}
+	b, err := json.Marshal(items)
+	if err != nil {
+		return []byte("[]")
+	}
+	return b
 }
 
 // clockSkew returns agentClock - serverClock in milliseconds at the moment

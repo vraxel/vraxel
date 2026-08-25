@@ -6,6 +6,12 @@ info:
 tags:
   - name: AuditLog
     description: 审计日志：记录 API 写操作和认证事件
+  - name: HostNIC
+    description: 主机网卡：agent 上报，已过滤容器/网桥虚拟接口。
+  - name: HostFilesystem
+    description: 主机文件系统：真实存储挂载点，已排除 tmpfs 等伪文件系统。
+  - name: HostBlockDevice
+    description: 主机块设备：整盘，已排除分区与可移动介质。
   - name: HostMetrics
     description: 主机监控曲线：固定网格 + 派生后的图表序列，null 为该桶无数据。
   - name: Host
@@ -4036,6 +4042,33 @@ components:
           type: string
         workspaceName:
           type: string
+    HostBlockDevice:
+      type: object
+      properties:
+        model:
+          type: string
+        name:
+          type: string
+        rotational:
+          type: boolean
+        sizeBytes:
+          type: integer
+          format: int64
+    HostFilesystem:
+      type: object
+      properties:
+        device:
+          type: string
+        fstype:
+          type: string
+        mount:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        usedBytes:
+          type: integer
+          format: int64
     HostList:
       type: object
       properties:
@@ -4061,6 +4094,29 @@ components:
         stepSec:
           type: integer
           format: int
+    HostNIC:
+      type: object
+      properties:
+        ipv4:
+          type: array
+          items:
+            type: string
+        ipv6:
+          type: array
+          items:
+            type: string
+        mac:
+          type: string
+        mtu:
+          type: integer
+          format: int32
+        name:
+          type: string
+        speedMbps:
+          type: integer
+          format: int32
+        state:
+          type: string
     HostSpec:
       type: object
       properties:
@@ -4089,9 +4145,29 @@ components:
           format: int64
         arch:
           type: string
+        biosVersion:
+          type: string
+        blockDevices:
+          type: array
+          items:
+            $ref: '#/components/schemas/HostBlockDevice'
+        bootAt:
+          type: string
+          format: date-time
         connectivityMode:
           type: string
         cpuCores:
+          type: integer
+          format: int32
+        cpuCoresPerSocket:
+          type: integer
+          format: int32
+        cpuModel:
+          type: string
+        cpuSockets:
+          type: integer
+          format: int32
+        cpuThreadsPerCore:
           type: integer
           format: int32
         cpuTrend:
@@ -4122,6 +4198,13 @@ components:
           format: double
         displayName:
           type: string
+        factsReportedAt:
+          type: string
+          format: date-time
+        filesystems:
+          type: array
+          items:
+            $ref: '#/components/schemas/HostFilesystem'
         firingAlerts:
           type: array
           items:
@@ -4132,6 +4215,8 @@ components:
           type: integer
           format: int64
         ip:
+          type: string
+        kernelVersion:
           type: string
         load1:
           type: number
@@ -4161,17 +4246,31 @@ components:
         netTxBps:
           type: number
           format: double
+        nics:
+          type: array
+          items:
+            $ref: '#/components/schemas/HostNIC'
         origin:
           type: string
         os:
+          type: string
+        productName:
           type: string
         reportedPrimaryIp:
           type: string
         scope:
           type: string
+        serialNumber:
+          type: string
         sshPort:
           type: integer
           format: int32
+        systemVendor:
+          type: string
+        timezone:
+          type: string
+        virtualization:
+          type: string
         workspaceId:
           type: string
         workspaceName:
@@ -4782,6 +4881,9 @@ x-tagGroups:
       - AuditLog
   - name: compute
     tags:
+      - HostNIC
+      - HostFilesystem
+      - HostBlockDevice
       - HostMetrics
       - Host
       - AgentJoinToken

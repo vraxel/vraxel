@@ -65,6 +65,17 @@ type Host struct {
 	CreatedBy         *int64    `json:"created_by"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
+	Virtualization    string    `json:"virtualization"`
+	CpuModel          string    `json:"cpu_model"`
+	CpuSockets        int32     `json:"cpu_sockets"`
+	CpuCoresPerSocket int32     `json:"cpu_cores_per_socket"`
+	CpuThreadsPerCore int32     `json:"cpu_threads_per_core"`
+	KernelVersion     string    `json:"kernel_version"`
+	SystemVendor      string    `json:"system_vendor"`
+	ProductName       string    `json:"product_name"`
+	BiosVersion       string    `json:"bios_version"`
+	SerialNumber      string    `json:"serial_number"`
+	Timezone          string    `json:"timezone"`
 }
 
 type HostAgent struct {
@@ -131,6 +142,14 @@ type HostAlertState struct {
 	Firing        bool       `json:"firing"`
 	FiringSince   *time.Time `json:"firing_since"`
 	Value         float32    `json:"value"`
+}
+
+type HostFact struct {
+	HostID       int64           `json:"host_id"`
+	Nics         json.RawMessage `json:"nics"`
+	Filesystems  json.RawMessage `json:"filesystems"`
+	BlockDevices json.RawMessage `json:"block_devices"`
+	ReportedAt   time.Time       `json:"reported_at"`
 }
 
 type HostMetricsLatest struct {
