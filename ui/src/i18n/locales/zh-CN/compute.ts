@@ -49,6 +49,9 @@ const compute = {
   "compute.host.metrics.noData": "暂无数据",
   "compute.host.metrics.offline": "主机离线，历史指标不可用",
   "compute.host.metrics.lastSample": "最后采样",
+  "compute.host.metrics.refresh": "刷新频率",
+  "compute.host.metrics.refresh.auto": "自动",
+  "compute.host.metrics.refresh.off": "暂停",
 
   "compute.host.edit": "编辑主机",
   "compute.host.deleteConfirm": "确定要删除主机「{name}」吗？此操作不可撤销。",

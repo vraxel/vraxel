@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react"
 import { keepPreviousData } from "@tanstack/react-query"
+import { RefreshCw } from "lucide-react"
 import { formatDateTime } from "@/shared/lib/format"
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card"
 import { Button } from "@/shared/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select"
 import { Skeleton } from "@/shared/ui/skeleton"
 import { translate, useTranslation } from "@/i18n"
 import { useApiQuery } from "@/core/query/hooks"
@@ -23,6 +25,22 @@ const WINDOWS = [
 ] as const
 
 type WindowKey = (typeof WINDOWS)[number]["key"]
+
+// Refresh cadences the operator can pick. "auto" is the default and the
+// only one that reasons about the window: no faster than a bucket
+// completes, never faster than 30s (see the query below). The explicit
+// values exist for the two cases auto cannot serve -- watching a change
+// land right now, and holding a picture still to read it.
+const REFRESH_OPTIONS = [
+  { key: "auto", ms: null },
+  { key: "off", ms: 0 },
+  { key: "15s", ms: 15_000 },
+  { key: "30s", ms: 30_000 },
+  { key: "1m", ms: 60_000 },
+  { key: "5m", ms: 300_000 },
+] as const
+
+type RefreshKey = (typeof REFRESH_OPTIONS)[number]["key"]
 
 // The device dimension for network series labels. Module-level so the
 // charts memo does not close over a per-render function.
@@ -59,6 +77,8 @@ export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef 
   const { t, locale } = useTranslation()
   const [win, setWin] = useState<WindowKey>("1h")
   const preset = WINDOWS.find((w) => w.key === win) ?? WINDOWS[0]
+  const [refreshKey, setRefreshKey] = useState<RefreshKey>("auto")
+  const refreshMs = REFRESH_OPTIONS.find((r) => r.key === refreshKey)?.ms ?? null
   // Shared across all six charts, so hovering one shows the crosshair at
   // the same instant on the others -- which is how a CPU spike and the
   // disk spike that caused it get lined up by eye.
@@ -79,7 +99,10 @@ export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef 
     // Only while the agent is up: an offline host has no ring to answer
     // from, and the panel says so instead of polling into an error.
     enabled: online,
-    // No faster than a bucket completes, and never faster than 30s.
+    // "auto" (null) derives the cadence: no faster than a bucket
+    // completes, and never faster than 30s. Anything else is the
+    // operator's explicit choice, with 0 meaning paused -- which
+    // TanStack spells `false`.
     //
     // Every poll refetches the whole window to learn about its tail: at
     // 6h, two polls 30s apart differ in 6 of 361 buckets (measured --
@@ -87,12 +110,12 @@ export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef 
     // filling. Polling twice per bucket buys a partially-formed tail,
     // which is not what a six-hour trend is read for, and each one is
     // work for the managed machine's own agent since the server keeps no
-    // history.
-    //
-    // The 30s floor is the other half: at 1h the step is the agent's own
-    // 15s sample period, and matching it would double the load on the
-    // default view to shave 15s off a chart nobody reads that closely.
-    refetchInterval: Math.max(preset.stepSec * 1000, 30_000),
+    // history. The 30s floor is the other half: at 1h the step is the
+    // agent's own 15s sample period, and matching it would double the
+    // load on the default view to shave 15s off a chart nobody reads
+    // that closely.
+    refetchInterval:
+      refreshMs === null ? Math.max(preset.stepSec * 1000, 30_000) : refreshMs || false,
     // The interval already skips fetching while the tab is hidden --
     // that is the library default, not something to restate here. What
     // is NOT the default is coming back: refetchOnWindowFocus is false
@@ -100,7 +123,11 @@ export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef 
     // charts on the window the operator walked away from until the next
     // tick fired. A metrics panel that reads as live has to catch up the
     // moment it is looked at.
-    refetchOnWindowFocus: true,
+    //
+    // Paused is the exception: someone who turned refreshing off wants
+    // the picture to hold still, and having it move the instant they
+    // click back into the window is the opposite of that.
+    refetchOnWindowFocus: refreshMs !== 0,
     // Switching range mints a new key, and without this the charts fall
     // back to skeletons: six recharts instances torn down and rebuilt,
     // losing whatever series the operator had isolated. Keeping the
@@ -183,17 +210,38 @@ export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef 
     <Card>
       <CardHeader className="flex-row items-center justify-between space-y-0">
         <CardTitle className="text-base">{t("compute.host.metrics.title")}</CardTitle>
-        <div className="flex gap-1">
-          {WINDOWS.map((w) => (
-            <Button
-              key={w.key}
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1">
+            {WINDOWS.map((w) => (
+              <Button
+                key={w.key}
+                size="sm"
+                variant={w.key === win ? "secondary" : "ghost"}
+                onClick={() => setWin(w.key)}
+              >
+                {w.key}
+              </Button>
+            ))}
+          </div>
+          <Select value={refreshKey} onValueChange={(v) => setRefreshKey(v as RefreshKey)}>
+            <SelectTrigger
               size="sm"
-              variant={w.key === win ? "secondary" : "ghost"}
-              onClick={() => setWin(w.key)}
+              className="w-28"
+              aria-label={t("compute.host.metrics.refresh")}
             >
-              {w.key}
-            </Button>
-          ))}
+              <RefreshCw className={`size-3.5 ${query.isFetching ? "animate-spin" : ""}`} />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent align="end">
+              {REFRESH_OPTIONS.map((r) => (
+                <SelectItem key={r.key} value={r.key}>
+                  {r.key === "auto" || r.key === "off"
+                    ? t(`compute.host.metrics.refresh.${r.key}`)
+                    : r.key}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </CardHeader>
       <CardContent>
