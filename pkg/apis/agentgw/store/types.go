@@ -105,11 +105,19 @@ type FactsInput struct {
 	CPUCoresPerSocket int32
 	CPUThreadsPerCore int32
 	KernelVersion     string
+	OSID              string
+	OSVersionID       string
 	SystemVendor      string
 	ProductName       string
 	BIOSVersion       string
+	BIOSDate          string
+	BoardName         string
+	BoardSerial       string
+	ChassisType       string
 	SerialNumber      string
+	AssetTag          string
 	Timezone          string
+	DefaultGateway    string
 	NICs              []byte
 	Filesystems       []byte
 	BlockDevices      []byte

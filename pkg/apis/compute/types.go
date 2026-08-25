@@ -132,17 +132,42 @@ type HostSpec struct {
 	CPUCoresPerSocket int32  `json:"cpuCoresPerSocket,omitempty"`
 	CPUThreadsPerCore int32  `json:"cpuThreadsPerCore,omitempty"`
 	KernelVersion     string `json:"kernelVersion,omitempty"`
-	SystemVendor      string `json:"systemVendor,omitempty"`
-	ProductName       string `json:"productName,omitempty"`
-	BIOSVersion       string `json:"biosVersion,omitempty"`
+	// OSID and OSVersionID are /etc/os-release's ID and VERSION_ID
+	// ("debian", "13"), kept apart from the display string in OS: a fleet
+	// question is a comparison on the parts, not a substring match on the
+	// joined name.
+	OSID         string `json:"osId,omitempty"`
+	OSVersionID  string `json:"osVersionId,omitempty"`
+	SystemVendor string `json:"systemVendor,omitempty"`
+	ProductName  string `json:"productName,omitempty"`
+	BIOSVersion  string `json:"biosVersion,omitempty"`
+	// BIOSDate is the firmware build date as DMI spells it (MM/DD/YYYY):
+	// the closest thing to a hardware age this machine can answer alone.
+	BIOSDate string `json:"biosDate,omitempty"`
+	// BoardName / BoardSerial describe the motherboard, not the system.
+	// A board swap changes these and leaves SerialNumber alone.
+	BoardName   string `json:"boardName,omitempty"`
+	BoardSerial string `json:"boardSerial,omitempty"`
+	// ChassisType is the SMBIOS enclosure class collapsed to one of
+	// desktop / tower / laptop / server / rack / blade. Empty on a guest,
+	// where every hypervisor reports "Other".
+	ChassisType string `json:"chassisType,omitempty"`
 	// SerialNumber is the DMI product serial: an asset identifier on
 	// physical hardware, and a restatement of the SMBIOS UUID on a guest.
 	// The UI shows it only when Virtualization says "physical".
 	SerialNumber string `json:"serialNumber,omitempty"`
+	// AssetTag is the tag burned into SMBIOS at provisioning -- the same
+	// field NetBox and bk-cmdb ask an operator to type in, read from the
+	// machine instead.
+	AssetTag string `json:"assetTag,omitempty"`
 	// Timezone is the IANA name the machine is configured with. Worth a
 	// field of its own because a host in the wrong zone produces logs
 	// nobody can line up against anything else.
 	Timezone string `json:"timezone,omitempty"`
+	// DefaultGateway is the IPv4 next hop for 0.0.0.0/0: where on the
+	// network this machine sits, without reading its addresses against a
+	// subnet map kept somewhere else.
+	DefaultGateway string `json:"defaultGateway,omitempty"`
 	// BootAt is when the machine last booted, dated by the SERVER's clock
 	// from the uptime counter the agent reports -- so it stays right on a
 	// host whose own clock is hours out.
@@ -173,6 +198,19 @@ type HostNIC struct {
 	SpeedMbps int32  `json:"speedMbps,omitempty"`
 	MTU       int32  `json:"mtu,omitempty"`
 	State     string `json:"state,omitempty"`
+	// Duplex is "full" or "half", absent on a down link. Half duplex on a
+	// server link is a negotiation failure that reads as unexplained
+	// latency everywhere else.
+	Duplex string `json:"duplex,omitempty"`
+	// Driver is the kernel module bound to the hardware.
+	Driver string `json:"driver,omitempty"`
+	// Kind is "physical", "bond", "bridge" or "vlan". The last three have
+	// no hardware behind them and are listed anyway, because on a machine
+	// that uses them the ADDRESS is on them and not on the port beneath.
+	Kind string `json:"kind,omitempty"`
+	// Master is the aggregate this interface is enslaved to, empty when it
+	// stands alone.
+	Master string `json:"master,omitempty"`
 }
 
 // HostFilesystem is one mounted real filesystem. tmpfs and the kernel's
@@ -185,6 +223,16 @@ type HostFilesystem struct {
 	FSType    string `json:"fstype,omitempty"`
 	SizeBytes int64  `json:"sizeBytes,omitempty"`
 	UsedBytes int64  `json:"usedBytes,omitempty"`
+	// InodesTotal / InodesUsed are absent on filesystems that allocate
+	// inodes on demand (btrfs) and so have no ceiling to report. Where
+	// they are present they can run out while the byte gauge still reads
+	// half empty, and writes then fail on a disk that looks fine.
+	InodesTotal int64 `json:"inodesTotal,omitempty"`
+	InodesUsed  int64 `json:"inodesUsed,omitempty"`
+	// ReadOnly is a fault indicator, not a setting: ext4 and xfs default
+	// to errors=remount-ro, so a local filesystem that has gone read-only
+	// is a disk the kernel gave up on with services still running on it.
+	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
 // HostBlockDevice is one whole disk. Partitions and removable media are
@@ -194,7 +242,12 @@ type HostBlockDevice struct {
 	Name       string `json:"name"`
 	SizeBytes  int64  `json:"sizeBytes,omitempty"`
 	Rotational bool   `json:"rotational,omitempty"`
+	Vendor     string `json:"vendor,omitempty"`
 	Model      string `json:"model,omitempty"`
+	// Serial identifies the physical drive across chassis and controller
+	// renumbering: "sda" is a slot, this is the disk. Absent on most
+	// virtual disks, which have no identity to publish.
+	Serial string `json:"serial,omitempty"`
 }
 
 // HostAlertRuleSpec is one threshold over the heartbeat snapshot.

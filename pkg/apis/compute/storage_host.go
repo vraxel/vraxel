@@ -272,11 +272,19 @@ func hostToAPI(r *modstore.HostRow) Host {
 	h.Spec.CPUCoresPerSocket = r.CPUCoresPerSocket
 	h.Spec.CPUThreadsPerCore = r.CPUThreadsPerCore
 	h.Spec.KernelVersion = r.KernelVersion
+	h.Spec.OSID = r.OSID
+	h.Spec.OSVersionID = r.OSVersionID
 	h.Spec.SystemVendor = r.SystemVendor
 	h.Spec.ProductName = r.ProductName
 	h.Spec.BIOSVersion = r.BIOSVersion
+	h.Spec.BIOSDate = r.BIOSDate
+	h.Spec.BoardName = r.BoardName
+	h.Spec.BoardSerial = r.BoardSerial
+	h.Spec.ChassisType = r.ChassisType
 	h.Spec.SerialNumber = r.SerialNumber
+	h.Spec.AssetTag = r.AssetTag
 	h.Spec.Timezone = r.Timezone
+	h.Spec.DefaultGateway = r.DefaultGateway
 	h.Spec.BootAt = r.BootAt
 	h.Spec.FactsReportedAt = r.FactsReportedAt
 	// Same round trip as CPUTrend above: agent JSON into jsonb and out

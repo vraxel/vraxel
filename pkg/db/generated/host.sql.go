@@ -164,7 +164,7 @@ func (q *Queries) DeleteHost(ctx context.Context, arg DeleteHostParams) (DeleteH
 }
 
 const getHostByID = `-- name: GetHostByID :one
-SELECT h.id, h.name, h.display_name, h.description, h.hostname, h.os, h.arch, h.cpu_cores, h.memory_mb, h.disk_gb, h.scope, h.workspace_id, h.namespace_id, h.status, h.status_message, h.ssh_port, h.agent_port, h.monitor_status, h.monitor_message, h.log_agent_status, h.log_agent_message, h.origin, h.connectivity_mode, h.reported_ips, h.reported_primary_ip, h.primary_ip_override, h.created_by, h.created_at, h.updated_at, h.virtualization, h.cpu_model, h.cpu_sockets, h.cpu_cores_per_socket, h.cpu_threads_per_core, h.kernel_version, h.system_vendor, h.product_name, h.bios_version, h.serial_number, h.timezone,
+SELECT h.id, h.name, h.display_name, h.description, h.hostname, h.os, h.arch, h.cpu_cores, h.memory_mb, h.disk_gb, h.scope, h.workspace_id, h.namespace_id, h.status, h.status_message, h.ssh_port, h.agent_port, h.monitor_status, h.monitor_message, h.log_agent_status, h.log_agent_message, h.origin, h.connectivity_mode, h.reported_ips, h.reported_primary_ip, h.primary_ip_override, h.created_by, h.created_at, h.updated_at, h.virtualization, h.cpu_model, h.cpu_sockets, h.cpu_cores_per_socket, h.cpu_threads_per_core, h.kernel_version, h.system_vendor, h.product_name, h.bios_version, h.serial_number, h.timezone, h.os_id, h.os_version_id, h.bios_date, h.board_name, h.board_serial, h.chassis_type, h.asset_tag, h.default_gateway,
     COALESCE(NULLIF(u.display_name, ''), u.username, '') AS creator_name,
     COALESCE(NULLIF(w.display_name, ''), w.name, '') AS workspace_name,
     COALESCE(NULLIF(ns.display_name, ''), ns.name, '') AS namespace_name,
@@ -289,6 +289,14 @@ type GetHostByIDRow struct {
 	BiosVersion             string          `json:"bios_version"`
 	SerialNumber            string          `json:"serial_number"`
 	Timezone                string          `json:"timezone"`
+	OsID                    string          `json:"os_id"`
+	OsVersionID             string          `json:"os_version_id"`
+	BiosDate                string          `json:"bios_date"`
+	BoardName               string          `json:"board_name"`
+	BoardSerial             string          `json:"board_serial"`
+	ChassisType             string          `json:"chassis_type"`
+	AssetTag                string          `json:"asset_tag"`
+	DefaultGateway          string          `json:"default_gateway"`
 	CreatorName             string          `json:"creator_name"`
 	WorkspaceName           string          `json:"workspace_name"`
 	NamespaceName           string          `json:"namespace_name"`
@@ -367,6 +375,14 @@ func (q *Queries) GetHostByID(ctx context.Context, arg GetHostByIDParams) (GetHo
 		&i.BiosVersion,
 		&i.SerialNumber,
 		&i.Timezone,
+		&i.OsID,
+		&i.OsVersionID,
+		&i.BiosDate,
+		&i.BoardName,
+		&i.BoardSerial,
+		&i.ChassisType,
+		&i.AssetTag,
+		&i.DefaultGateway,
 		&i.CreatorName,
 		&i.WorkspaceName,
 		&i.NamespaceName,
@@ -424,7 +440,7 @@ func (q *Queries) HostScopeByID(ctx context.Context, id int64) (HostScopeByIDRow
 }
 
 const listHosts = `-- name: ListHosts :many
-SELECT h.id, h.name, h.display_name, h.description, h.hostname, h.os, h.arch, h.cpu_cores, h.memory_mb, h.disk_gb, h.scope, h.workspace_id, h.namespace_id, h.status, h.status_message, h.ssh_port, h.agent_port, h.monitor_status, h.monitor_message, h.log_agent_status, h.log_agent_message, h.origin, h.connectivity_mode, h.reported_ips, h.reported_primary_ip, h.primary_ip_override, h.created_by, h.created_at, h.updated_at, h.virtualization, h.cpu_model, h.cpu_sockets, h.cpu_cores_per_socket, h.cpu_threads_per_core, h.kernel_version, h.system_vendor, h.product_name, h.bios_version, h.serial_number, h.timezone,
+SELECT h.id, h.name, h.display_name, h.description, h.hostname, h.os, h.arch, h.cpu_cores, h.memory_mb, h.disk_gb, h.scope, h.workspace_id, h.namespace_id, h.status, h.status_message, h.ssh_port, h.agent_port, h.monitor_status, h.monitor_message, h.log_agent_status, h.log_agent_message, h.origin, h.connectivity_mode, h.reported_ips, h.reported_primary_ip, h.primary_ip_override, h.created_by, h.created_at, h.updated_at, h.virtualization, h.cpu_model, h.cpu_sockets, h.cpu_cores_per_socket, h.cpu_threads_per_core, h.kernel_version, h.system_vendor, h.product_name, h.bios_version, h.serial_number, h.timezone, h.os_id, h.os_version_id, h.bios_date, h.board_name, h.board_serial, h.chassis_type, h.asset_tag, h.default_gateway,
     COALESCE(NULLIF(u.display_name, ''), u.username, '') AS creator_name,
     COALESCE(NULLIF(w.display_name, ''), w.name, '') AS workspace_name,
     COALESCE(NULLIF(ns.display_name, ''), ns.name, '') AS namespace_name,
@@ -599,6 +615,14 @@ type ListHostsRow struct {
 	BiosVersion             string          `json:"bios_version"`
 	SerialNumber            string          `json:"serial_number"`
 	Timezone                string          `json:"timezone"`
+	OsID                    string          `json:"os_id"`
+	OsVersionID             string          `json:"os_version_id"`
+	BiosDate                string          `json:"bios_date"`
+	BoardName               string          `json:"board_name"`
+	BoardSerial             string          `json:"board_serial"`
+	ChassisType             string          `json:"chassis_type"`
+	AssetTag                string          `json:"asset_tag"`
+	DefaultGateway          string          `json:"default_gateway"`
 	CreatorName             string          `json:"creator_name"`
 	WorkspaceName           string          `json:"workspace_name"`
 	NamespaceName           string          `json:"namespace_name"`
@@ -688,6 +712,14 @@ func (q *Queries) ListHosts(ctx context.Context, arg ListHostsParams) ([]ListHos
 			&i.BiosVersion,
 			&i.SerialNumber,
 			&i.Timezone,
+			&i.OsID,
+			&i.OsVersionID,
+			&i.BiosDate,
+			&i.BoardName,
+			&i.BoardSerial,
+			&i.ChassisType,
+			&i.AssetTag,
+			&i.DefaultGateway,
 			&i.CreatorName,
 			&i.WorkspaceName,
 			&i.NamespaceName,

@@ -19,11 +19,19 @@ WITH scalars AS (
         cpu_cores_per_socket = @cpu_cores_per_socket,
         cpu_threads_per_core = @cpu_threads_per_core,
         kernel_version       = @kernel_version,
+        os_id                = @os_id,
+        os_version_id        = @os_version_id,
         system_vendor        = @system_vendor,
         product_name         = @product_name,
         bios_version         = @bios_version,
+        bios_date            = @bios_date,
+        board_name           = @board_name,
+        board_serial         = @board_serial,
+        chassis_type         = @chassis_type,
         serial_number        = @serial_number,
-        timezone             = @timezone
+        asset_tag            = @asset_tag,
+        timezone             = @timezone,
+        default_gateway      = @default_gateway
         -- updated_at is deliberately left alone. It means "an operator
         -- changed this record"; a machine describing itself is not that,
         -- and bumping it would make every host look edited once an hour.

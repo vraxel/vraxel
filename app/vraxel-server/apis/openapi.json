@@ -6558,9 +6558,15 @@
           "rotational": {
             "type": "boolean"
           },
+          "serial": {
+            "type": "string"
+          },
           "sizeBytes": {
             "type": "integer",
             "format": "int64"
+          },
+          "vendor": {
+            "type": "string"
           }
         }
       },
@@ -6573,8 +6579,19 @@
           "fstype": {
             "type": "string"
           },
+          "inodesTotal": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "inodesUsed": {
+            "type": "integer",
+            "format": "int64"
+          },
           "mount": {
             "type": "string"
+          },
+          "readOnly": {
+            "type": "boolean"
           },
           "sizeBytes": {
             "type": "integer",
@@ -6626,6 +6643,12 @@
       "HostNIC": {
         "type": "object",
         "properties": {
+          "driver": {
+            "type": "string"
+          },
+          "duplex": {
+            "type": "string"
+          },
           "ipv4": {
             "type": "array",
             "items": {
@@ -6638,7 +6661,13 @@
               "type": "string"
             }
           },
+          "kind": {
+            "type": "string"
+          },
           "mac": {
+            "type": "string"
+          },
+          "master": {
             "type": "string"
           },
           "mtu": {
@@ -6695,6 +6724,12 @@
           "arch": {
             "type": "string"
           },
+          "assetTag": {
+            "type": "string"
+          },
+          "biosDate": {
+            "type": "string"
+          },
           "biosVersion": {
             "type": "string"
           },
@@ -6704,9 +6739,18 @@
               "$ref": "#/components/schemas/HostBlockDevice"
             }
           },
+          "boardName": {
+            "type": "string"
+          },
+          "boardSerial": {
+            "type": "string"
+          },
           "bootAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "chassisType": {
+            "type": "string"
           },
           "connectivityMode": {
             "type": "string"
@@ -6742,6 +6786,9 @@
             "format": "double"
           },
           "createdByName": {
+            "type": "string"
+          },
+          "defaultGateway": {
             "type": "string"
           },
           "description": {
@@ -6846,6 +6893,12 @@
             "type": "string"
           },
           "os": {
+            "type": "string"
+          },
+          "osId": {
+            "type": "string"
+          },
+          "osVersionId": {
             "type": "string"
           },
           "productName": {

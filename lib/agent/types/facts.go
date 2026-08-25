@@ -37,14 +37,58 @@ type HostFacts struct {
 	// and far more useful: patch compliance is decided by the kernel, not
 	// by the release name.
 	KernelVersion string `json:"kernelVersion,omitempty"`
-	SystemVendor  string `json:"systemVendor,omitempty"`
-	ProductName   string `json:"productName,omitempty"`
-	BIOSVersion   string `json:"biosVersion,omitempty"`
+	// OSID and OSVersionID are /etc/os-release's ID and VERSION_ID --
+	// "debian" and "13" -- kept apart from the display string the hello
+	// carries ("Debian GNU/Linux 13"). A fleet question is asked against
+	// the parts: "everything still on EL8" is a comparison on two fields
+	// and a substring match on the joined string, and the substring match
+	// is wrong the first time somebody ships a distro whose name contains
+	// a digit.
+	OSID        string `json:"osId,omitempty"`
+	OSVersionID string `json:"osVersionId,omitempty"`
+	// No os-bit field, though both CMDBs carry one. It is a function of
+	// Arch, which the hello already reports: x86_64 and aarch64 are 64,
+	// i686 and armv7l are 32. A second column restating the first is a
+	// column that can disagree with it.
+	SystemVendor string `json:"systemVendor,omitempty"`
+	ProductName  string `json:"productName,omitempty"`
+	BIOSVersion  string `json:"biosVersion,omitempty"`
+	// BIOSDate is the firmware's build date as DMI spells it (MM/DD/YYYY),
+	// passed through rather than parsed: it is displayed, never compared,
+	// and a vendor who ships a malformed date should not cost a field.
+	// The closest thing to a warranty age this machine can answer by
+	// itself, which is what bk-cmdb's hand-entered bk_service_term is for.
+	BIOSDate string `json:"biosDate,omitempty"`
+	// BoardName and BoardSerial describe the motherboard, which is not the
+	// system. On a whitebox the system vendor is the integrator and the
+	// board is the only place the actual hardware generation is written;
+	// on any machine a board swap changes BoardSerial and leaves
+	// SerialNumber (the chassis asset) alone, which is exactly the event a
+	// hardware inventory exists to notice.
+	BoardName   string `json:"boardName,omitempty"`
+	BoardSerial string `json:"boardSerial,omitempty"`
+	// ChassisType is one of the Chassis* constants: the SMBIOS enclosure
+	// class, translated here so nothing downstream carries a copy of table
+	// 17. Meaningless on a guest, where every hypervisor reports "Other".
+	ChassisType string `json:"chassisType,omitempty"`
 	// SerialNumber is the DMI product serial. Meaningful on physical
 	// hardware; on a guest it is a restatement of the SMBIOS UUID, which
 	// is why the UI shows it only when Virtualization is VirtPhysical.
 	SerialNumber string `json:"serialNumber,omitempty"`
-	Timezone     string `json:"timezone,omitempty"`
+	// AssetTag is the tag an operator burned into SMBIOS at provisioning.
+	// The one asset-management field on this struct that a machine can
+	// answer about itself -- NetBox's asset_tag and bk-cmdb's bk_asset_id
+	// are the same field, typed in by hand -- so where it is set it should
+	// never be typed in again.
+	AssetTag string `json:"assetTag,omitempty"`
+	Timezone string `json:"timezone,omitempty"`
+	// DefaultGateway is the IPv4 next hop for 0.0.0.0/0. It answers where
+	// on the network this machine sits, which is otherwise inferred by
+	// eyeballing NIC addresses against a subnet map somebody keeps
+	// elsewhere. IPv4 only: the v6 default route lives in a different
+	// procfs file with a different format, and no operator has yet asked
+	// which of two answers is "the" gateway.
+	DefaultGateway string `json:"defaultGateway,omitempty"`
 
 	// No uptime or boot time here, though the detail page shows one. It
 	// already arrives on every hello inside MachineFingerprint, where the
@@ -76,8 +120,34 @@ const (
 	VirtUnknown    = "unknown"
 )
 
-// NIC is one network interface that belongs to the machine. Virtual
-// plumbing (veth, docker0, bridges) is filtered out at collection --
+// Chassis values, collapsed from SMBIOS table 17's 36 enclosure types to
+// the six a datacentre distinguishes. The source enum separates "Mini
+// Tower" from "Tower" and "Blade" from "Blade Enclosure"; nobody operates
+// differently on either split, and every extra value is one more the UI
+// has to name in two languages. Anything outside these groups reports
+// empty rather than a guess, since "Other" is what every hypervisor says.
+const (
+	ChassisDesktop = "desktop"
+	ChassisTower   = "tower"
+	ChassisLaptop  = "laptop"
+	ChassisServer  = "server"
+	ChassisRack    = "rack"
+	ChassisBlade   = "blade"
+)
+
+// NIC kinds. Physical is the only one with hardware behind it; the other
+// three are the kernel's own devices, and they are in this list because
+// on a machine that uses them the ADDRESS is on them and not on the
+// hardware underneath.
+const (
+	NICPhysical = "physical"
+	NICBond     = "bond"
+	NICBridge   = "bridge"
+	NICVLAN     = "vlan"
+)
+
+// NIC is one network interface that belongs to the machine. Container and
+// bridge plumbing (veth, docker0, cni) is filtered out at collection --
 // see RealNetDevice.
 type NIC struct {
 	Name string `json:"name"`
@@ -92,6 +162,20 @@ type NIC struct {
 	SpeedMbps int32  `json:"speedMbps,omitempty"`
 	MTU       int32  `json:"mtu,omitempty"`
 	State     string `json:"state,omitempty"`
+	// Duplex is "full" or "half". Half duplex on a server link is a
+	// negotiation failure that shows up as latency nobody can explain,
+	// and it is invisible in every other view of the machine.
+	Duplex string `json:"duplex,omitempty"`
+	// Driver is the kernel module bound to the hardware (e1000, mlx5_core,
+	// virtio_net). The first question asked about a misbehaving NIC.
+	Driver string `json:"driver,omitempty"`
+	// Kind is one of the NIC* constants.
+	Kind string `json:"kind,omitempty"`
+	// Master is the aggregate this interface is enslaved to, empty when it
+	// stands alone. Without it a bonded machine reads as two idle NICs
+	// with no addresses beside a bond that holds every address, and
+	// nothing on the page says the three are one link.
+	Master string `json:"master,omitempty"`
 }
 
 // Filesystem is one mounted real filesystem.
@@ -101,6 +185,18 @@ type Filesystem struct {
 	FSType    string `json:"fstype,omitempty"`
 	SizeBytes int64  `json:"sizeBytes,omitempty"`
 	UsedBytes int64  `json:"usedBytes,omitempty"`
+	// InodesTotal / InodesUsed come from the same statfs that sizes the
+	// filesystem. A tree of small files exhausts inodes while the byte
+	// gauge still reads half empty, and writes then fail with ENOSPC on a
+	// disk every dashboard calls fine.
+	InodesTotal int64 `json:"inodesTotal,omitempty"`
+	InodesUsed  int64 `json:"inodesUsed,omitempty"`
+	// ReadOnly is the mount's rw/ro flag, and on the local filesystems
+	// that survive RealFSType it is a fault indicator rather than a
+	// setting: ext4 and xfs default to errors=remount-ro, so a root
+	// filesystem that has gone read-only is a disk the kernel gave up on
+	// while every service on top of it is still running.
+	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
 // BlockDevice is one whole disk, partitions excluded.
@@ -110,7 +206,13 @@ type BlockDevice struct {
 	// Rotational separates spinning rust from SSD/NVMe. A hypervisor lies
 	// about this as often as not, which is worth knowing in itself.
 	Rotational bool   `json:"rotational,omitempty"`
+	Vendor     string `json:"vendor,omitempty"`
 	Model      string `json:"model,omitempty"`
+	// Serial identifies the physical disk across chassis and controller
+	// renumbering: sda is a slot, this is the drive. It is what makes a
+	// failed-disk record still mean something after the replacement boots
+	// and takes the same name. Absent on most virtual disks.
+	Serial string `json:"serial,omitempty"`
 }
 
 // notLocalStorage are the filesystem types that are not this machine's
