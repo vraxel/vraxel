@@ -174,8 +174,10 @@ func nics() []agenttypes.NIC {
 		if m := sysInt(dir, "mtu"); m > 0 {
 			n.MTU = int32(m)
 		}
-		// Both files return EINVAL rather than a value on a down link, so
-		// an interface that is not up simply has neither.
+		// duplex reads EINVAL on a down link, the same as speed above, so
+		// a link that is not up simply has none. Matched against the two
+		// values the kernel defines rather than passed through: it also
+		// spells "unknown", which would render as a duplex mode.
 		if d := sysStr(dir, "duplex"); d == "full" || d == "half" {
 			n.Duplex = d
 		}
@@ -277,8 +279,11 @@ func filesystems() []agenttypes.Filesystem {
 		}
 		var st syscall.Statfs_t
 		// Statfs blocks forever on a wedged NFS mount. Not guarded here
-		// because parseMounts already dropped everything that is not a
-		// /dev/ device, and a local block device does not wedge a statfs.
+		// because parseMounts rejects every network filesystem BY TYPE
+		// before this line is reached, and a local block device does not
+		// wedge a statfs. (This used to say "everything that is not a
+		// /dev/ device", which was the older rule -- and the one that
+		// dropped ZFS, whose source names a pool.)
 		if err := syscall.Statfs(m.mount, &st); err == nil && st.Bsize > 0 {
 			bs := int64(st.Bsize)
 			fs.SizeBytes = int64(st.Blocks) * bs
@@ -326,7 +331,7 @@ func blockDevices() []agenttypes.BlockDevice {
 		d := agenttypes.BlockDevice{
 			Name:       e.Name(),
 			Rotational: sysInt(filepath.Join(dir, "queue"), "rotational") == 1,
-			Vendor:     sysStr(devDir, "vendor"),
+			Vendor:     diskVendor(sysStr(devDir, "vendor")),
 			Model:      sysStr(devDir, "model"),
 			// NVMe publishes the drive serial directly; SCSI and SATA
 			// publish the VPD identifier instead, and wwid is where the

@@ -288,3 +288,21 @@ HOME_URL="https://www.debian.org/"
 		t.Errorf("id = %q, want rocky", id)
 	}
 }
+
+// The SCSI INQUIRY vendor field is 8 bytes, so a longer name arrives cut
+// off wherever byte 8 lands -- "VMware, Inc." as "VMware, ". Only the
+// dangling separator goes; a name that fits is untouched.
+func TestDiskVendor(t *testing.T) {
+	for in, want := range map[string]string{
+		"VMware, ": "VMware",
+		"VMware,":  "VMware",
+		"ATA     ": "ATA",
+		"SEAGATE":  "SEAGATE",
+		"DELL":     "DELL",
+		"":         "",
+	} {
+		if got := diskVendor(in); got != want {
+			t.Errorf("diskVendor(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

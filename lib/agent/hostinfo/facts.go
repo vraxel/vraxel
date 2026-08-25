@@ -212,6 +212,18 @@ func hasMountOption(opts, want string) bool {
 	return false
 }
 
+// diskVendor cleans up the SCSI INQUIRY vendor field.
+//
+// That field is exactly 8 bytes, space padded, so a vendor whose name is
+// longer arrives cut off wherever byte 8 falls. VMware's "VMware, Inc."
+// lands as "VMware, " and renders as a typo in a table. A trailing comma
+// can only be the separator of a name that was truncated after it -- no
+// vendor's name ends in one -- so dropping it recovers the name rather
+// than editing it.
+func diskVendor(v string) string {
+	return strings.TrimRight(v, " ,")
+}
+
 // chassisTypes maps the SMBIOS enclosure enum (DSP0134 table 17) onto the
 // Chassis* groups. Only the values a server room contains are listed:
 // everything else -- and every hypervisor, which reports 1 "Other" --
