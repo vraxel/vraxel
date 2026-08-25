@@ -139,12 +139,16 @@ export function HostDiskCell({ spec }: { spec: Host["spec"] }) {
   const total = spec.diskTotalBytes
   const stale = isStale(spec.metricsSampledAt)
   // The agent sums used/total across the same real filesystems that
-  // decide diskUsedPct (each device counted once), so the percentage
-  // displayed here is the host's overall disk pressure, not the single
-  // fullest mount. Old agents that do not report these fields render
-  // the percentage alone, which is what they always did.
+  // decide diskUsedPct (each device counted once), so with the pair in
+  // hand the percentage shown is the host's overall disk pressure rather
+  // than its single fullest mount.
+  //
+  // Without it, fall back to diskUsedPct. An agent older than those two
+  // fields still reports that one, and it is the whole disk column for
+  // such a host -- dropping it left the cell reading "-" on a machine
+  // that was reporting its disk perfectly well.
   const hasPair = typeof used === "number" && typeof total === "number" && total > 0
-  const pct = hasPair ? (used / total) * 100 : undefined
+  const pct = hasPair ? (used / total) * 100 : spec.diskUsedPct
   const amount = hasPair ? `${gibBytes(used)} / ${gibBytes(total)} GiB` : undefined
   return <UtilGauge amount={amount} value={pct} stale={stale} />
 }
