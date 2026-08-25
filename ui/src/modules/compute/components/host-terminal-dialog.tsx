@@ -87,6 +87,12 @@ export function HostTerminalDialog({
     let resizeObserver: ResizeObserver | null = null
     let onWindowResize: (() => void) | null = null
     const disposables: { dispose: () => void }[] = []
+    // The socket is created after an await, so the dialog can close
+    // before it exists. Without this the cleanup finds `socket` still
+    // null, skips it, and the connection opens afterwards with nobody
+    // left to close it -- a PTY held on a real machine until the
+    // server's idle timer reaps it.
+    let cancelled = false
 
     // Deferred to the next frame rather than run inline: the container is
     // in the DOM by now but has not been laid out, so fitting here would
@@ -115,7 +121,7 @@ export function HostTerminalDialog({
       // auto-refresh on 401, but a WebSocket upgrade has no such path.
       const localTerminal = terminal
       refreshTokenOnce().finally(() => {
-        if (!localTerminal) return
+        if (cancelled) return
         socket = new WebSocket(
           terminalUrl({ ws: scopeWs, ns: scopeNs }, hostId, localTerminal.cols, localTerminal.rows),
         )
@@ -202,6 +208,7 @@ export function HostTerminalDialog({
     })
 
     return () => {
+      cancelled = true
       cancelAnimationFrame(frame)
       if (onWindowResize) window.removeEventListener("resize", onWindowResize)
       resizeObserver?.disconnect()
