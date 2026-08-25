@@ -350,9 +350,7 @@ export function HostNetworkTab({ host }: { host: Host }) {
                       so it is called out; full is the expected case and is
                       left quiet. */}
                   {n.duplex === "half" && (
-                    <div className="text-warning text-xs">
-                      {t("compute.host.nic.duplexHalf")}
-                    </div>
+                    <div className="text-warning text-xs">{t("compute.host.nic.duplexHalf")}</div>
                   )}
                   {n.duplex === "full" && (
                     <div className="text-muted-foreground text-xs">

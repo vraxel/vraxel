@@ -198,7 +198,8 @@ const compute = {
   "compute.host.fs.usage": "使用量",
   "compute.host.fs.inodes": "Inode",
   "compute.host.fs.readOnly": "只读",
-  "compute.host.fs.readOnlyHint": "文件系统已只读挂载。ext4/xfs 默认 errors=remount-ro，通常意味着内核在此盘上遇到错误后主动降级。",
+  "compute.host.fs.readOnlyHint":
+    "文件系统已只读挂载。ext4/xfs 默认 errors=remount-ro，通常意味着内核在此盘上遇到错误后主动降级。",
 
   // agent status
   "compute.agent.online": "在线",
