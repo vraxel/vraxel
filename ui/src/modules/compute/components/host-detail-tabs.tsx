@@ -17,21 +17,27 @@ import type { Host } from "@/modules/compute/api/types"
 // host object and take no callbacks.
 
 /** One label/value pair. Empty renders "-" rather than collapsing, so a
- *  field that has not been reported keeps its place and its label. */
+ *  field that has not been reported keeps its place and its label.
+ *
+ *  wide takes two of the four columns, for values that would truncate in
+ *  one (a CPU model, a UUID); full takes the row, for free text. */
 function Field({
   label,
   value,
   mono,
-  span,
+  wide,
+  full,
 }: {
   label: string
   value?: ReactNode
   mono?: boolean
-  span?: boolean
+  wide?: boolean
+  full?: boolean
 }) {
   const empty = value === undefined || value === null || value === ""
+  const span = full ? "col-span-2 lg:col-span-4" : wide ? "col-span-2" : ""
   return (
-    <div className={`min-w-0 ${span ? "col-span-2" : ""}`}>
+    <div className={`min-w-0 ${span}`}>
       <dt className="text-muted-foreground text-xs">{label}</dt>
       <dd
         className={`truncate ${mono ? "font-mono text-xs" : "text-sm"}`}
@@ -43,6 +49,18 @@ function Field({
   )
 }
 
+/**
+ * A full-width card of label/value pairs, four across on a wide screen.
+ *
+ * Full width and stacked rather than two cards side by side, which is
+ * what this page did first: a CSS grid gives its cells a common row
+ * height, so the shorter card inherits the taller one's and the
+ * difference becomes dead space inside it (measured at 148px between an
+ * 11-field card and a 5-field one). Stacking removes the coupling
+ * entirely -- each card is as tall as its own content, whatever gets
+ * added to its neighbour later -- and four columns is what pays for the
+ * width, since these values are "amd64", "4", "6.00".
+ */
 function InfoCard({ title, children }: { title: string; children: ReactNode }) {
   return (
     <Card>
@@ -50,7 +68,7 @@ function InfoCard({ title, children }: { title: string; children: ReactNode }) {
         <CardTitle className="text-base">{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-3">{children}</dl>
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-3 lg:grid-cols-4">{children}</dl>
       </CardContent>
     </Card>
   )
@@ -81,78 +99,18 @@ function barTone(pct: number): string {
   return "bg-primary"
 }
 
-/** Overview: how loaded the machine is, then what the record says. */
+/**
+ * Overview: how loaded the machine is, then everything it IS.
+ *
+ * All 25 scalar fields on one tab, because they fit: four across on a
+ * wide screen this is three cards and about one screen, and splitting
+ * them earlier bought a second tab click in exchange for a panel that
+ * used 349px of an 830px viewport. Tabs earn their place here only for
+ * the inventory TABLES, which a real server can fill with a dozen disks
+ * and twenty mounts, and for the metrics panel, which is expensive to
+ * mount.
+ */
 export function HostOverviewTab({ host }: { host: Host }) {
-  const { t } = useTranslation()
-  const s = host.spec
-
-  return (
-    <div className="space-y-4">
-      {/* The same three gauges the list sorts on, at the top of the page
-          an operator opened to answer "how is this host doing". Same
-          component as the list cells, so the reading and its colour
-          cannot drift between the two views. */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <GaugeCard label={t("compute.host.cpu")}>
-          <HostCpuCell spec={s} wide />
-        </GaugeCard>
-        <GaugeCard label={t("compute.host.memory")}>
-          <HostMemCell spec={s} wide />
-        </GaugeCard>
-        <GaugeCard label={t("compute.host.disk")}>
-          <HostDiskCell spec={s} wide />
-        </GaugeCard>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <InfoCard title={t("compute.host.basicInfo")}>
-          <Field label={t("compute.host.ip")} value={s.reportedPrimaryIp} mono />
-          <Field label={t("compute.host.hostname")} value={s.hostname} />
-          <Field label={t("compute.host.os")} value={s.os} />
-          <Field label={t("compute.host.kernel")} value={s.kernelVersion} mono />
-          <Field label={t("compute.host.arch")} value={s.arch} />
-          <Field label={t("compute.host.timezone")} value={s.timezone} />
-          <Field
-            label={t("compute.host.origin")}
-            value={
-              s.origin === "agent" ? t("compute.host.originAgent") : t("compute.host.originManual")
-            }
-          />
-          <Field label={t("compute.host.bootAt")} value={formatDateTime(s.bootAt)} />
-          <Field label={t("common.createdBy")} value={s.createdByName} />
-          <Field label={t("common.created")} value={formatDateTime(host.metadata.createdAt)} />
-          <Field label={t("common.description")} value={s.description} span />
-        </InfoCard>
-
-        <InfoCard title={t("compute.host.agentSession")}>
-          <Field label={t("compute.host.agentVersion")} value={s.agentVersion} />
-          <Field label={t("compute.host.agentId")} value={s.agentId} mono />
-          <Field label={t("compute.host.connectedAt")} value={formatDateTime(s.agentConnectedAt)} />
-          <Field label={t("compute.host.lastSeenAt")} value={formatDateTime(s.agentLastSeenAt)} />
-          <Field
-            label={t("compute.host.factsReportedAt")}
-            value={formatDateTime(s.factsReportedAt)}
-            span
-          />
-        </InfoCard>
-      </div>
-    </div>
-  )
-}
-
-function GaugeCard({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <Card>
-      <CardContent className="space-y-2 p-4">
-        <p className="text-muted-foreground text-sm">{label}</p>
-        {children}
-      </CardContent>
-    </Card>
-  )
-}
-
-/** Hardware: what the machine is made of, and what it runs on. */
-export function HostHardwareTab({ host }: { host: Host }) {
   const { t } = useTranslation()
   const s = host.spec
 
@@ -175,24 +133,53 @@ export function HostHardwareTab({ host }: { host: Host }) {
   const physical = s.virtualization === "physical"
 
   return (
-    <div className="grid gap-4 md:grid-cols-2">
-      <InfoCard title={t("compute.host.cpu")}>
-        <Field label={t("compute.host.cpuModel")} value={s.cpuModel} span />
+    <div className="space-y-4">
+      {/* The same three gauges the list sorts on, at the top of the page
+          an operator opened to answer "how is this host doing". Same
+          component as the list cells, so the reading and its colour
+          cannot drift between the two views. */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <GaugeCard label={t("compute.host.cpu")}>
+          <HostCpuCell spec={s} wide />
+        </GaugeCard>
+        <GaugeCard label={t("compute.host.memory")}>
+          <HostMemCell spec={s} wide />
+        </GaugeCard>
+        <GaugeCard label={t("compute.host.disk")}>
+          <HostDiskCell spec={s} wide />
+        </GaugeCard>
+      </div>
+
+      <InfoCard title={t("compute.host.basicInfo")}>
+        <Field label={t("compute.host.ip")} value={s.reportedPrimaryIp} mono />
+        <Field label={t("compute.host.hostname")} value={s.hostname} />
+        <Field label={t("compute.host.os")} value={s.os} wide />
+        <Field label={t("compute.host.kernel")} value={s.kernelVersion} mono />
+        <Field label={t("compute.host.arch")} value={s.arch} />
+        <Field label={t("compute.host.timezone")} value={s.timezone} />
+        <Field
+          label={t("compute.host.origin")}
+          value={
+            s.origin === "agent" ? t("compute.host.originAgent") : t("compute.host.originManual")
+          }
+        />
+        <Field label={t("compute.host.bootAt")} value={formatDateTime(s.bootAt)} />
+        <Field label={t("common.createdBy")} value={s.createdByName} />
+        <Field label={t("common.created")} value={formatDateTime(host.metadata.createdAt)} />
+        <Field label={t("common.description")} value={s.description} full />
+      </InfoCard>
+
+      <InfoCard title={t("compute.host.hardware")}>
+        <Field label={t("compute.host.cpuModel")} value={s.cpuModel} wide />
         <Field
           label={t("compute.host.logicalCpus")}
           value={s.cpuCores ? `${s.cpuCores}` : undefined}
         />
         <Field label={t("compute.host.cpuTopology")} value={topology} />
-      </InfoCard>
-
-      <InfoCard title={t("compute.host.memory")}>
         <Field
           label={t("compute.host.memoryTotal")}
           value={s.memoryMb ? bytes(s.memoryMb * 1024 * 1024) : undefined}
         />
-      </InfoCard>
-
-      <InfoCard title={t("compute.host.platform")}>
         <Field
           label={t("compute.host.virtualization")}
           value={s.virtualization ? <VirtBadge value={s.virtualization} /> : undefined}
@@ -200,9 +187,33 @@ export function HostHardwareTab({ host }: { host: Host }) {
         <Field label={t("compute.host.systemVendor")} value={s.systemVendor} />
         <Field label={t("compute.host.productName")} value={s.productName} />
         <Field label={t("compute.host.biosVersion")} value={s.biosVersion} />
-        {physical && <Field label={t("compute.host.serialNumber")} value={s.serialNumber} mono />}
+        {physical && (
+          <Field label={t("compute.host.serialNumber")} value={s.serialNumber} wide mono />
+        )}
+      </InfoCard>
+
+      <InfoCard title={t("compute.host.agentSession")}>
+        <Field label={t("compute.host.agentVersion")} value={s.agentVersion} />
+        <Field label={t("compute.host.agentId")} value={s.agentId} wide mono />
+        <Field label={t("compute.host.connectedAt")} value={formatDateTime(s.agentConnectedAt)} />
+        <Field label={t("compute.host.lastSeenAt")} value={formatDateTime(s.agentLastSeenAt)} />
+        <Field
+          label={t("compute.host.factsReportedAt")}
+          value={formatDateTime(s.factsReportedAt)}
+        />
       </InfoCard>
     </div>
+  )
+}
+
+function GaugeCard({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <Card>
+      <CardContent className="space-y-2 p-4">
+        <p className="text-muted-foreground text-sm">{label}</p>
+        {children}
+      </CardContent>
+    </Card>
   )
 }
 
