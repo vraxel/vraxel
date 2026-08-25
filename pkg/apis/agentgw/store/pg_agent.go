@@ -433,6 +433,32 @@ func (s *pgAgentStore) UpsertFacts(ctx context.Context, hostID int64, in FactsIn
 	return nil
 }
 
+// UpsertProcesses overwrites the host's workload snapshot.
+func (s *pgAgentStore) UpsertProcesses(ctx context.Context, hostID int64, groups []byte) error {
+	err := s.Q().UpsertHostProcesses(ctx, generated.UpsertHostProcessesParams{
+		HostID: hostID,
+		Groups: emptyArray(groups),
+	})
+	if err != nil {
+		return fmt.Errorf("upsert host processes: %w", err)
+	}
+	return nil
+}
+
+// UpsertAccounts overwrites the host's account inventory.
+func (s *pgAgentStore) UpsertAccounts(ctx context.Context, hostID int64, in AccountsInput) error {
+	err := s.Q().UpsertHostAccounts(ctx, generated.UpsertHostAccountsParams{
+		HostID:    hostID,
+		Users:     emptyArray(in.Users),
+		Groups:    emptyArray(in.Groups),
+		SudoRules: emptyArray(in.SudoRules),
+	})
+	if err != nil {
+		return fmt.Errorf("upsert host accounts: %w", err)
+	}
+	return nil
+}
+
 // emptyArray keeps a nil slice out of a NOT NULL jsonb column, where it
 // would be written as SQL NULL rather than as the empty list it means.
 func emptyArray(b []byte) []byte {

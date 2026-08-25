@@ -28,7 +28,7 @@ type hostOps struct {
 // fields, so a partial update of it is the same request as a full one,
 // and a host is deleted one at a time because deleting it detaches a
 // machine that is probably still running.
-func HostsDef(store modstore.HostStore, agentHosts modstore.AgentHostStore, agents agentgw.AgentStore, hub *statushub.Hub, terminals *ws.SessionManager, dialer *AgentDialerHolder, metricsBackend MetricsBackend) apiserver.ResourceDef[Host] {
+func HostsDef(store modstore.HostStore, agentHosts modstore.AgentHostStore, agents agentgw.AgentStore, hub *statushub.Hub, terminals *ws.SessionManager, dialer *AgentDialerHolder, metricsBackend MetricsBackend, runtime modstore.HostRuntimeStore) apiserver.ResourceDef[Host] {
 	o := hostOps{store: store}
 	m := hostMergeOps{hosts: store, agentHosts: agentHosts, agents: agents}
 	metrics := hostMetricsOps{hosts: store, backend: metricsBackend}
@@ -51,6 +51,12 @@ func HostsDef(store modstore.HostStore, agentHosts modstore.AgentHostStore, agen
 			// permission code, reading utilisation curves is exactly what
 			// "may read this host's details" should cover.
 			apiserver.VerbAny("metrics", metrics.series),
+			// Under compute:hosts:get too, and for the same reason: what
+			// a machine runs is the same class of fact as how loaded it
+			// is. Its sibling read, accounts, is registered separately
+			// because who can log in is NOT that class -- see
+			// storage_host_runtime.go.
+			apiserver.VerbAny("processes", hostRuntimeOps{hosts: store, runtime: runtime}.processes),
 		},
 		Actions: []apiserver.ActionDef{
 			// On the collection, and borrowing the collection's own

@@ -1,0 +1,188 @@
+package types
+
+// This file is the wire contract for what the machine is DOING, as
+// opposed to HostFacts, which is what the machine IS.
+//
+// The distinction is load-bearing, and it is the reason these are
+// separate frames rather than more fields on HostFacts. Facts sit still:
+// a CPU model does not change, so the agent can compare a report against
+// the last one it sent and stay silent, and the whole struct is built
+// around that gate. Runtime data does change -- and the design problem
+// for every field below was making it change ONLY when something an
+// operator would call a change actually happened.
+
+// HostProcesses is the machine's workload.
+//
+// Grouped, never per-process, and carrying no PID. Both follow from the
+// reporting cadence: this arrives minutes apart, so a PID printed in a
+// table is near-certainly stale by the time somebody reads it -- the same
+// reason HostFacts carries no uptime. Dropping it is not a loss of
+// detail, it is the removal of a field that could only ever mislead.
+//
+// Dropping it also makes the send-only-when-changed gate work at all.
+// With PIDs, restarting one service rewrites every row that follows it
+// and the agent would ship the whole table; grouped by identity, a
+// restart produces a byte-identical report and nothing is sent. It bounds
+// the payload too: the size follows the number of DISTINCT workloads, not
+// the process count, so a machine running 400 nginx workers reports one
+// row rather than four hundred.
+type HostProcesses struct {
+	Groups []ProcessGroup `json:"groups,omitempty"`
+}
+
+// ProcessGroup is one workload: every process sharing an identity,
+// counted.
+type ProcessGroup struct {
+	// Name is the executable name (/proc/pid/comm), truncated to 15
+	// characters by the kernel -- "victoria-metric", not
+	// "victoria-metrics". Passed through as the kernel reports it rather
+	// than reconstructed from the command line, which is not collected.
+	Name string `json:"name"`
+	// User is the effective user's name, or its numeric uid when the
+	// machine has no passwd entry for it (every container process whose
+	// uid exists only inside the image).
+	User  string `json:"user,omitempty"`
+	Count int32  `json:"count"`
+	// Unit is the systemd unit this workload belongs to, from its cgroup
+	// path. This is where a workload's IDENTITY comes from, and taking it
+	// from the supervisor rather than from the command line is deliberate:
+	// a command line routinely carries credentials (mysql -pSECRET, a
+	// --token= flag), and a CMDB table that many people can read must not
+	// be able to leak one. The cost is that two bare-shell java processes
+	// are indistinguishable; production does not run that way.
+	Unit string `json:"unit,omitempty"`
+	// Container is true when the cgroup names a container scope rather
+	// than a unit. The container's NAME is not here: the cgroup carries
+	// only its 64-hex id, and resolving that means either talking to a
+	// container daemon or reading its private state files.
+	Container bool `json:"container,omitempty"`
+	// Ports are the sockets this workload listens on -- the answer to
+	// "what does this machine serve", which nothing else in the platform
+	// can give. Empty for the workloads that only make outbound
+	// connections, which is most of them and is exactly why the process
+	// list is not filtered down to listeners.
+	Ports []ListenPort `json:"ports,omitempty"`
+}
+
+// ListenPort is one listening socket.
+type ListenPort struct {
+	// Proto is "tcp" or "udp". The v4/v6 split is not here because Addr
+	// already carries it: 0.0.0.0 and :: are different bindings, and a
+	// separate "tcp6" would say the same thing twice.
+	Proto string `json:"proto"`
+	Addr  string `json:"addr,omitempty"`
+	Port  int32  `json:"port"`
+}
+
+// HostAccounts is who can use the machine, and what they can do on it.
+//
+// Nothing here is a secret and nothing here may become one. The shadow
+// file is read to learn the SHAPE of a password field -- set, locked,
+// absent -- and the hash itself never leaves the machine. Authorized keys
+// are reported as fingerprints, which is the form anyone actually
+// compares against.
+type HostAccounts struct {
+	Users  []Account   `json:"users,omitempty"`
+	Groups []UserGroup `json:"groups,omitempty"`
+	// SudoRules are the non-comment, non-Defaults lines of /etc/sudoers
+	// and whatever it includes, verbatim.
+	//
+	// Verbatim because sudoers has a real grammar -- aliases, host specs,
+	// Runas lists, NOPASSWD, command sets -- and a parser that understands
+	// most of it produces confident wrong answers about who can become
+	// root, which is worse than no answer. What IS extracted is the who
+	// field, which is unambiguous, and it lands in Account.Privileges. The
+	// rest is put in front of a human unaltered.
+	SudoRules []string `json:"sudoRules,omitempty"`
+}
+
+// Account is one entry of /etc/passwd, with what the machine knows about
+// what it can do.
+type Account struct {
+	Name string `json:"name"`
+	// int64, not int32: a uid is an unsigned 32-bit value and the
+	// conventional "nobody" on several systems is 4294967294, which
+	// overflows a signed 32-bit field into a negative user id.
+	UID   int64  `json:"uid"`
+	GID   int64  `json:"gid"`
+	Group string `json:"group,omitempty"`
+	Home  string `json:"home,omitempty"`
+	Shell string `json:"shell,omitempty"`
+	// CanLogin is false for the nologin / false shells that most of a
+	// passwd file carries. It is what separates the two or three accounts
+	// a person could log into from the twenty-odd a package manager made.
+	CanLogin bool `json:"canLogin,omitempty"`
+	// Password is one of the Pw* constants: the shape of the shadow
+	// field, never its content.
+	Password string `json:"password,omitempty"`
+	// Groups are the supplementary groups naming this account.
+	Groups []string `json:"groups,omitempty"`
+	// Privileges names every route this account has to root, empty for an
+	// ordinary one. See the Priv* constants -- there is more than one
+	// route, and only the first is visible in /etc/passwd.
+	Privileges []string `json:"privileges,omitempty"`
+	SSHKeys    []SSHKey `json:"sshKeys,omitempty"`
+}
+
+// UserGroup is one entry of /etc/group.
+type UserGroup struct {
+	Name string `json:"name"`
+	GID  int64  `json:"gid"`
+	// Members are the SUPPLEMENTARY members listed in /etc/group. A user
+	// whose PRIMARY group this is does not appear here -- that membership
+	// lives in the passwd entry -- so this list is not the full answer to
+	// "who is in this group" and Account.Groups is not built from it
+	// alone.
+	Members []string `json:"members,omitempty"`
+}
+
+// SSHKey is one line of an authorized_keys file, reduced to what
+// identifies it.
+type SSHKey struct {
+	Type string `json:"type"`
+	// Fingerprint is the OpenSSH SHA256 form ("SHA256:base64"), which is
+	// what ssh-keygen -l prints and what anyone would compare against.
+	Fingerprint string `json:"fingerprint"`
+	Comment     string `json:"comment,omitempty"`
+}
+
+// Password field shapes, from the shadow entry's first character. Four
+// rather than a can-log-in boolean, because they are four different
+// situations:
+//
+// PwSet is an ordinary account. PwLocked is one somebody disabled with
+// passwd -l, and the hash is still there to be restored -- on a human's
+// account that is a record of an offboarding. PwDisabled is the "*" that
+// every packaged system account ships with and nobody ever set. And
+// PwEmpty is an account with NO password that can still be logged into,
+// which is not a quieter version of disabled: it is the one value here
+// that is a finding.
+const (
+	PwSet      = "set"
+	PwLocked   = "locked"
+	PwDisabled = "disabled"
+	PwEmpty    = "empty"
+)
+
+// Routes to root. Listed separately rather than collapsed to a boolean
+// because they are removed in different places: a sudoers rule is edited
+// in /etc/sudoers, a group membership with gpasswd, and uid 0 by deleting
+// the account. "This user is privileged" without saying how sends an
+// operator looking in the wrong file.
+const (
+	// PrivRoot is uid 0. Any account with it IS root, whatever it is
+	// called -- a second uid-0 entry is the oldest backdoor there is.
+	PrivRoot = "root"
+	// PrivSudo means a sudoers rule names this account, directly or
+	// through a group or a User_Alias. It does NOT mean the rule grants
+	// full root: the rule text is reported alongside so a human can read
+	// what it actually allows.
+	PrivSudo = "sudo"
+	// PrivDockerGroup is membership of docker / lxd. Root by a route that
+	// does not appear anywhere in sudoers: a member can start a container
+	// with the host filesystem mounted and write to any file on it.
+	PrivDockerGroup = "docker-group"
+	// PrivDiskGroup is membership of disk / raw device groups: read and
+	// write to the block devices under every filesystem's permissions.
+	PrivDiskGroup = "disk-group"
+)

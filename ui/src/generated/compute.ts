@@ -491,3 +491,162 @@ export interface HostMergeResponse {
    */
   agentMoved: boolean;
 }
+/**
+ * HostProcesses is what a host is running: the response of
+ * GET /hosts/{id}/processes.
+ * One object rather than a paginated list, because it is not a
+ * collection anybody pages through -- a real machine reports a couple of
+ * dozen workloads -- and because the report's timestamp belongs to the
+ * report, not to a row inside it.
+ * +openapi:description=主机进程：agent 上报的工作负载快照
+ */
+export interface HostProcesses {
+  apiVersion?: string;
+  kind?: string;
+  groups?: HostProcessGroup[];
+  /**
+   * ReportedAt is when the agent last SENT this. The agent stays silent
+   * while the workload sits still, so an old timestamp means "nothing
+   * has changed", not "nobody is looking".
+   */
+  reportedAt?: string;
+}
+/**
+ * HostProcessGroup is one workload: every process sharing an identity,
+ * counted. There is deliberately no PID -- see lib/agent/types.
+ */
+export interface HostProcessGroup {
+  /**
+   * Name is the executable name as the kernel reports it, truncated to
+   * 15 characters ("victoria-metric").
+   */
+  name: string;
+  /**
+   * User is the effective user's name, or a bare uid when the machine
+   * has no passwd entry for it -- which is every container process
+   * running as a uid that exists only inside its image.
+   */
+  user?: string;
+  count: number /* int32 */;
+  /**
+   * Unit is the systemd unit this workload belongs to. Identity comes
+   * from the supervisor rather than the command line, which is not
+   * collected: command lines carry credentials.
+   */
+  unit?: string;
+  /**
+   * Container is true when the workload runs in a container. Its NAME
+   * is not here: the cgroup carries only the container's hex id.
+   */
+  container?: boolean;
+  /**
+   * Ports are the sockets this workload listens on, empty for the
+   * workloads that only make outbound connections.
+   */
+  ports?: HostListenPort[];
+}
+/**
+ * HostListenPort is one listening socket.
+ */
+export interface HostListenPort {
+  /**
+   * Proto is "tcp" or "udp". The v4/v6 split lives in Addr, where
+   * 0.0.0.0 and :: are visibly different bindings.
+   */
+  proto: string;
+  addr?: string;
+  port: number /* int32 */;
+}
+/**
+ * HostAccounts is who can use a host and what they can do on it: the
+ * response of GET /hosts/{id}/accounts.
+ * Behind its own permission code rather than the host's get, unlike the
+ * process list. The reasoning is the one already applied to the journal
+ * endpoint: "may read this host's details" should cover how loaded it is
+ * and what it runs, and should not automatically cover which accounts
+ * exist, which of them can log in and which of them are root.
+ * +openapi:description=主机账号：可登录的用户、用户组与提权面
+ */
+export interface HostAccounts {
+  apiVersion?: string;
+  kind?: string;
+  users?: HostAccount[];
+  groups?: HostUserGroup[];
+  /**
+   * SudoRules are the verbatim grant lines of /etc/sudoers and its
+   * includes. Unparsed on purpose: sudo's grammar is real, and a parser
+   * that half-understands it gives a confident wrong answer about the
+   * one account that matters.
+   */
+  sudoRules?: string[];
+  reportedAt?: string;
+}
+/**
+ * HostAccount is one local account.
+ */
+export interface HostAccount {
+  name: string;
+  /**
+   * int64 because a uid is unsigned 32-bit: the conventional "nobody"
+   * on several systems is 4294967294.
+   */
+  uid: number /* int64 */;
+  gid: number /* int64 */;
+  group?: string;
+  home?: string;
+  shell?: string;
+  /**
+   * CanLogin is false for the nologin / false shells most of a passwd
+   * file carries -- what separates the two or three accounts a person
+   * could log into from the twenty a package manager created.
+   */
+  canLogin?: boolean;
+  /**
+   * Password is the SHAPE of the shadow field: "set", "locked",
+   * "disabled" or "empty". The hash is reduced to this word on the host
+   * and never leaves it. "empty" is the one value that is a finding: an
+   * account that can be logged into with no password at all.
+   */
+  password?: string;
+  /**
+   * Groups are the supplementary groups naming this account.
+   */
+  groups?: string[];
+  /**
+   * Privileges names every route this account has to root: "root" (uid
+   * 0), "sudo" (a sudoers rule names it), "docker-group" (can mount the
+   * host filesystem into a container, which appears nowhere in sudoers)
+   * or "disk-group". Empty for an ordinary account.
+   */
+  privileges?: string[];
+  /**
+   * SSHKeys are the keys that let somebody in as this account, by
+   * fingerprint. Key bodies are not collected.
+   */
+  sshKeys?: HostSSHKey[];
+}
+/**
+ * HostUserGroup is one local group.
+ */
+export interface HostUserGroup {
+  name: string;
+  gid: number /* int64 */;
+  /**
+   * Members are the SUPPLEMENTARY members from /etc/group. A user whose
+   * PRIMARY group this is does not appear here, so this is not the full
+   * answer to "who is in this group" -- HostAccount.Groups is.
+   */
+  members?: string[];
+}
+/**
+ * HostSSHKey is one authorized key, reduced to what identifies it.
+ */
+export interface HostSSHKey {
+  type: string;
+  /**
+   * Fingerprint is the OpenSSH SHA256 form, the same value
+   * ssh-keygen -l prints.
+   */
+  fingerprint: string;
+  comment?: string;
+}

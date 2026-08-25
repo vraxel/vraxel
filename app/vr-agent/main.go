@@ -133,6 +133,8 @@ func main() {
 		// the server only learns it happened if the next hello says so.
 		Fingerprint:    func() agenttypes.MachineFingerprint { return hostinfo.Collect().Fingerprint() },
 		Facts:          hostinfo.Facts,
+		Processes:      hostinfo.Processes,
+		Accounts:       hostinfo.Accounts,
 		ServerURL:      st.ServerURL,
 		AgentToken:     func() string { return st.AgentToken },
 		Version:        version,

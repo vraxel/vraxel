@@ -69,6 +69,17 @@ const (
 	// sends one after hello and then only when the content's hash moves,
 	// so a settled fleet spends nothing on this.
 	FrameTypeHostFacts = "host.facts"
+	// FrameTypeHostProcesses carries the machine's workload
+	// (HostProcesses), and FrameTypeHostAccounts who can use it
+	// (HostAccounts).
+	//
+	// Three frames rather than one, because the three change on different
+	// scales: hardware perhaps twice a year, accounts when somebody is
+	// onboarded, workloads on every deploy. Folded together they would
+	// all have to travel at the fastest one's cadence, and every deploy
+	// would resend the DMI strings.
+	FrameTypeHostProcesses = "host.processes"
+	FrameTypeHostAccounts  = "host.accounts"
 )
 
 // Agent lifecycle statuses for FrameTypeAgentStatus.
@@ -176,6 +187,10 @@ type Frame struct {
 
 	// --- host.facts ---
 	Facts *HostFacts `json:"facts,omitempty"`
+
+	// --- host.processes / host.accounts ---
+	Processes *HostProcesses `json:"processes,omitempty"`
+	Accounts  *HostAccounts  `json:"accounts,omitempty"`
 
 	// --- config.reload ---
 	// AllowedPorts narrows the data channel's port allowlist to the

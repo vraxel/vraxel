@@ -350,6 +350,10 @@ func (h *protocolHandler) handleFrame(ctx context.Context, sess *Session, f *age
 		h.touch(ctx, sess, clockSkew(f.ClockUnixMs))
 	case agenttypes.FrameTypeHostFacts:
 		h.recordFacts(ctx, sess, f.Facts)
+	case agenttypes.FrameTypeHostProcesses:
+		h.recordProcesses(ctx, sess, f.Processes)
+	case agenttypes.FrameTypeHostAccounts:
+		h.recordAccounts(ctx, sess, f.Accounts)
 	case agenttypes.FrameTypeJobAck:
 		// The agent accepted a dispatched job: flip it to running so the
 		// driver stops re-dispatching and starts its timeout clock.
@@ -466,6 +470,34 @@ func (h *protocolHandler) recordFacts(ctx context.Context, sess *Session, facts 
 	}
 	if err := h.agents.UpsertFacts(ctx, sess.HostID, in); err != nil {
 		logger.Warnf("agentgw: record facts for host %d: %v", sess.HostID, err)
+	}
+}
+
+// recordProcesses persists the machine's workload, and recordAccounts who
+// can use it. Same swallow-and-log contract as recordFacts: the agent
+// resends its whole inventory on the next reconnect, so the worst case is
+// a detail page showing an older snapshot, and no display concern may be
+// able to take a control channel down.
+func (h *protocolHandler) recordProcesses(ctx context.Context, sess *Session, p *agenttypes.HostProcesses) {
+	if p == nil {
+		return
+	}
+	if err := h.agents.UpsertProcesses(ctx, sess.HostID, marshalList(p.Groups)); err != nil {
+		logger.Warnf("agentgw: record processes for host %d: %v", sess.HostID, err)
+	}
+}
+
+func (h *protocolHandler) recordAccounts(ctx context.Context, sess *Session, a *agenttypes.HostAccounts) {
+	if a == nil {
+		return
+	}
+	in := gwstore.AccountsInput{
+		Users:     marshalList(a.Users),
+		Groups:    marshalList(a.Groups),
+		SudoRules: marshalList(a.SudoRules),
+	}
+	if err := h.agents.UpsertAccounts(ctx, sess.HostID, in); err != nil {
+		logger.Warnf("agentgw: record accounts for host %d: %v", sess.HostID, err)
 	}
 }
 

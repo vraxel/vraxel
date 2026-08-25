@@ -86,6 +86,14 @@ type Host struct {
 	DefaultGateway    string    `json:"default_gateway"`
 }
 
+type HostAccount struct {
+	HostID     int64           `json:"host_id"`
+	Users      json.RawMessage `json:"users"`
+	Groups     json.RawMessage `json:"groups"`
+	SudoRules  json.RawMessage `json:"sudo_rules"`
+	ReportedAt time.Time       `json:"reported_at"`
+}
+
 type HostAgent struct {
 	HostID             int64       `json:"host_id"`
 	AgentID            pgtype.UUID `json:"agent_id"`
@@ -175,6 +183,12 @@ type HostMetricsLatest struct {
 	CpuTrend       json.RawMessage `json:"cpu_trend"`
 	DiskUsedBytes  *int64          `json:"disk_used_bytes"`
 	DiskTotalBytes *int64          `json:"disk_total_bytes"`
+}
+
+type HostProcess struct {
+	HostID     int64           `json:"host_id"`
+	Groups     json.RawMessage `json:"groups"`
+	ReportedAt time.Time       `json:"reported_at"`
 }
 
 type LoginThrottle struct {

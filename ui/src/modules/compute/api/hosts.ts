@@ -2,7 +2,13 @@ import { defineAction, defineResourceApi, defineSubApi, defineVerb } from "@/cor
 import type { ListParams } from "@/core/api/types"
 import { hostsDef } from "../defs"
 import type { Host, HostList } from "./types"
-import type { HostMergeRequest, HostMergeResponse, HostMetrics } from "@/generated/compute"
+import type {
+  HostAccounts,
+  HostMergeRequest,
+  HostMergeResponse,
+  HostMetrics,
+  HostProcesses,
+} from "@/generated/compute"
 
 // Params the list route understands beyond the standard ones. Both are
 // server-side filters, so the toolbar does not have to hold the whole
@@ -63,3 +69,19 @@ export const hostImageSiblingsApi = defineSubApi<Host>(hostsDef, "image-siblings
 // chart series (see HostMetrics in the generated types), so the caller
 // plots what it gets and never computes a rate.
 export const hostMetricsApi = defineVerb<HostMetrics>(hostsDef, "metrics")
+
+// What the host is running: a grouped workload snapshot with the ports
+// each one listens on. Same verb shape as metrics, and under the same
+// permission -- what a machine runs is the same class of fact as how
+// loaded it is.
+export const hostProcessesApi = defineVerb<HostProcesses>(hostsDef, "processes")
+
+// Who can use the host and what they can do on it.
+//
+// defineVerb builds the same /{id}/accounts URL, but this one is NOT a
+// verb on the server: it is a nested resource with a permission code of
+// its own (compute:hosts:accounts:list), because "may read this host's
+// details" should not automatically carry which accounts exist, which
+// can log in and which are root. A caller without that code gets a 403
+// here while the rest of the page keeps working.
+export const hostAccountsApi = defineVerb<HostAccounts>(hostsDef, "accounts")

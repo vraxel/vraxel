@@ -87,6 +87,13 @@ type AgentStore interface {
 	// new BIOS version or an extra disk, which no open page is waiting on.
 	UpsertFacts(ctx context.Context, hostID int64, in FactsInput) error
 
+	// UpsertProcesses and UpsertAccounts overwrite the two runtime
+	// inventories, on the same terms as UpsertFacts. Processes takes a
+	// bare jsonb payload rather than a struct because it has exactly one
+	// field and a wrapper would carry no information.
+	UpsertProcesses(ctx context.Context, hostID int64, groups []byte) error
+	UpsertAccounts(ctx context.Context, hostID int64, in AccountsInput) error
+
 	// MarkStaleOffline sweeps rows with no heartbeat for staleAfter. The
 	// cutoff is applied against the DB clock, not the caller's.
 	MarkStaleOffline(ctx context.Context, staleAfter time.Duration) error
