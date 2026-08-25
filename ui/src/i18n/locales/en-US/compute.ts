@@ -53,7 +53,7 @@ const compute = {
   "compute.host.metrics.refresh.auto": "Auto",
   "compute.host.metrics.refresh.off": "Paused",
 
-  "compute.host.metrics.group.overview": "Overview",
+  "compute.host.metrics.group.overview": "Key metrics",
   "compute.host.metrics.group.cpu": "CPU",
   "compute.host.metrics.group.memory": "Memory",
   "compute.host.metrics.group.disk": "Disk",

@@ -53,7 +53,7 @@ const compute = {
   "compute.host.metrics.refresh.auto": "自动",
   "compute.host.metrics.refresh.off": "暂停",
 
-  "compute.host.metrics.group.overview": "概览",
+  "compute.host.metrics.group.overview": "关键指标",
   "compute.host.metrics.group.cpu": "CPU",
   "compute.host.metrics.group.memory": "内存",
   "compute.host.metrics.group.disk": "磁盘",
