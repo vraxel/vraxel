@@ -229,6 +229,50 @@ func parseStatusUID(data []byte) (int64, bool) {
 	return 0, false
 }
 
+// procStat is the subset of /proc/pid/stat this collector needs. One
+// file for three answers -- cpu jiffies, start time and resident pages --
+// where status/statm would be two more reads per process on a loop that
+// already runs over every process on the machine.
+type procStat struct {
+	jiffies    int64 // utime + stime
+	startTicks int64
+	rssPages   int64
+}
+
+// parseProcStat reads fields 14 (utime), 15 (stime), 22 (starttime) and
+// 24 (rss) of /proc/pid/stat.
+//
+// Field positions are counted from the CLOSING parenthesis, not from the
+// start of the line: field 2 is the executable name in parentheses and it
+// may itself contain spaces and parentheses ("(Web Content)"), so
+// splitting the whole line on whitespace shifts every later field on
+// exactly the processes whose names are most awkward.
+func parseProcStat(data []byte) (procStat, bool) {
+	i := bytes.LastIndexByte(data, ')')
+	if i < 0 || i+2 >= len(data) {
+		return procStat{}, false
+	}
+	// After ") " comes field 3 (state), so fields[0] is field 3 and field
+	// N is fields[N-3].
+	f := strings.Fields(string(data[i+2:]))
+	const utime, stime, starttime, rss = 14, 15, 22, 24
+	if len(f) < rss-3+1 {
+		return procStat{}, false
+	}
+	get := func(n int) int64 {
+		v, err := strconv.ParseInt(f[n-3], 10, 64)
+		if err != nil {
+			return 0
+		}
+		return v
+	}
+	return procStat{
+		jiffies:    get(utime) + get(stime),
+		startTicks: get(starttime),
+		rssPages:   get(rss),
+	}, true
+}
+
 // groupKey identifies one workload. Two processes sharing it are two
 // instances of the same thing.
 type groupKey struct {

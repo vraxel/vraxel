@@ -3,6 +3,8 @@
 package hostinfo
 
 import (
+	"encoding/binary"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -16,6 +18,7 @@ const (
 	groupPath      = "/etc/group"
 	shadowPath     = "/etc/shadow"
 	sudoersPath    = "/etc/sudoers"
+	lastlogPath    = "/var/log/lastlog"
 	maxKeyFileSize = 256 << 10
 )
 
@@ -28,10 +31,12 @@ const (
 func Accounts() agenttypes.HostAccounts {
 	users := parsePasswd(readFileBytes(passwdPath))
 	groups := parseGroup(readFileBytes(groupPath))
-	shadow := parseShadowStates(readFileBytes(shadowPath))
+	shadow := parseShadow(readFileBytes(shadowPath))
 	rules, who := parseSudoers(sudoersFiles())
+	logins := lastLogins()
 
-	accounts, groups := buildAccounts(users, groups, shadow, who, authorizedKeys)
+	accounts, groups := buildAccounts(users, groups, shadow, who, authorizedKeys,
+		func(uid int64) int64 { return logins[uid] })
 	return agenttypes.HostAccounts{Users: accounts, Groups: groups, SudoRules: rules}
 }
 
@@ -150,4 +155,65 @@ func userName(table map[int64]string, uid int64) string {
 		return n
 	}
 	return strconv.FormatInt(uid, 10)
+}
+
+// lastlogRecordSize is sizeof(struct lastlog): a 32-bit time followed by
+// a 32-byte tty and a 256-byte host. The file is a flat array of these
+// INDEXED BY UID -- record N starts at N*292 -- which is why it is sparse
+// and why a machine whose highest uid ever to log in is 0 has a 292-byte
+// file.
+const lastlogRecordSize = 292
+
+// maxLastlogBytes bounds the read. A machine with a uid in the billions
+// (some LDAP mappings) has a nominally enormous file; it is sparse on
+// disk, but reading it whole would not be.
+const maxLastlogBytes = 8 << 20
+
+// lastLogins maps uid to its last login, truncated to the day.
+//
+// Truncated because this rides a report that is sent only when its
+// content changed: the exact second changes on every login, so a jump
+// host would re-send its whole account inventory every time anybody
+// connected. To the day it changes at most once per account per day.
+//
+// wtmp would give richer history and is the wrong file for this: it is
+// an append-only log of every login ever, rotated and often gigabytes,
+// and answering "when did uid N last log in" from it means scanning the
+// whole thing. lastlog is the kernel-maintained answer to exactly this
+// question, at a fixed offset.
+func lastLogins() map[int64]int64 {
+	out := map[int64]int64{}
+	f, err := os.Open(lastlogPath)
+	if err != nil {
+		// No lastlog is normal: a container image has none, and some
+		// distros have moved to lastlog2. Nothing reported beats a wrong
+		// answer, and every other account field still arrives.
+		return out
+	}
+	defer f.Close()
+
+	st, err := f.Stat()
+	if err != nil || st.Size() == 0 {
+		return out
+	}
+	size := st.Size()
+	if size > maxLastlogBytes {
+		size = maxLastlogBytes
+	}
+	buf := make([]byte, size-size%lastlogRecordSize)
+	n, err := io.ReadFull(f, buf)
+	if err != nil && n == 0 {
+		return out
+	}
+	for off := 0; off+lastlogRecordSize <= n; off += lastlogRecordSize {
+		// Little-endian int32 seconds. A zero record is an account that
+		// has never logged in, which is most of the file.
+		secs := int64(int32(binary.LittleEndian.Uint32(buf[off : off+4])))
+		if secs <= 0 {
+			continue
+		}
+		uid := int64(off / lastlogRecordSize)
+		out[uid] = secs / 86400 * 86400 * 1000
+	}
+	return out
 }

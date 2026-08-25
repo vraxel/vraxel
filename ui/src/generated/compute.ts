@@ -505,11 +505,21 @@ export interface HostProcesses {
   kind?: string;
   groups?: HostProcessGroup[];
   /**
-   * ReportedAt is when the agent last SENT this. The agent stays silent
-   * while the workload sits still, so an old timestamp means "nothing
-   * has changed", not "nobody is looking".
+   * ReportedAt is when this answer was produced: the moment of the live
+   * read when Live is true, and when the agent last SENT its inventory
+   * when it is false. The agent stays silent while the workload sits
+   * still, so an old timestamp on the stored path means "nothing has
+   * changed", not "nobody is looking".
    */
   reportedAt?: string;
+  /**
+   * Live says the host answered just now, which is also the only case
+   * where cpuPct and rssBytes are populated. False means the agent is
+   * unreachable and this is the last inventory it pushed -- still the
+   * right answer to "what did this box run", which is the question
+   * somebody asks about a host that stopped responding.
+   */
+  live?: boolean;
 }
 /**
  * HostProcessGroup is one workload: every process sharing an identity,
@@ -544,6 +554,27 @@ export interface HostProcessGroup {
    * workloads that only make outbound connections.
    */
   ports?: HostListenPort[];
+  /**
+   * Exe is the resolved path of the running binary. It carries no
+   * credentials -- unlike the command line, which is why that is not
+   * collected -- and answers what Name cannot: /usr/sbin/nginx and
+   * /tmp/nginx report the same name.
+   */
+  exe?: string;
+  /**
+   * StartedAtMs is when the oldest member of this group started, in
+   * unix milliseconds. The oldest because a prefork server replaces
+   * workers continuously while the service has been up for months.
+   */
+  startedAtMs?: number /* int64 */;
+  /**
+   * CPUPct and RSSBytes are present only when HostProcesses.Live is
+   * true. They are measured on demand and never stored: both change
+   * every time they are read, and the stored inventory is sent only
+   * when its content changes.
+   */
+  cpuPct?: number /* float64 */;
+  rssBytes?: number /* int64 */;
 }
 /**
  * HostListenPort is one listening socket.
@@ -624,6 +655,24 @@ export interface HostAccount {
    * fingerprint. Key bodies are not collected.
    */
   sshKeys?: HostSSHKey[];
+  /**
+   * FullName is the first GECOS field -- who this account is for.
+   */
+  fullName?: string;
+  /**
+   * PasswordChangedAtMs and ExpiresAtMs come from the shadow entry's
+   * day counters, so they land on midnight UTC and no finer. Reported
+   * raw: how old is too old is a policy this platform does not hold.
+   */
+  passwordChangedAtMs?: number /* int64 */;
+  expiresAtMs?: number /* int64 */;
+  /**
+   * LastLoginAtMs is truncated to the day, because the exact value
+   * changes on every login and this rides a report sent only when its
+   * content changes. Zero means never logged in -- expected for a
+   * service account, a finding for a person's.
+   */
+  lastLoginAtMs?: number /* int64 */;
 }
 /**
  * HostUserGroup is one local group.

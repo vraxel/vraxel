@@ -2,6 +2,7 @@ package hostinfo
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	agenttypes "vraxel.io/vraxel/lib/agent/types"
@@ -232,10 +233,14 @@ func TestBuildAccountsResolvesGroups(t *testing.T) {
 		{Name: "sudo", GID: 27, Members: []string{"zly"}},
 		{Name: "zly", GID: 1000},
 	}
-	shadow := map[string]string{"root": agenttypes.PwLocked, "zly": agenttypes.PwSet}
+	shadow := map[string]shadowEntry{
+		"root": {state: agenttypes.PwLocked, changedDays: -1, expireDays: -1},
+		// 20336 days after the epoch is 2025-09-12; expiry left blank.
+		"zly": {state: agenttypes.PwSet, changedDays: 20336, expireDays: -1},
+	}
 	who := sudoersWho{users: map[string]struct{}{}, groups: map[string]struct{}{"sudo": {}}}
 
-	accounts, _ := buildAccounts(users, groups, shadow, who, nil)
+	accounts, _ := buildAccounts(users, groups, shadow, who, nil, nil)
 	if len(accounts) != 2 {
 		t.Fatalf("got %d accounts", len(accounts))
 	}
@@ -251,5 +256,74 @@ func TestBuildAccountsResolvesGroups(t *testing.T) {
 	}
 	if accounts[0].Password != agenttypes.PwLocked {
 		t.Errorf("root password state = %q", accounts[0].Password)
+	}
+	if zly.PasswordChangedAtMs != 20336*86400*1000 {
+		t.Errorf("password change date = %d", zly.PasswordChangedAtMs)
+	}
+	// A blank expiry is absent, not the epoch -- an account showing
+	// "expired 1970-01-01" is a false finding on every ordinary machine.
+	if zly.ExpiresAtMs != 0 || accounts[0].PasswordChangedAtMs != 0 {
+		t.Errorf("a blank shadow counter became a date: %+v", zly)
+	}
+}
+
+func TestShadowDays(t *testing.T) {
+	for in, want := range map[string]int64{
+		"20336": 20336,
+		// Not blank: in the lastchg column 0 means "must change at next
+		// login", which is exactly the freshly-provisioned account
+		// somebody wants to find.
+		"0":  0,
+		"":   -1,
+		" ":  -1,
+		"-1": -1,
+		"xx": -1,
+	} {
+		if got := shadowDays(in); got != want {
+			t.Errorf("shadowDays(%q) = %d, want %d", in, got, want)
+		}
+	}
+	if daysToUnixMs(-1) != 0 {
+		t.Error("an absent counter must not become a date")
+	}
+}
+
+func TestGecosName(t *testing.T) {
+	for in, want := range map[string]string{
+		// The passwd comment is a 1970s campus directory record; only the
+		// first field was ever a name.
+		"zly,,,":                     "zly",
+		"Zhou Leyan,Room 5,555-1234": "Zhou Leyan",
+		" Padded Name , x":           "Padded Name",
+		"":                           "",
+		",,,":                        "",
+	} {
+		if got := gecosName(in); got != want {
+			t.Errorf("gecosName(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestParseShadowKeepsNoHash(t *testing.T) {
+	const shadow = `root:$6$saltsalt$averylonghashthatmustnevertravel:20336:0:99999:7:::
+svc:!:19000:0:99999:7:::
+tmp::20000:0:99999:7::20400:
+`
+	got := parseShadow([]byte(shadow))
+	if got["root"].state != agenttypes.PwSet || got["root"].changedDays != 20336 {
+		t.Errorf("root = %+v", got["root"])
+	}
+	if got["svc"].state != agenttypes.PwLocked {
+		t.Errorf("svc = %+v", got["svc"])
+	}
+	if got["tmp"].state != agenttypes.PwEmpty || got["tmp"].expireDays != 20400 {
+		t.Errorf("tmp = %+v", got["tmp"])
+	}
+	// The one invariant that matters: nothing in the returned structure
+	// can be used to authenticate as anybody.
+	for name, e := range got {
+		if strings.Contains(e.state, "$") {
+			t.Fatalf("a hash survived into %s: %+v", name, e)
+		}
 	}
 }

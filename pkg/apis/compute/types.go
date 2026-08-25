@@ -417,10 +417,18 @@ type HostMergeResponse struct {
 type HostProcesses struct {
 	runtime.TypeMeta `json:",inline"`
 	Groups           []HostProcessGroup `json:"groups,omitempty"`
-	// ReportedAt is when the agent last SENT this. The agent stays silent
-	// while the workload sits still, so an old timestamp means "nothing
-	// has changed", not "nobody is looking".
+	// ReportedAt is when this answer was produced: the moment of the live
+	// read when Live is true, and when the agent last SENT its inventory
+	// when it is false. The agent stays silent while the workload sits
+	// still, so an old timestamp on the stored path means "nothing has
+	// changed", not "nobody is looking".
 	ReportedAt *time.Time `json:"reportedAt,omitempty"`
+	// Live says the host answered just now, which is also the only case
+	// where cpuPct and rssBytes are populated. False means the agent is
+	// unreachable and this is the last inventory it pushed -- still the
+	// right answer to "what did this box run", which is the question
+	// somebody asks about a host that stopped responding.
+	Live bool `json:"live,omitempty"`
 }
 
 func (h *HostProcesses) GetTypeMeta() *runtime.TypeMeta { return &h.TypeMeta }
@@ -446,6 +454,21 @@ type HostProcessGroup struct {
 	// Ports are the sockets this workload listens on, empty for the
 	// workloads that only make outbound connections.
 	Ports []HostListenPort `json:"ports,omitempty"`
+	// Exe is the resolved path of the running binary. It carries no
+	// credentials -- unlike the command line, which is why that is not
+	// collected -- and answers what Name cannot: /usr/sbin/nginx and
+	// /tmp/nginx report the same name.
+	Exe string `json:"exe,omitempty"`
+	// StartedAtMs is when the oldest member of this group started, in
+	// unix milliseconds. The oldest because a prefork server replaces
+	// workers continuously while the service has been up for months.
+	StartedAtMs int64 `json:"startedAtMs,omitempty"`
+	// CPUPct and RSSBytes are present only when HostProcesses.Live is
+	// true. They are measured on demand and never stored: both change
+	// every time they are read, and the stored inventory is sent only
+	// when its content changes.
+	CPUPct   float64 `json:"cpuPct,omitempty"`
+	RSSBytes int64   `json:"rssBytes,omitempty"`
 }
 
 // HostListenPort is one listening socket.
@@ -509,6 +532,18 @@ type HostAccount struct {
 	// SSHKeys are the keys that let somebody in as this account, by
 	// fingerprint. Key bodies are not collected.
 	SSHKeys []HostSSHKey `json:"sshKeys,omitempty"`
+	// FullName is the first GECOS field -- who this account is for.
+	FullName string `json:"fullName,omitempty"`
+	// PasswordChangedAtMs and ExpiresAtMs come from the shadow entry's
+	// day counters, so they land on midnight UTC and no finer. Reported
+	// raw: how old is too old is a policy this platform does not hold.
+	PasswordChangedAtMs int64 `json:"passwordChangedAtMs,omitempty"`
+	ExpiresAtMs         int64 `json:"expiresAtMs,omitempty"`
+	// LastLoginAtMs is truncated to the day, because the exact value
+	// changes on every login and this rides a report sent only when its
+	// content changes. Zero means never logged in -- expected for a
+	// service account, a finding for a person's.
+	LastLoginAtMs int64 `json:"lastLoginAtMs,omitempty"`
 }
 
 // HostUserGroup is one local group.

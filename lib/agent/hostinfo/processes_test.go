@@ -169,3 +169,55 @@ func TestGroupProcessesIsDeterministic(t *testing.T) {
 		}
 	}
 }
+
+// The trap this parser exists for: field 2 of /proc/pid/stat is the
+// executable name IN PARENTHESES, and it may contain spaces and
+// parentheses of its own. Splitting the whole line on whitespace shifts
+// every later field on exactly the processes whose names are worst.
+func TestParseProcStat(t *testing.T) {
+	// An ordinary one first: pid 1, comm "systemd", state S.
+	const plain = "1 (systemd) S 0 1 1 0 -1 4194560 20876 445 91 0 " +
+		"431 1874 51 47 20 0 1 0 34 175882240 4621 18446744073709551615 rest ignored\n"
+	got, ok := parseProcStat([]byte(plain))
+	if !ok {
+		t.Fatal("rejected a well-formed line")
+	}
+	// fields 14+15 = 431+1874, field 22 = 34, field 24 = 4621
+	if got.jiffies != 431+1874 || got.startTicks != 34 || got.rssPages != 4621 {
+		t.Errorf("got %+v", got)
+	}
+
+	// The same numbers behind a name containing a space AND a closing
+	// paren. Firefox really does name a process "(Web Content)".
+	const nasty = "42 (Web Content (x)) S 0 1 1 0 -1 4194560 20876 445 91 0 " +
+		"431 1874 51 47 20 0 1 0 34 175882240 4621 18446744073709551615 rest ignored\n"
+	got2, ok := parseProcStat([]byte(nasty))
+	if !ok {
+		t.Fatal("rejected a line whose comm contains a paren")
+	}
+	if got2 != got {
+		t.Errorf("a parenthesised name shifted the fields: %+v vs %+v", got2, got)
+	}
+
+	for _, bad := range []string{"", "no parens here", "1 (x) S"} {
+		if _, ok := parseProcStat([]byte(bad)); ok {
+			t.Errorf("accepted %q", bad)
+		}
+	}
+}
+
+// A workload's start time is dated from boot, so it must survive the
+// machine's own clock being wrong -- the same property BootAt has.
+func TestParseProcStatStartIsRelativeToBoot(t *testing.T) {
+	const line = "1 (systemd) S 0 1 1 0 -1 0 0 0 0 0 " +
+		"0 0 0 0 20 0 1 0 500 0 0 rest\n"
+	got, ok := parseProcStat([]byte(line))
+	if !ok {
+		t.Fatal("parse failed")
+	}
+	// 500 ticks at 100 Hz is 5 seconds after boot, whatever the wall
+	// clock says.
+	if ms := got.startTicks * 1000 / 100; ms != 5000 {
+		t.Errorf("start offset = %dms, want 5000", ms)
+	}
+}
