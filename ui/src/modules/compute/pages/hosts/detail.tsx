@@ -19,7 +19,6 @@ import { AgentStatusBadge } from "@/modules/compute/components/agent-status-badg
 import { HostEditDialog } from "@/modules/compute/components/host-edit-dialog"
 import { HostMetricsPanel } from "@/modules/compute/components/host-metrics-panel"
 import {
-  HostHardwareTab,
   HostNetworkTab,
   HostOverviewTab,
   HostStorageTab,
@@ -210,15 +209,16 @@ export default function HostDetailPage() {
         </div>
       )}
 
-      {/* Tabs rather than one column of cards: the inventory arrives as
-          three tables (NICs, disks, filesystems) that a single scroll
-          would bury the record's own fields under. Each tab answers one
-          question -- how is it doing, what is it, how is it connected,
-          what does it store. */}
+      {/* A tab earns its place by holding something that would otherwise
+          crowd the page, not by naming a category. The scalar fields all
+          fit on one screen together, so they share the overview; the
+          inventory TABLES get their own, because a real server fills them
+          with a dozen disks and twenty mounts; and metrics gets one
+          because mounting it starts a polling query and a chart per
+          series. */}
       <Tabs defaultValue="overview">
         <TabsList>
           <TabsTrigger value="overview">{t("compute.host.tab.overview")}</TabsTrigger>
-          <TabsTrigger value="hardware">{t("compute.host.tab.hardware")}</TabsTrigger>
           <TabsTrigger value="network">{t("compute.host.tab.network")}</TabsTrigger>
           <TabsTrigger value="storage">{t("compute.host.tab.storage")}</TabsTrigger>
           <TabsTrigger value="metrics">{t("compute.host.tab.metrics")}</TabsTrigger>
@@ -227,9 +227,6 @@ export default function HostDetailPage() {
         <TabsContent value="overview" className="mt-4">
           <HostOverviewTab host={host} />
           <p className="text-muted-foreground mt-4 text-xs">{t("compute.host.reportedNote")}</p>
-        </TabsContent>
-        <TabsContent value="hardware" className="mt-4">
-          <HostHardwareTab host={host} />
         </TabsContent>
         <TabsContent value="network" className="mt-4">
           <HostNetworkTab host={host} />

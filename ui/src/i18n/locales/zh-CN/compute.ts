@@ -85,12 +85,12 @@ const compute = {
     "以上信息由 agent 自动上报，不支持手工修改；仅显示名称与描述可编辑。",
 
   "compute.host.tab.overview": "概览",
-  "compute.host.tab.hardware": "硬件",
   "compute.host.tab.network": "网络",
   "compute.host.tab.storage": "存储",
   "compute.host.tab.metrics": "监控",
 
   // machine inventory
+  "compute.host.hardware": "硬件",
   "compute.host.kernel": "内核版本",
   "compute.host.timezone": "时区",
   "compute.host.bootAt": "启动时间",
@@ -101,7 +101,6 @@ const compute = {
   "compute.host.cpuTopology": "拓扑",
   "compute.host.cpuTopologyValue": "{sockets} 插槽 x {cores} 核 x {threads} 线程",
   "compute.host.memoryTotal": "总容量",
-  "compute.host.platform": "平台",
   "compute.host.virtualization": "虚拟化",
   "compute.host.systemVendor": "厂商",
   "compute.host.productName": "产品型号",

@@ -87,12 +87,12 @@ const compute = {
     "Everything above is reported by the agent and cannot be edited; only the display name and description are yours to change.",
 
   "compute.host.tab.overview": "Overview",
-  "compute.host.tab.hardware": "Hardware",
   "compute.host.tab.network": "Network",
   "compute.host.tab.storage": "Storage",
   "compute.host.tab.metrics": "Metrics",
 
   // machine inventory
+  "compute.host.hardware": "Hardware",
   "compute.host.kernel": "Kernel",
   "compute.host.timezone": "Time zone",
   "compute.host.bootAt": "Booted at",
@@ -104,7 +104,6 @@ const compute = {
   "compute.host.cpuTopology": "Topology",
   "compute.host.cpuTopologyValue": "{sockets} sockets x {cores} cores x {threads} threads",
   "compute.host.memoryTotal": "Total",
-  "compute.host.platform": "Platform",
   "compute.host.virtualization": "Virtualization",
   "compute.host.systemVendor": "Vendor",
   "compute.host.productName": "Product",
