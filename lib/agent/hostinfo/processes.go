@@ -3,6 +3,7 @@ package hostinfo
 import (
 	"bufio"
 	"bytes"
+	"net/netip"
 	"sort"
 	"strconv"
 	"strings"
@@ -82,6 +83,11 @@ func parseHexAddr(s string) (addr string, port int32, ok bool) {
 		}
 		return decodeRouteAddr32(uint32(v)), port, true
 	case 32:
+		// netip rather than net.IP: net.IP.String renders a v4-mapped
+		// address as a dotted quad, which would print "::ffff:0.0.0.0"
+		// and "0.0.0.0" identically while they are different bindings.
+		// netip keeps them apart and collapses zero runs correctly, so
+		// there is nothing here worth hand-rolling.
 		var b [16]byte
 		for i := range 4 {
 			w, err := strconv.ParseUint(h[i*8:i*8+8], 16, 32)
@@ -94,7 +100,7 @@ func parseHexAddr(s string) (addr string, port int32, ok bool) {
 			b[i*4+2] = byte(w >> 16)
 			b[i*4+3] = byte(w >> 24)
 		}
-		return formatV6(b), port, true
+		return netip.AddrFrom16(b).String(), port, true
 	}
 	return "", 0, false
 }
@@ -105,52 +111,6 @@ func decodeRouteAddr32(v uint32) string {
 		strconv.FormatUint(uint64(v>>8&0xff), 10) + "." +
 		strconv.FormatUint(uint64(v>>16&0xff), 10) + "." +
 		strconv.FormatUint(uint64(v>>24&0xff), 10)
-}
-
-// formatV6 renders 16 bytes as an IPv6 literal, collapsing the longest
-// run of zero groups the way the text form requires. Hand-rolled rather
-// than via net.IP.String, which renders a v4-mapped address as dotted
-// quad -- correct, but it would make "::ffff:0.0.0.0" and "0.0.0.0" print
-// identically while being different bindings.
-func formatV6(b [16]byte) string {
-	var g [8]uint16
-	for i := range g {
-		g[i] = uint16(b[i*2])<<8 | uint16(b[i*2+1])
-	}
-	bestI, bestN, curI, curN := -1, 0, -1, 0
-	for i, v := range g {
-		if v == 0 {
-			if curI < 0 {
-				curI = i
-			}
-			curN++
-			if curN > bestN {
-				bestI, bestN = curI, curN
-			}
-			continue
-		}
-		curI, curN = -1, 0
-	}
-	// A single zero group is written out; :: is only for a run.
-	if bestN < 2 {
-		bestI, bestN = -1, 0
-	}
-	var sb strings.Builder
-	for i := 0; i < 8; i++ {
-		if i == bestI {
-			sb.WriteString("::")
-			i += bestN - 1
-			continue
-		}
-		if sb.Len() > 0 && !strings.HasSuffix(sb.String(), ":") {
-			sb.WriteByte(':')
-		}
-		sb.WriteString(strconv.FormatUint(uint64(g[i]), 16))
-	}
-	if sb.Len() == 0 {
-		return "::"
-	}
-	return sb.String()
 }
 
 // parseCgroupWorkload extracts the supervisor's name from a
@@ -181,6 +141,14 @@ func parseCgroupWorkload(data []byte) (unit string, container bool) {
 		switch {
 		case leaf == "" || leaf == "-.slice":
 			continue
+		// An interactive login gets session-<n>.scope, and the number is
+		// fresh per login. Reported as a unit it would put an ephemeral id
+		// in the group key, so every ssh session would move bash into a
+		// new group and make the whole workload report look changed --
+		// against a gate whose entire job is to notice real change. That
+		// somebody is logged in is already in the count.
+		case isSessionScope(leaf):
+			return "", false
 		case isContainerScope(leaf):
 			return "", true
 		case strings.HasSuffix(leaf, ".service"), strings.HasSuffix(leaf, ".socket"),
@@ -189,6 +157,21 @@ func parseCgroupWorkload(data []byte) (unit string, container bool) {
 		}
 	}
 	return "", false
+}
+
+// isSessionScope reports whether a cgroup leaf names one interactive
+// login session.
+func isSessionScope(leaf string) bool {
+	n, ok := strings.CutPrefix(strings.TrimSuffix(leaf, ".scope"), "session-")
+	if !ok || n == "" {
+		return false
+	}
+	for _, c := range n {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // containerScopePrefixes are how the container runtimes name their

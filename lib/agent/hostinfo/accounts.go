@@ -382,7 +382,7 @@ func buildAccounts(
 	groups []agenttypes.UserGroup,
 	shadow map[string]string,
 	who sudoersWho,
-	keysOf func(home, user string) []agenttypes.SSHKey,
+	keysOf func(home string) []agenttypes.SSHKey,
 ) ([]agenttypes.Account, []agenttypes.UserGroup) {
 	byGID := make(map[int64]string, len(groups))
 	supplementary := map[string][]string{}
@@ -409,7 +409,7 @@ func buildAccounts(
 		sort.Strings(a.Groups)
 		a.Privileges = privilegesOf(a, who)
 		if keysOf != nil {
-			a.SSHKeys = keysOf(u.home, u.name)
+			a.SSHKeys = keysOf(u.home)
 		}
 		out = append(out, a)
 	}

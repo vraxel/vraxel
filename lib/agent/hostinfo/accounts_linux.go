@@ -92,7 +92,7 @@ func sudoersFiles() (map[string][]byte, []string) {
 var sshdAuthorizedKeysFiles = []string{".ssh/authorized_keys", ".ssh/authorized_keys2"}
 
 // authorizedKeys reads the keys that let somebody in as this account.
-func authorizedKeys(home, _ string) []agenttypes.SSHKey {
+func authorizedKeys(home string) []agenttypes.SSHKey {
 	if home == "" || home == "/" || home == "/nonexistent" {
 		return nil
 	}

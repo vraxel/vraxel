@@ -58,7 +58,7 @@ export function HostProcessesTab({ host, scope }: { host: Host; scope: ScopeRef 
           </TableHeader>
           <TableBody>
             {groups.map((g) => (
-              <TableRow key={`${g.name}/${g.user ?? ""}/${g.unit ?? ""}`}>
+              <TableRow key={`${g.name}/${g.user ?? ""}/${g.unit ?? ""}/${g.container ?? false}`}>
                 <TableCell className="font-mono text-xs">{g.name}</TableCell>
                 <TableCell className="text-muted-foreground font-mono text-xs">
                   {g.user || "-"}

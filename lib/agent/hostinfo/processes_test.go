@@ -94,8 +94,13 @@ func TestParseCgroupWorkload(t *testing.T) {
 		// A unit whose name merely starts like a container scope. Without
 		// the hex-id check this would be reported as a container.
 		"unit named docker-something": {"0::/system.slice/docker-cleanup.service\n", "docker-cleanup.service", false},
-		"user session":                {"0::/user.slice/user-1000.slice/session-3.scope\n", "session-3.scope", false},
-		"root cgroup":                 {"0::/\n", "", false},
+		// The session number is fresh per login, so reporting it would
+		// put an ephemeral id in the group key and make every ssh login
+		// look like a workload change.
+		"interactive login": {"0::/user.slice/user-1000.slice/session-3.scope\n", "", false},
+		// A user manager IS stable -- one per uid, not one per login.
+		"user manager": {"0::/user.slice/user-1000.slice/user@1000.service\n", "user@1000.service", false},
+		"root cgroup":  {"0::/\n", "", false},
 		// cgroup v1 repeats the path once per controller; only the systemd
 		// hierarchy is the one that names units.
 		"cgroup v1": {"12:pids:/system.slice/sshd.service\n1:name=systemd:/system.slice/sshd.service\n", "sshd.service", false},
