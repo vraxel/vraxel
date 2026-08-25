@@ -135,6 +135,13 @@ export function HostAccountsTab({ host, scope }: { host: Host; scope: ScopeRef }
   const sudoRules = query.data?.sudoRules ?? []
   if (users.length === 0 && groups.length === 0) return <EmptyRuntime />
 
+  // Most of /etc/group is groups nobody is in -- 48 of 58 on an ordinary
+  // Debian box -- and a row saying so carries nothing. Counted rather
+  // than silently dropped, because "these are the groups" and "these are
+  // the groups with anybody in them" are different claims.
+  const namedGroups = groups.filter((g) => g.members?.length)
+  const emptyGroups = groups.length - namedGroups.length
+
   // Privileged accounts first, then the ones a person could log into,
   // then everything else. A passwd file is mostly service accounts
   // nobody reads, and the two or three rows that matter would otherwise
@@ -241,7 +248,7 @@ export function HostAccountsTab({ host, scope }: { host: Host; scope: ScopeRef }
         </Card>
       )}
 
-      {groups.length > 0 && (
+      {namedGroups.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">{t("compute.host.accountGroups")}</CardTitle>
@@ -256,26 +263,22 @@ export function HostAccountsTab({ host, scope }: { host: Host; scope: ScopeRef }
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {groups
-                  .filter((g) => g.members?.length)
-                  .map((g) => (
-                    <TableRow key={g.name}>
-                      <TableCell className="font-mono text-xs">{g.name}</TableCell>
-                      <TableCell className="text-right text-sm tabular-nums">{g.gid}</TableCell>
-                      <TableCell className="text-muted-foreground text-xs">
-                        {g.members?.join(", ")}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                {namedGroups.map((g) => (
+                  <TableRow key={g.name}>
+                    <TableCell className="font-mono text-xs">{g.name}</TableCell>
+                    <TableCell className="text-right text-sm tabular-nums">{g.gid}</TableCell>
+                    <TableCell className="text-muted-foreground text-xs">
+                      {g.members?.join(", ")}
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
-            {/* Groups with no members are most of /etc/group and say
-                nothing, so they are dropped rather than paged through. */}
-            <p className="text-muted-foreground mt-2 text-xs">
-              {t("compute.host.acct.emptyGroupsHidden", {
-                count: groups.filter((g) => !g.members?.length).length,
-              })}
-            </p>
+            {emptyGroups > 0 && (
+              <p className="text-muted-foreground mt-2 text-xs">
+                {t("compute.host.acct.emptyGroupsHidden", { count: emptyGroups })}
+              </p>
+            )}
           </CardContent>
         </Card>
       )}
