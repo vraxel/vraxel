@@ -7,7 +7,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	agenttypes "vraxel.io/vraxel/lib/agent/types"
@@ -37,6 +39,12 @@ const vmRateWindow = "1m"
 type vmExpr struct {
 	expr string
 	dim  string
+	// dim2 is the second identifying label, for the one series that needs
+	// two: an hwmon reading is a (chip, sensor) pair, and keeping only one
+	// of them would collapse a board's several temperatures onto one line
+	// -- while the agent backend keeps them apart. Empty for everything
+	// else.
+	dim2 string
 }
 
 // vmVocabulary is the translation table: the same chart names the
@@ -47,6 +55,32 @@ type vmExpr struct {
 // clamps: every percentage the agent backend runs through clampPct is
 // clamped here too, or a deep disk queue reads 100.4% busy on one tier
 // and 100% on the other.
+// fsFilter / netFilter are the PromQL spellings of RealFSType and
+// RealNetDevice, generated from the very lists those predicates use. The
+// agent backend applies them by calling the predicates; expressing the
+// same rule twice by hand is how the two tiers would quietly stop
+// agreeing about what a host's disk is.
+var (
+	fsFilter  = `fstype!~"` + strings.Join(agenttypes.NonLocalFSTypes(), "|") + `"`
+	netFilter = buildNetFilter()
+)
+
+func buildNetFilter() string {
+	prefixes, exact := agenttypes.VirtualNetPrefixes()
+	alts := make([]string, 0, len(prefixes)+len(exact))
+	alts = append(alts, exact...)
+	for _, p := range prefixes {
+		// Anchored implicitly by PromQL (=~ matches the whole label), so a
+		// prefix rule needs its own trailing wildcard.
+		alts = append(alts, regexp.QuoteMeta(p)+".*")
+	}
+	return `device!~"` + strings.Join(alts, "|") + `"`
+}
+
+// rate wraps a counter in the shared rate window, so no expression below
+// spells the window out and none can drift from the others.
+func rate(metric string) string { return `rate(` + metric + `[` + vmRateWindow + `])` }
+
 var vmVocabulary = map[string]vmExpr{
 	agenttypes.SeriesCPUUsedPct: {
 		expr: `clamp(100 * (1 - sum(rate(node_cpu_seconds_total{mode=~"idle|iowait"}[` + vmRateWindow + `])) / sum(rate(node_cpu_seconds_total[` + vmRateWindow + `]))), 0, 100)`,
@@ -72,11 +106,15 @@ var vmVocabulary = map[string]vmExpr{
 	agenttypes.SeriesLoad5:  {expr: `node_load5`},
 	agenttypes.SeriesLoad15: {expr: `node_load15`},
 	agenttypes.SeriesFSUsedPct: {
-		expr: `clamp(100 * (1 - node_filesystem_avail_bytes / node_filesystem_size_bytes), 0, 100)`,
+		expr: `clamp(100 * (1 - node_filesystem_avail_bytes{` + fsFilter + `} / node_filesystem_size_bytes{` + fsFilter + `}), 0, 100)`,
 		dim:  "mountpoint",
 	},
 	agenttypes.SeriesFSSize: {
-		expr: `node_filesystem_size_bytes`,
+		expr: `node_filesystem_size_bytes{` + fsFilter + `}`,
+		dim:  "mountpoint",
+	},
+	agenttypes.SeriesFSInodesPct: {
+		expr: `clamp(100 * (1 - node_filesystem_files_free{` + fsFilter + `} / node_filesystem_files{` + fsFilter + `}), 0, 100)`,
 		dim:  "mountpoint",
 	},
 	agenttypes.SeriesDiskReadBps: {
@@ -91,25 +129,109 @@ var vmVocabulary = map[string]vmExpr{
 		expr: `clamp(100 * rate(node_disk_io_time_seconds_total[` + vmRateWindow + `]), 0, 100)`,
 		dim:  "device",
 	},
-	agenttypes.SeriesNetRxBps: {
-		expr: `rate(node_network_receive_bytes_total[` + vmRateWindow + `])`,
+	agenttypes.SeriesNetRxBps:   {expr: rate(`node_network_receive_bytes_total{` + netFilter + `}`), dim: "device"},
+	agenttypes.SeriesNetTxBps:   {expr: rate(`node_network_transmit_bytes_total{` + netFilter + `}`), dim: "device"},
+	agenttypes.SeriesNetRxPps:   {expr: rate(`node_network_receive_packets_total{` + netFilter + `}`), dim: "device"},
+	agenttypes.SeriesNetTxPps:   {expr: rate(`node_network_transmit_packets_total{` + netFilter + `}`), dim: "device"},
+	agenttypes.SeriesNetRxErrs:  {expr: rate(`node_network_receive_errs_total{` + netFilter + `}`), dim: "device"},
+	agenttypes.SeriesNetTxErrs:  {expr: rate(`node_network_transmit_errs_total{` + netFilter + `}`), dim: "device"},
+	agenttypes.SeriesNetRxDrops: {expr: rate(`node_network_receive_drop_total{` + netFilter + `}`), dim: "device"},
+	agenttypes.SeriesNetTxDrops: {expr: rate(`node_network_transmit_drop_total{` + netFilter + `}`), dim: "device"},
+
+	// --- memory composition ---
+	agenttypes.SeriesMemTotal:   {expr: `node_memory_MemTotal_bytes`},
+	agenttypes.SeriesMemFree:    {expr: `node_memory_MemFree_bytes`},
+	agenttypes.SeriesMemBuffers: {expr: `node_memory_Buffers_bytes`},
+	agenttypes.SeriesMemCached:  {expr: `node_memory_Cached_bytes`},
+	agenttypes.SeriesSwapInPps:  {expr: rate(`node_vmstat_pswpin`)},
+	agenttypes.SeriesSwapOutPps: {expr: rate(`node_vmstat_pswpout`)},
+	// label_replace rather than two series, so the "kind" dimension the
+	// agent backend attaches survives on this tier too.
+	agenttypes.SeriesPageFaults: {
+		expr: `label_replace(` + rate(`node_vmstat_pgfault`) + `, "kind", "minor", "", "") or ` +
+			`label_replace(` + rate(`node_vmstat_pgmajfault`) + `, "kind", "major", "", "")`,
+		dim: "kind",
+	},
+	// increase() over the step, not rate(): one kill has to read as 1.
+	agenttypes.SeriesOOMKills: {expr: `increase(node_vmstat_oom_kill[` + vmRateWindow + `])`},
+
+	// --- pressure ---
+	agenttypes.SeriesPSICPUPct: {expr: `clamp(100 * ` + rate(`node_pressure_cpu_waiting_seconds_total`) + `, 0, 100)`},
+	agenttypes.SeriesPSIMemPct: {expr: `clamp(100 * ` + rate(`node_pressure_memory_waiting_seconds_total`) + `, 0, 100)`},
+	agenttypes.SeriesPSIIOPct:  {expr: `clamp(100 * ` + rate(`node_pressure_io_waiting_seconds_total`) + `, 0, 100)`},
+
+	// --- cpu / system counters ---
+	agenttypes.SeriesCtxSwitches: {expr: rate(`node_context_switches_total`)},
+	agenttypes.SeriesInterrupts:  {expr: rate(`node_intr_total`)},
+
+	// --- disk ops and latency ---
+	agenttypes.SeriesDiskReadIOPS:  {expr: rate(`node_disk_reads_completed_total`), dim: "device"},
+	agenttypes.SeriesDiskWriteIOPS: {expr: rate(`node_disk_writes_completed_total`), dim: "device"},
+	// Mean seconds per operation. The `> 0` guard is what the agent
+	// backend's "an idle device has no latency" rule looks like in PromQL:
+	// without it the division is 0/0 and the chart draws NaN as a break
+	// anyway, but with it an idle device drops out cleanly instead.
+	agenttypes.SeriesDiskReadWait: {
+		expr: rate(`node_disk_read_time_seconds_total`) + ` / (` + rate(`node_disk_reads_completed_total`) + ` > 0)`,
 		dim:  "device",
 	},
-	agenttypes.SeriesNetTxBps: {
-		expr: `rate(node_network_transmit_bytes_total[` + vmRateWindow + `])`,
+	agenttypes.SeriesDiskWriteWait: {
+		expr: rate(`node_disk_write_time_seconds_total`) + ` / (` + rate(`node_disk_writes_completed_total`) + ` > 0)`,
 		dim:  "device",
 	},
+
+	// --- sockets ---
+	agenttypes.SeriesTCPRetrans:  {expr: rate(`node_netstat_Tcp_RetransSegs`)},
+	agenttypes.SeriesTCPInUse:    {expr: `node_sockstat_TCP_inuse`},
+	agenttypes.SeriesSocketsUsed: {expr: `node_sockstat_sockets_used`},
+	agenttypes.SeriesConntrackPct: {
+		expr: `clamp(100 * node_nf_conntrack_entries / (node_nf_conntrack_entries_limit > 0), 0, 100)`,
+	},
+
+	// --- system state ---
+	agenttypes.SeriesUptimeSec:    {expr: `node_time_seconds - node_boot_time_seconds`},
+	agenttypes.SeriesProcsRunning: {expr: `node_procs_running`},
+	agenttypes.SeriesProcsBlocked: {expr: `node_procs_blocked`},
+	agenttypes.SeriesFDUsedPct:    {expr: `clamp(100 * node_filefd_allocated / (node_filefd_maximum > 0), 0, 100)`},
+	agenttypes.SeriesTimeDriftSec: {expr: `node_timex_offset_seconds`},
+	agenttypes.SeriesTimeSynced:   {expr: `node_timex_sync_status`},
+	agenttypes.SeriesTempCelsius:  {expr: `node_hwmon_temp_celsius`, dim: "chip", dim2: "sensor"},
 }
 
 // vmVocabularyOrder keeps responses deterministic: map iteration order
 // must not decide which line is drawn first.
+//
+// It must also list EVERY key in vmVocabulary, because an unlisted one is
+// simply never queried when the caller asks for all series -- a chart
+// that silently stays empty on this tier and works on the other.
+// TestVMVocabularyOrderIsComplete holds the two together.
 var vmVocabularyOrder = []string{
 	agenttypes.SeriesCPUUsedPct, agenttypes.SeriesCPUModePct,
-	agenttypes.SeriesMemUsedPct, agenttypes.SeriesMemUsed, agenttypes.SeriesSwapUsed,
+	agenttypes.SeriesPSICPUPct, agenttypes.SeriesCtxSwitches, agenttypes.SeriesInterrupts,
 	agenttypes.SeriesLoad1, agenttypes.SeriesLoad5, agenttypes.SeriesLoad15,
-	agenttypes.SeriesFSUsedPct, agenttypes.SeriesFSSize,
+
+	agenttypes.SeriesMemUsedPct, agenttypes.SeriesMemUsed, agenttypes.SeriesSwapUsed,
+	agenttypes.SeriesMemTotal, agenttypes.SeriesMemFree,
+	agenttypes.SeriesMemBuffers, agenttypes.SeriesMemCached,
+	agenttypes.SeriesSwapInPps, agenttypes.SeriesSwapOutPps,
+	agenttypes.SeriesPageFaults, agenttypes.SeriesOOMKills, agenttypes.SeriesPSIMemPct,
+
+	agenttypes.SeriesFSUsedPct, agenttypes.SeriesFSSize, agenttypes.SeriesFSInodesPct,
 	agenttypes.SeriesDiskReadBps, agenttypes.SeriesDiskWriteBps, agenttypes.SeriesDiskUtilPct,
+	agenttypes.SeriesDiskReadIOPS, agenttypes.SeriesDiskWriteIOPS,
+	agenttypes.SeriesDiskReadWait, agenttypes.SeriesDiskWriteWait,
+	agenttypes.SeriesPSIIOPct,
+
 	agenttypes.SeriesNetRxBps, agenttypes.SeriesNetTxBps,
+	agenttypes.SeriesNetRxPps, agenttypes.SeriesNetTxPps,
+	agenttypes.SeriesNetRxErrs, agenttypes.SeriesNetTxErrs,
+	agenttypes.SeriesNetRxDrops, agenttypes.SeriesNetTxDrops,
+	agenttypes.SeriesTCPRetrans, agenttypes.SeriesTCPInUse,
+	agenttypes.SeriesSocketsUsed, agenttypes.SeriesConntrackPct,
+
+	agenttypes.SeriesUptimeSec, agenttypes.SeriesProcsRunning, agenttypes.SeriesProcsBlocked,
+	agenttypes.SeriesFDUsedPct, agenttypes.SeriesTimeDriftSec, agenttypes.SeriesTimeSynced,
+	agenttypes.SeriesTempCelsius,
 }
 
 // vmMetrics answers chart queries from VictoriaMetrics: the full tier.
@@ -231,6 +353,11 @@ func (b vmMetrics) rangeQuery(ctx context.Context, hostID int64, v vmExpr, fromM
 		if v.dim != "" {
 			if d, ok := r.Metric[v.dim]; ok {
 				labels = map[string]string{v.dim: d}
+				if v.dim2 != "" {
+					if d2, ok := r.Metric[v.dim2]; ok {
+						labels[v.dim2] = d2
+					}
+				}
 			}
 		}
 		out = append(out, HostMetricsSeries{Name: name, Labels: labels, Values: values})
