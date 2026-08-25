@@ -49,6 +49,9 @@ const compute = {
   "compute.host.metrics.noData": "No data",
   "compute.host.metrics.offline": "Host is offline; historical metrics are unavailable",
   "compute.host.metrics.lastSample": "last sample",
+  "compute.host.metrics.refresh": "Refresh",
+  "compute.host.metrics.refresh.auto": "Auto",
+  "compute.host.metrics.refresh.off": "Paused",
 
   "compute.host.edit": "Edit host",
   "compute.host.deleteConfirm":
