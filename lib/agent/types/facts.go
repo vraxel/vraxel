@@ -110,29 +110,48 @@ type BlockDevice struct {
 	Model      string `json:"model,omitempty"`
 }
 
-// pseudoFSTypes are the kernel's bookkeeping filesystems and the
-// memory-backed ones. They are not storage: a full /run or /dev/shm is a
-// memory problem wearing a filesystem's clothes.
+// notLocalStorage are the filesystem types that are not this machine's
+// disk, in two groups.
 //
-// This predicate and RealNetDevice live here, in the wire contract,
-// because they define what the fields around them MEAN. The host list's
-// disk gauge (nodemetrics' summary) and this detail list are two views of
-// one fleet, and they have to agree on what counts -- a detail page
-// listing a tmpfs the gauge excluded is a page whose numbers do not add
-// up to the number beside them.
-var pseudoFSTypes = map[string]struct{}{
+// The kernel's bookkeeping and memory-backed filesystems: a full /run or
+// /dev/shm is a memory problem wearing a filesystem's clothes, and it
+// would pin the disk gauge at a number no operator can act on.
+//
+// And the network ones. An NFS share is real storage, but it is the
+// FILE SERVER's disk: counting it toward this host's capacity inflates
+// the fleet's total by however many hosts mount the same export, and a
+// filling share would raise the alert on every client instead of on the
+// machine that owns it. node_exporter's filesystem collector reports
+// them (its default exclusion list covers only the pseudo group), so
+// they have to be excluded here or they are silently counted.
+//
+// This predicate and RealNetDevice live in the wire contract because
+// they define what the fields around them MEAN. The host list's disk
+// gauge (nodemetrics' summary) and the detail page's filesystem table
+// are two views of one machine, and they have to agree on what counts --
+// a table whose rows do not add up to the number printed beside them is
+// worse than either view alone.
+var notLocalStorage = map[string]struct{}{
+	// pseudo / memory-backed
 	"tmpfs": {}, "ramfs": {}, "devtmpfs": {},
 	"proc": {}, "sysfs": {}, "devpts": {}, "cgroup": {}, "cgroup2": {},
 	"securityfs": {}, "pstore": {}, "bpf": {}, "autofs": {}, "hugetlbfs": {},
 	"mqueue": {}, "debugfs": {}, "tracefs": {}, "fusectl": {}, "configfs": {},
 	"binfmt_misc": {}, "rpc_pipefs": {}, "nsfs": {}, "squashfs": {},
-	"overlay": {}, "fuse.gvfsd-fuse": {}, "efivarfs": {},
+	"overlay": {}, "fuse.gvfsd-fuse": {}, "efivarfs": {}, "iso9660": {},
+	"erofs": {}, "selinuxfs": {}, "procfs": {},
+	// network / remote
+	"nfs": {}, "nfs4": {}, "cifs": {}, "smbfs": {}, "smb3": {},
+	"afs": {}, "ceph": {}, "glusterfs": {}, "lustre": {}, "beegfs": {},
+	"9p": {}, "ncpfs": {}, "coda": {}, "gpfs": {},
+	"fuse.sshfs": {}, "fuse.s3fs": {}, "fuse.rclone": {}, "fuse.glusterfs": {},
 }
 
-// RealFSType reports whether a filesystem type describes storage.
+// RealFSType reports whether a filesystem type describes storage
+// attached to this machine.
 func RealFSType(fstype string) bool {
-	_, pseudo := pseudoFSTypes[fstype]
-	return !pseudo
+	_, skip := notLocalStorage[fstype]
+	return !skip
 }
 
 // virtualNetPrefixes are the per-container and per-bridge interface

@@ -155,8 +155,8 @@ type mountEntry struct {
 	fstype string
 }
 
-// parseMounts returns the real filesystems, first mount of each device
-// only.
+// parseMounts returns this machine's own filesystems, first mount of
+// each device only.
 //
 // The device dedup is the same rule the metrics summary applies (see
 // nodemetrics.summaryDisk): a bind mount and a btrfs subvolume are extra
@@ -170,13 +170,14 @@ func parseMounts(data []byte) []mountEntry {
 	sc := bufio.NewScanner(bytes.NewReader(data))
 	for sc.Scan() {
 		f := strings.Fields(sc.Text())
+		// Filtered by TYPE, not by whether the source looks like
+		// /dev/something. ZFS names a pool and btrfs can name a subvolume,
+		// so a device-path test would drop two real local filesystems --
+		// and it would drop exactly the ones the metrics summary keeps,
+		// which is the disagreement RealFSType exists to prevent. Type is
+		// also what keeps statfs off a wedged NFS mount, since the network
+		// types are excluded before the call below is ever reached.
 		if len(f) < 3 || !agenttypes.RealFSType(f[2]) {
-			continue
-		}
-		// Only real block devices. A network or fuse mount whose source
-		// is a URL is storage, but it is not THIS machine's storage, and
-		// the inventory question is what this machine has.
-		if !strings.HasPrefix(f[0], "/dev/") {
 			continue
 		}
 		if _, dup := seen[f[0]]; dup {

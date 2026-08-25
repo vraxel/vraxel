@@ -124,14 +124,18 @@ udev /dev devtmpfs rw,nosuid 0 0
 /dev/mapper/debian--vg-root / ext4 rw,relatime,errors=remount-ro 0 0
 tmpfs /run tmpfs rw,nosuid 0 0
 /dev/sda1 /boot ext4 rw,relatime 0 0
-/dev/mapper/debian--vg-root /var/lib/docker/btrfs btrfs rw,relatime 0 0
 server:/export /mnt/nfs nfs4 rw,relatime 0 0
+//fileserver/share /mnt/smb cifs rw 0 0
+tank/data /srv/tank zfs rw,relatime 0 0
 /dev/sdb1 /mnt/data\040dir ext4 rw,relatime 0 0
 `
 	got := parseMounts([]byte(mounts))
+	// zfs names a pool, not a device path, and is kept: it is this
+	// machine's disk. nfs4 and cifs are somebody else's, and are not.
 	want := []mountEntry{
 		{device: "/dev/mapper/debian--vg-root", mount: "/", fstype: "ext4"},
 		{device: "/dev/sda1", mount: "/boot", fstype: "ext4"},
+		{device: "tank/data", mount: "/srv/tank", fstype: "zfs"},
 		{device: "/dev/sdb1", mount: "/mnt/data dir", fstype: "ext4"},
 	}
 	if len(got) != len(want) {
@@ -156,12 +160,16 @@ func TestParseMountsDedupesByDevice(t *testing.T) {
 }
 
 func TestRealFSTypeAndNetDevice(t *testing.T) {
-	for _, fs := range []string{"ext4", "xfs", "btrfs", "zfs"} {
+	for _, fs := range []string{"ext4", "xfs", "btrfs", "zfs", "ext3", "vfat"} {
 		if !agenttypes.RealFSType(fs) {
 			t.Errorf("RealFSType(%q) = false", fs)
 		}
 	}
-	for _, fs := range []string{"tmpfs", "proc", "sysfs", "overlay"} {
+	// The network types matter as much as the pseudo ones: node_exporter's
+	// filesystem collector reports them by default, so leaving them in
+	// would count the file server's disk toward every client that mounts
+	// it -- in the gauge and in the table alike.
+	for _, fs := range []string{"tmpfs", "proc", "sysfs", "overlay", "nfs4", "cifs", "fuse.sshfs"} {
 		if agenttypes.RealFSType(fs) {
 			t.Errorf("RealFSType(%q) = true", fs)
 		}

@@ -45,6 +45,13 @@ const (
 	// Sized so the worst case (long names plus 256-byte failure
 	// messages) stays well inside MaxFrameBytes.
 	maxHeartbeatProbes = 128
+	// maxFactsListEntries caps each inventory list, for the same reason
+	// maxHeartbeatProbes exists: an oversize frame is refused by
+	// EncodeFrame, and a host with 500 LVM volumes would then never
+	// report its inventory at all -- losing its CPU model and kernel
+	// version, which fit easily, over a list nobody can read anyway.
+	// Truncation is logged; silent capping would read as completeness.
+	maxFactsListEntries = 128
 )
 
 // bootNonce identifies this agent process for the lifetime of the
@@ -377,6 +384,11 @@ func (c *Channel) factsLoop(ctx context.Context, send SendFunc) {
 	sent := ""
 	for {
 		facts := c.Facts()
+		// Generic, so a free function rather than a method: Go has no
+		// generic methods.
+		facts.NICs = capFacts(facts.NICs, c.Log, "nics")
+		facts.Filesystems = capFacts(facts.Filesystems, c.Log, "filesystems")
+		facts.BlockDevices = capFacts(facts.BlockDevices, c.Log, "block devices")
 		if encoded, err := json.Marshal(facts); err != nil {
 			c.Log.Warnf("control channel: encode host facts: %v", err)
 		} else if string(encoded) != sent {
@@ -396,6 +408,19 @@ func (c *Channel) factsLoop(ctx context.Context, send SendFunc) {
 		case <-ticker.C:
 		}
 	}
+}
+
+// capFacts trims one inventory list to what a frame can carry, saying so
+// when it has to. Logged on every resample rather than once: this is a
+// standing property of the host, and an hourly line is the only place it
+// is visible at all.
+func capFacts[T any](items []T, log Logger, what string) []T {
+	if len(items) <= maxFactsListEntries {
+		return items
+	}
+	log.Warnf("host facts: reporting %d of %d %s; the rest exceed the control frame limit",
+		maxFactsListEntries, len(items), what)
+	return items[:maxFactsListEntries]
 }
 
 func (c *Channel) handle(ctx context.Context, f agenttypes.Frame, send SendFunc) {
