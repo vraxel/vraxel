@@ -144,7 +144,6 @@ const (
 	// The composition behind mem.used_pct: a host "at 90%" that is 70%
 	// page cache is not short of memory, and the percentage alone cannot
 	// tell an operator which of the two they are looking at.
-	SeriesMemTotal   = "mem.total_bytes"
 	SeriesMemFree    = "mem.free_bytes"
 	SeriesMemBuffers = "mem.buffers_bytes"
 	SeriesMemCached  = "mem.cached_bytes"
@@ -167,13 +166,11 @@ const (
 	SeriesProcsRunning = "sys.procs_running"
 	SeriesProcsBlocked = "sys.procs_blocked"
 	SeriesFDUsedPct    = "sys.fd_used_pct"
-	// Offset from true time in seconds, and whether the kernel considers
-	// itself synchronised (1 / 0). A host whose clock has drifted writes
-	// metric timestamps nothing can line up -- observed on this platform
-	// as charts that were simply empty, with no other field able to say
-	// why.
+	// Offset from true time in seconds. A host whose clock has drifted
+	// writes metric timestamps nothing can line up -- observed on this
+	// platform as charts that were simply empty, with no other field able
+	// to say why.
 	SeriesTimeDriftSec = "sys.time_drift_sec"
-	SeriesTimeSynced   = "sys.time_synced"
 
 	// --- sockets, unlabelled ---
 	// Retransmits per second is the single best "is the network healthy"

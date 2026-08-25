@@ -139,7 +139,6 @@ var vmVocabulary = map[string]vmExpr{
 	agenttypes.SeriesNetTxDrops: {expr: rate(`node_network_transmit_drop_total{` + netFilter + `}`), dim: "device"},
 
 	// --- memory composition ---
-	agenttypes.SeriesMemTotal:   {expr: `node_memory_MemTotal_bytes`},
 	agenttypes.SeriesMemFree:    {expr: `node_memory_MemFree_bytes`},
 	agenttypes.SeriesMemBuffers: {expr: `node_memory_Buffers_bytes`},
 	agenttypes.SeriesMemCached:  {expr: `node_memory_Cached_bytes`},
@@ -194,7 +193,6 @@ var vmVocabulary = map[string]vmExpr{
 	agenttypes.SeriesProcsBlocked: {expr: `node_procs_blocked`},
 	agenttypes.SeriesFDUsedPct:    {expr: `clamp(100 * node_filefd_allocated / (node_filefd_maximum > 0), 0, 100)`},
 	agenttypes.SeriesTimeDriftSec: {expr: `node_timex_offset_seconds`},
-	agenttypes.SeriesTimeSynced:   {expr: `node_timex_sync_status`},
 	agenttypes.SeriesTempCelsius:  {expr: `node_hwmon_temp_celsius`, dim: "chip", dim2: "sensor"},
 }
 
@@ -211,7 +209,7 @@ var vmVocabularyOrder = []string{
 	agenttypes.SeriesLoad1, agenttypes.SeriesLoad5, agenttypes.SeriesLoad15,
 
 	agenttypes.SeriesMemUsedPct, agenttypes.SeriesMemUsed, agenttypes.SeriesSwapUsed,
-	agenttypes.SeriesMemTotal, agenttypes.SeriesMemFree,
+	agenttypes.SeriesMemFree,
 	agenttypes.SeriesMemBuffers, agenttypes.SeriesMemCached,
 	agenttypes.SeriesSwapInPps, agenttypes.SeriesSwapOutPps,
 	agenttypes.SeriesPageFaults, agenttypes.SeriesOOMKills, agenttypes.SeriesPSIMemPct,
@@ -230,7 +228,7 @@ var vmVocabularyOrder = []string{
 	agenttypes.SeriesSocketsUsed, agenttypes.SeriesConntrackPct,
 
 	agenttypes.SeriesUptimeSec, agenttypes.SeriesProcsRunning, agenttypes.SeriesProcsBlocked,
-	agenttypes.SeriesFDUsedPct, agenttypes.SeriesTimeDriftSec, agenttypes.SeriesTimeSynced,
+	agenttypes.SeriesFDUsedPct, agenttypes.SeriesTimeDriftSec,
 	agenttypes.SeriesTempCelsius,
 }
 
