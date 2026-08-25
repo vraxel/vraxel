@@ -79,15 +79,36 @@ export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef 
     // Only while the agent is up: an offline host has no ring to answer
     // from, and the panel says so instead of polling into an error.
     enabled: online,
-    refetchInterval: 30_000,
+    // No faster than a bucket completes, and never faster than 30s.
+    //
+    // Every poll refetches the whole window to learn about its tail: at
+    // 6h, two polls 30s apart differ in 6 of 361 buckets (measured --
+    // 3.8% of the points), because only the trailing buckets are still
+    // filling. Polling twice per bucket buys a partially-formed tail,
+    // which is not what a six-hour trend is read for, and each one is
+    // work for the managed machine's own agent since the server keeps no
+    // history.
+    //
+    // The 30s floor is the other half: at 1h the step is the agent's own
+    // 15s sample period, and matching it would double the load on the
+    // default view to shave 15s off a chart nobody reads that closely.
+    refetchInterval: Math.max(preset.stepSec * 1000, 30_000),
+    // The interval already skips fetching while the tab is hidden --
+    // that is the library default, not something to restate here. What
+    // is NOT the default is coming back: refetchOnWindowFocus is false
+    // globally (core/query/client.ts), so returning to the tab left the
+    // charts on the window the operator walked away from until the next
+    // tick fired. A metrics panel that reads as live has to catch up the
+    // moment it is looked at.
+    refetchOnWindowFocus: true,
     // Switching range mints a new key, and without this the charts fall
     // back to skeletons: six recharts instances torn down and rebuilt,
     // losing whatever series the operator had isolated. Keeping the
     // previous window on screen swaps the data in place instead.
     placeholderData: keepPreviousData,
-    // Failures render inline on the card. Without this, the 30s poll
-    // against a briefly unreachable agent raises a toast per attempt --
-    // a sustained storm for as long as the page stays open.
+    // Failures render inline on the card. Without this, polling against
+    // a briefly unreachable agent raises a toast per attempt -- a
+    // sustained storm for as long as the page stays open.
     meta: { skipGlobalError: true },
   })
 
