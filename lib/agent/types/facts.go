@@ -1,6 +1,9 @@
 package types
 
-import "strings"
+import (
+	"sort"
+	"strings"
+)
 
 // HostFacts is the machine's inventory: what it IS, as opposed to what it
 // is currently doing. Reported on the host.facts frame.
@@ -154,6 +157,21 @@ func RealFSType(fstype string) bool {
 	return !skip
 }
 
+// NonLocalFSTypes lists what RealFSType rejects, sorted.
+//
+// Exported so the VictoriaMetrics backend can build the equivalent
+// PromQL label matcher from this same set. The two metric backends
+// promise to answer identically for the same window, and the only way to
+// keep two hand-written exclusion lists agreeing is to not have two.
+func NonLocalFSTypes() []string {
+	out := make([]string, 0, len(notLocalStorage))
+	for k := range notLocalStorage {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
 // virtualNetPrefixes are the per-container and per-bridge interface
 // families. A packet crossing a bridge is counted again on every veth it
 // traverses, and an operator reading a NIC list wants the machine's
@@ -161,6 +179,14 @@ func RealFSType(fstype string) bool {
 var virtualNetPrefixes = []string{
 	"veth", "docker", "br-", "virbr", "cni", "flannel", "cali", "tunl",
 	"nodelocaldns", "kube-ipvs", "dummy", "lxc", "tap",
+}
+
+// VirtualNetPrefixes lists the interface-name prefixes RealNetDevice
+// rejects, plus the loopback it rejects by exact name. Exported for the
+// same reason as NonLocalFSTypes: one membership rule, two query
+// languages.
+func VirtualNetPrefixes() (prefixes []string, exact []string) {
+	return append([]string(nil), virtualNetPrefixes...), []string{"lo"}
 }
 
 // RealNetDevice reports whether an interface belongs to the machine
