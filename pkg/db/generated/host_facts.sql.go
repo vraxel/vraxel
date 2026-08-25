@@ -20,11 +20,19 @@ WITH scalars AS (
         cpu_cores_per_socket = $8,
         cpu_threads_per_core = $9,
         kernel_version       = $10,
-        system_vendor        = $11,
-        product_name         = $12,
-        bios_version         = $13,
-        serial_number        = $14,
-        timezone             = $15
+        os_id                = $11,
+        os_version_id        = $12,
+        system_vendor        = $13,
+        product_name         = $14,
+        bios_version         = $15,
+        bios_date            = $16,
+        board_name           = $17,
+        board_serial         = $18,
+        chassis_type         = $19,
+        serial_number        = $20,
+        asset_tag            = $21,
+        timezone             = $22,
+        default_gateway      = $23
         -- updated_at is deliberately left alone. It means "an operator
         -- changed this record"; a machine describing itself is not that,
         -- and bumping it would make every host look edited once an hour.
@@ -50,11 +58,19 @@ type UpsertHostFactsParams struct {
 	CpuCoresPerSocket int32           `json:"cpu_cores_per_socket"`
 	CpuThreadsPerCore int32           `json:"cpu_threads_per_core"`
 	KernelVersion     string          `json:"kernel_version"`
+	OsID              string          `json:"os_id"`
+	OsVersionID       string          `json:"os_version_id"`
 	SystemVendor      string          `json:"system_vendor"`
 	ProductName       string          `json:"product_name"`
 	BiosVersion       string          `json:"bios_version"`
+	BiosDate          string          `json:"bios_date"`
+	BoardName         string          `json:"board_name"`
+	BoardSerial       string          `json:"board_serial"`
+	ChassisType       string          `json:"chassis_type"`
 	SerialNumber      string          `json:"serial_number"`
+	AssetTag          string          `json:"asset_tag"`
 	Timezone          string          `json:"timezone"`
+	DefaultGateway    string          `json:"default_gateway"`
 }
 
 // Host inventory writes. Reads live in host.sql's GetHostByID, because
@@ -80,11 +96,19 @@ func (q *Queries) UpsertHostFacts(ctx context.Context, arg UpsertHostFactsParams
 		arg.CpuCoresPerSocket,
 		arg.CpuThreadsPerCore,
 		arg.KernelVersion,
+		arg.OsID,
+		arg.OsVersionID,
 		arg.SystemVendor,
 		arg.ProductName,
 		arg.BiosVersion,
+		arg.BiosDate,
+		arg.BoardName,
+		arg.BoardSerial,
+		arg.ChassisType,
 		arg.SerialNumber,
+		arg.AssetTag,
 		arg.Timezone,
+		arg.DefaultGateway,
 	)
 	return err
 }

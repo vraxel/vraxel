@@ -31,6 +31,9 @@ func Facts() agenttypes.HostFacts {
 	cpuinfo, _ := os.ReadFile("/proc/cpuinfo")
 	model, sockets, coresPerSocket, threadsPerCore := parseCPUInfo(cpuinfo)
 	vendor, product := dmiField("sys_vendor"), dmiField("product_name")
+	osReleaseData, _ := os.ReadFile("/etc/os-release")
+	osID, osVersionID := parseOSRelease(osReleaseData)
+	route, _ := os.ReadFile("/proc/net/route")
 
 	return agenttypes.HostFacts{
 		Virtualization:    detectVirt(cpuinfo, vendor, product),
@@ -39,16 +42,37 @@ func Facts() agenttypes.HostFacts {
 		CPUCoresPerSocket: coresPerSocket,
 		CPUThreadsPerCore: threadsPerCore,
 		KernelVersion:     kernelVersion(),
+		OSID:              osID,
+		OSVersionID:       osVersionID,
 		SystemVendor:      vendor,
 		ProductName:       product,
 		BIOSVersion:       dmiField("bios_version"),
+		BIOSDate:          dmiField("bios_date"),
+		BoardName:         dmiField("board_name"),
+		BoardSerial:       dmiField("board_serial"),
+		ChassisType:       chassisType(dmiInt("chassis_type")),
 		SerialNumber:      dmiField("product_serial"),
-		Timezone:          timezone(),
+		// The chassis tag is the one an operator burns in at racking; the
+		// board tag is what a board vendor may have left. Chassis first,
+		// board only when the chassis has nothing, because a replaced
+		// board must not silently change a machine's asset identity.
+		AssetTag:       firstNonEmpty(dmiField("chassis_asset_tag"), dmiField("board_asset_tag")),
+		Timezone:       timezone(),
+		DefaultGateway: parseRouteGateway(route),
 
 		NICs:         nics(),
 		Filesystems:  filesystems(),
 		BlockDevices: blockDevices(),
 	}
+}
+
+func firstNonEmpty(vs ...string) string {
+	for _, v := range vs {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 // dmiField reads one SMBIOS string.
@@ -70,6 +94,13 @@ func dmiField(name string) string {
 		return ""
 	}
 	return v
+}
+
+// dmiInt reads one SMBIOS field that holds a number, -1 when there is
+// none. Separate from dmiField because the placeholder filter there would
+// have to know that "0" is a real chassis code and "0123456789" is not.
+func dmiInt(name string) int64 {
+	return sysInt(dmiDir, name)
 }
 
 // kernelVersion is uname -r, read from procfs rather than through
@@ -100,10 +131,17 @@ func timezone() string {
 // nics lists the machine's own interfaces.
 //
 // Two filters, and they catch different things. RealNetDevice drops
-// container and bridge plumbing by name, which is what an operator means
-// by "not my NIC". The device/ symlink check drops what remains of the
-// kernel's invented interfaces -- bonds, vlans, tunnels -- which have no
-// hardware behind them at all.
+// container plumbing by name, which is what an operator means by "not my
+// NIC". nicKind then keeps what has hardware behind it OR is one of the
+// three kernel devices that CARRY ADDRESSES -- bond, bridge, vlan -- and
+// drops the rest (tunnels, wireguard, dummy).
+//
+// Keeping those three is the point. Enslave eth0 and eth1 to bond0 and
+// the addresses move to bond0; filter bond0 out and the page shows two
+// hardware ports with no address and no sign that the machine has one.
+// The same happens to a hypervisor host whose address sits on br0 and to
+// any tagged uplink. So the aggregate is listed alongside its members,
+// and Master says which member belongs to which.
 func nics() []agenttypes.NIC {
 	entries, err := os.ReadDir(sysNetDir)
 	if err != nil {
@@ -116,13 +154,16 @@ func nics() []agenttypes.NIC {
 			continue
 		}
 		dir := filepath.Join(sysNetDir, name)
-		if _, err := os.Stat(filepath.Join(dir, "device")); err != nil {
+		kind := nicKind(dir)
+		if kind == "" {
 			continue
 		}
 		n := agenttypes.NIC{
-			Name:  name,
-			MAC:   strings.ToLower(sysStr(dir, "address")),
-			State: sysStr(dir, "operstate"),
+			Name:   name,
+			MAC:    strings.ToLower(sysStr(dir, "address")),
+			State:  sysStr(dir, "operstate"),
+			Kind:   kind,
+			Master: linkName(dir, "master"),
 		}
 		// A down link reports -1, and a driver that does not know reports
 		// an error; both mean "no speed to show", not zero megabits. Same
@@ -133,11 +174,67 @@ func nics() []agenttypes.NIC {
 		if m := sysInt(dir, "mtu"); m > 0 {
 			n.MTU = int32(m)
 		}
+		// duplex reads EINVAL on a down link, the same as speed above, so
+		// a link that is not up simply has none. Matched against the two
+		// values the kernel defines rather than passed through: it also
+		// spells "unknown", which would render as a duplex mode.
+		if d := sysStr(dir, "duplex"); d == "full" || d == "half" {
+			n.Duplex = d
+		}
+		n.Driver = linkName(filepath.Join(dir, "device"), "driver")
 		n.IPv4, n.IPv6 = addrsOf(name)
 		out = append(out, n)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
+}
+
+// nicKind classifies one interface, empty for the ones not worth listing.
+//
+// DEVTYPE in uevent is how the kernel names its own device classes, and
+// it is the only answer that does not involve guessing from the
+// interface's name: a bond called "uplink" and a vlan called "storage"
+// are both ordinary, and neither is recognisable by string matching.
+// Hardware has no DEVTYPE at all, which is what the device/ symlink is
+// left to answer.
+func nicKind(dir string) string {
+	switch devType(dir) {
+	case "bond":
+		return agenttypes.NICBond
+	case "bridge":
+		return agenttypes.NICBridge
+	case "vlan":
+		return agenttypes.NICVLAN
+	}
+	if _, err := os.Stat(filepath.Join(dir, "device")); err == nil {
+		return agenttypes.NICPhysical
+	}
+	return ""
+}
+
+// devType reads DEVTYPE out of an interface's uevent file.
+func devType(dir string) string {
+	b, err := os.ReadFile(filepath.Join(dir, "uevent"))
+	if err != nil {
+		return ""
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		if v, ok := strings.CutPrefix(line, "DEVTYPE="); ok {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
+}
+
+// linkName resolves a sysfs symlink to the last element of its target,
+// which is the name of whatever it points at: the bond an interface is
+// enslaved to, the driver module bound to a device.
+func linkName(dir, name string) string {
+	target, err := os.Readlink(filepath.Join(dir, name))
+	if err != nil {
+		return ""
+	}
+	return filepath.Base(target)
 }
 
 // addrsOf splits an interface's addresses by family, in CIDR form.
@@ -177,11 +274,16 @@ func filesystems() []agenttypes.Filesystem {
 	}
 	var out []agenttypes.Filesystem
 	for _, m := range parseMounts(data) {
-		fs := agenttypes.Filesystem{Mount: m.mount, Device: m.device, FSType: m.fstype}
+		fs := agenttypes.Filesystem{
+			Mount: m.mount, Device: m.device, FSType: m.fstype, ReadOnly: m.readOnly,
+		}
 		var st syscall.Statfs_t
 		// Statfs blocks forever on a wedged NFS mount. Not guarded here
-		// because parseMounts already dropped everything that is not a
-		// /dev/ device, and a local block device does not wedge a statfs.
+		// because parseMounts rejects every network filesystem BY TYPE
+		// before this line is reached, and a local block device does not
+		// wedge a statfs. (This used to say "everything that is not a
+		// /dev/ device", which was the older rule -- and the one that
+		// dropped ZFS, whose source names a pool.)
 		if err := syscall.Statfs(m.mount, &st); err == nil && st.Bsize > 0 {
 			bs := int64(st.Bsize)
 			fs.SizeBytes = int64(st.Blocks) * bs
@@ -189,6 +291,13 @@ func filesystems() []agenttypes.Filesystem {
 			// is unavailable to anything an operator runs, so counting it
 			// as free is a number that disagrees with df.
 			fs.UsedBytes = (int64(st.Blocks) - int64(st.Bavail)) * bs
+			// btrfs and most network filesystems allocate inodes on
+			// demand and report Files as 0. That is "no limit to show",
+			// not "no inodes left", so both fields stay absent.
+			if st.Files > 0 {
+				fs.InodesTotal = int64(st.Files)
+				fs.InodesUsed = int64(st.Files) - int64(st.Ffree)
+			}
 		}
 		out = append(out, fs)
 	}
@@ -218,10 +327,17 @@ func blockDevices() []agenttypes.BlockDevice {
 		if sysInt(dir, "removable") == 1 {
 			continue
 		}
+		devDir := filepath.Join(dir, "device")
 		d := agenttypes.BlockDevice{
 			Name:       e.Name(),
 			Rotational: sysInt(filepath.Join(dir, "queue"), "rotational") == 1,
-			Model:      sysStr(filepath.Join(dir, "device"), "model"),
+			Vendor:     diskVendor(sysStr(devDir, "vendor")),
+			Model:      sysStr(devDir, "model"),
+			// NVMe publishes the drive serial directly; SCSI and SATA
+			// publish the VPD identifier instead, and wwid is where the
+			// kernel writes it. Neither is present on most virtual disks,
+			// which have no identity to publish.
+			Serial: firstNonEmpty(sysStr(devDir, "serial"), sysStr(devDir, "wwid")),
 		}
 		// size is in 512-byte sectors regardless of the device's own
 		// block size; this is a kernel ABI constant, not a guess.

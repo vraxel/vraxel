@@ -152,9 +152,34 @@ export interface HostSpec {
   cpuCoresPerSocket?: number /* int32 */;
   cpuThreadsPerCore?: number /* int32 */;
   kernelVersion?: string;
+  /**
+   * OSID and OSVersionID are /etc/os-release's ID and VERSION_ID
+   * ("debian", "13"), kept apart from the display string in OS: a fleet
+   * question is a comparison on the parts, not a substring match on the
+   * joined name.
+   */
+  osId?: string;
+  osVersionId?: string;
   systemVendor?: string;
   productName?: string;
   biosVersion?: string;
+  /**
+   * BIOSDate is the firmware build date as DMI spells it (MM/DD/YYYY):
+   * the closest thing to a hardware age this machine can answer alone.
+   */
+  biosDate?: string;
+  /**
+   * BoardName / BoardSerial describe the motherboard, not the system.
+   * A board swap changes these and leaves SerialNumber alone.
+   */
+  boardName?: string;
+  boardSerial?: string;
+  /**
+   * ChassisType is the SMBIOS enclosure class collapsed to one of
+   * desktop / tower / laptop / server / rack / blade. Empty on a guest,
+   * where every hypervisor reports "Other".
+   */
+  chassisType?: string;
   /**
    * SerialNumber is the DMI product serial: an asset identifier on
    * physical hardware, and a restatement of the SMBIOS UUID on a guest.
@@ -162,11 +187,23 @@ export interface HostSpec {
    */
   serialNumber?: string;
   /**
+   * AssetTag is the tag burned into SMBIOS at provisioning -- the same
+   * field NetBox and bk-cmdb ask an operator to type in, read from the
+   * machine instead.
+   */
+  assetTag?: string;
+  /**
    * Timezone is the IANA name the machine is configured with. Worth a
    * field of its own because a host in the wrong zone produces logs
    * nobody can line up against anything else.
    */
   timezone?: string;
+  /**
+   * DefaultGateway is the IPv4 next hop for 0.0.0.0/0: where on the
+   * network this machine sits, without reading its addresses against a
+   * subnet map kept somewhere else.
+   */
+  defaultGateway?: string;
   /**
    * BootAt is when the machine last booted, dated by the SERVER's clock
    * from the uptime counter the agent reports -- so it stays right on a
@@ -207,6 +244,27 @@ export interface HostNIC {
   speedMbps?: number /* int32 */;
   mtu?: number /* int32 */;
   state?: string;
+  /**
+   * Duplex is "full" or "half", absent on a down link. Half duplex on a
+   * server link is a negotiation failure that reads as unexplained
+   * latency everywhere else.
+   */
+  duplex?: string;
+  /**
+   * Driver is the kernel module bound to the hardware.
+   */
+  driver?: string;
+  /**
+   * Kind is "physical", "bond", "bridge" or "vlan". The last three have
+   * no hardware behind them and are listed anyway, because on a machine
+   * that uses them the ADDRESS is on them and not on the port beneath.
+   */
+  kind?: string;
+  /**
+   * Master is the aggregate this interface is enslaved to, empty when it
+   * stands alone.
+   */
+  master?: string;
 }
 /**
  * HostFilesystem is one mounted real filesystem. tmpfs and the kernel's
@@ -220,6 +278,20 @@ export interface HostFilesystem {
   fstype?: string;
   sizeBytes?: number /* int64 */;
   usedBytes?: number /* int64 */;
+  /**
+   * InodesTotal / InodesUsed are absent on filesystems that allocate
+   * inodes on demand (btrfs) and so have no ceiling to report. Where
+   * they are present they can run out while the byte gauge still reads
+   * half empty, and writes then fail on a disk that looks fine.
+   */
+  inodesTotal?: number /* int64 */;
+  inodesUsed?: number /* int64 */;
+  /**
+   * ReadOnly is a fault indicator, not a setting: ext4 and xfs default
+   * to errors=remount-ro, so a local filesystem that has gone read-only
+   * is a disk the kernel gave up on with services still running on it.
+   */
+  readOnly?: boolean;
 }
 /**
  * HostBlockDevice is one whole disk. Partitions and removable media are
@@ -230,7 +302,14 @@ export interface HostBlockDevice {
   name: string;
   sizeBytes?: number /* int64 */;
   rotational?: boolean;
+  vendor?: string;
   model?: string;
+  /**
+   * Serial identifies the physical drive across chassis and controller
+   * renumbering: "sda" is a slot, this is the disk. Absent on most
+   * virtual disks, which have no identity to publish.
+   */
+  serial?: string;
 }
 /**
  * HostAlertRuleSpec is one threshold over the heartbeat snapshot.

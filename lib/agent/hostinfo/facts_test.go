@@ -185,3 +185,124 @@ func TestRealFSTypeAndNetDevice(t *testing.T) {
 		}
 	}
 }
+
+// The trap this parser exists for: ext4's DEFAULT mount options contain
+// the string "ro" inside errors=remount-ro, so a substring test would
+// report every healthy root filesystem as faulted.
+func TestParseMountsReadOnly(t *testing.T) {
+	const mounts = `/dev/sda1 / ext4 rw,relatime,errors=remount-ro 0 0
+/dev/sda2 /var ext4 ro,relatime 0 0
+/dev/sda3 /srv xfs rw,nosuid,errors=remount-ro,discard 0 0
+`
+	got := parseMounts([]byte(mounts))
+	want := map[string]bool{"/": false, "/var": true, "/srv": false}
+	if len(got) != len(want) {
+		t.Fatalf("got %d mounts, want %d", len(got), len(want))
+	}
+	for _, m := range got {
+		if m.readOnly != want[m.mount] {
+			t.Errorf("%s readOnly = %v, want %v", m.mount, m.readOnly, want[m.mount])
+		}
+	}
+}
+
+func TestChassisType(t *testing.T) {
+	for code, want := range map[int64]string{
+		3:  agenttypes.ChassisDesktop,
+		7:  agenttypes.ChassisTower,
+		10: agenttypes.ChassisLaptop,
+		17: agenttypes.ChassisServer,
+		23: agenttypes.ChassisRack,
+		28: agenttypes.ChassisBlade,
+		// 1 is "Other", which is what every hypervisor reports and what an
+		// unreadable field decodes to. Naming it would put a made-up
+		// enclosure on every VM in the fleet.
+		1: "",
+		2: "",
+		// sysInt returns -1 when there is nothing to read.
+		-1: "",
+	} {
+		if got := chassisType(code); got != want {
+			t.Errorf("chassisType(%d) = %q, want %q", code, got, want)
+		}
+	}
+}
+
+func TestParseRouteGateway(t *testing.T) {
+	// 0201010A is 10.1.1.2 read back to front, which is how the kernel
+	// prints a little-endian machine's in-memory address word.
+	const route = `Iface	Destination	Gateway 	Flags	RefCnt	Use	Metric	Mask		MTU	Window	IRTT
+ens33	00000000	0201010A	0003	0	0	100	00000000	0	0	0
+ens33	0001010A	00000000	0001	0	0	0	00FFFFFF	0	0	0
+docker0	000011AC	00000000	0001	0	0	0	0000FFFF	0	0	0
+`
+	if got := parseRouteGateway([]byte(route)); got != "10.1.1.2" {
+		t.Errorf("gateway = %q, want 10.1.1.2", got)
+	}
+}
+
+// Two uplinks means two default routes, and the kernel uses the cheaper
+// one. Reporting whichever came first would name the standby half the
+// time, and the file's order is not stable across reboots.
+func TestParseRouteGatewayPrefersLowestMetric(t *testing.T) {
+	const route = `Iface	Destination	Gateway 	Flags	RefCnt	Use	Metric	Mask		MTU	Window	IRTT
+eth1	00000000	FE01010A	0003	0	0	200	00000000	0	0	0
+eth0	00000000	0201010A	0003	0	0	100	00000000	0	0	0
+`
+	if got := parseRouteGateway([]byte(route)); got != "10.1.1.2" {
+		t.Errorf("gateway = %q, want 10.1.1.2 (metric 100)", got)
+	}
+}
+
+// A default route with no RTF_GATEWAY bit is an on-link route out an
+// interface. It is a valid way to reach the internet and it has no next
+// hop, so there is nothing to report.
+func TestParseRouteGatewayIgnoresOnLinkAndAbsent(t *testing.T) {
+	const onlink = `Iface	Destination	Gateway 	Flags	RefCnt	Use	Metric	Mask		MTU	Window	IRTT
+eth0	00000000	00000000	0001	0	0	0	00000000	0	0	0
+`
+	if got := parseRouteGateway([]byte(onlink)); got != "" {
+		t.Errorf("on-link default gave %q, want empty", got)
+	}
+	if got := parseRouteGateway(nil); got != "" {
+		t.Errorf("empty route table gave %q, want empty", got)
+	}
+}
+
+func TestParseOSRelease(t *testing.T) {
+	const osRelease = `PRETTY_NAME="Debian GNU/Linux 13 (trixie)"
+NAME="Debian GNU/Linux"
+VERSION_ID="13"
+VERSION="13 (trixie)"
+ID=debian
+HOME_URL="https://www.debian.org/"
+`
+	id, version := parseOSRelease([]byte(osRelease))
+	if id != "debian" || version != "13" {
+		t.Errorf("got (%q, %q), want (debian, 13)", id, version)
+	}
+	// ID_LIKE starts with "ID" and is a different field; a prefix match
+	// would return "rhel fedora" as the distribution's own id.
+	id, _ = parseOSRelease([]byte("ID_LIKE=\"rhel fedora\"\nID=\"rocky\"\n"))
+	if id != "rocky" {
+		t.Errorf("id = %q, want rocky", id)
+	}
+}
+
+// The SCSI INQUIRY vendor field is 8 bytes, so a longer name arrives cut
+// off wherever byte 8 lands -- "VMware, Inc." as "VMware, ". Only the
+// dangling separator goes; a name that fits is untouched.
+func TestDiskVendor(t *testing.T) {
+	for in, want := range map[string]string{
+		"VMware, ": "VMware",
+		"VMware,":  "VMware",
+		"ATA     ": "ATA",
+		"SEAGATE":  "SEAGATE",
+		"DELL":     "DELL",
+		"":         "",
+	} {
+		if got := diskVendor(in); got != want {
+			t.Errorf("diskVendor(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

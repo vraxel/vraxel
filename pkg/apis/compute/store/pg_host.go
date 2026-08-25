@@ -102,11 +102,19 @@ type HostRow struct {
 	CPUCoresPerSocket int32
 	CPUThreadsPerCore int32
 	KernelVersion     string
+	OSID              string
+	OSVersionID       string
 	SystemVendor      string
 	ProductName       string
 	BIOSVersion       string
+	BIOSDate          string
+	BoardName         string
+	BoardSerial       string
+	ChassisType       string
 	SerialNumber      string
+	AssetTag          string
 	Timezone          string
+	DefaultGateway    string
 	// BootAt is dated by the SERVER's clock from the uptime the agent
 	// reports, which is why it survives a host whose wall clock is wrong.
 	BootAt            *time.Time
@@ -380,11 +388,19 @@ func listRowToDomain(r *generated.ListHostsRow) HostRow {
 		CPUCoresPerSocket:       r.CpuCoresPerSocket,
 		CPUThreadsPerCore:       r.CpuThreadsPerCore,
 		KernelVersion:           r.KernelVersion,
+		OSID:                    r.OsID,
+		OSVersionID:             r.OsVersionID,
 		SystemVendor:            r.SystemVendor,
 		ProductName:             r.ProductName,
 		BIOSVersion:             r.BiosVersion,
+		BIOSDate:                r.BiosDate,
+		BoardName:               r.BoardName,
+		BoardSerial:             r.BoardSerial,
+		ChassisType:             r.ChassisType,
 		SerialNumber:            r.SerialNumber,
+		AssetTag:                r.AssetTag,
 		Timezone:                r.Timezone,
+		DefaultGateway:          r.DefaultGateway,
 	}
 }
 
@@ -429,11 +445,19 @@ func getRowToDomain(r *generated.GetHostByIDRow) HostRow {
 		CPUCoresPerSocket:       r.CpuCoresPerSocket,
 		CPUThreadsPerCore:       r.CpuThreadsPerCore,
 		KernelVersion:           r.KernelVersion,
+		OSID:                    r.OsID,
+		OSVersionID:             r.OsVersionID,
 		SystemVendor:            r.SystemVendor,
 		ProductName:             r.ProductName,
 		BIOSVersion:             r.BiosVersion,
+		BIOSDate:                r.BiosDate,
+		BoardName:               r.BoardName,
+		BoardSerial:             r.BoardSerial,
+		ChassisType:             r.ChassisType,
 		SerialNumber:            r.SerialNumber,
+		AssetTag:                r.AssetTag,
 		Timezone:                r.Timezone,
+		DefaultGateway:          r.DefaultGateway,
 		BootAt:                  r.AgentBootAt,
 		FactsNICs:               r.FactsNics,
 		FactsFilesystems:        r.FactsFilesystems,

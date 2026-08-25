@@ -4051,9 +4051,13 @@ components:
           type: string
         rotational:
           type: boolean
+        serial:
+          type: string
         sizeBytes:
           type: integer
           format: int64
+        vendor:
+          type: string
     HostFilesystem:
       type: object
       properties:
@@ -4061,8 +4065,16 @@ components:
           type: string
         fstype:
           type: string
+        inodesTotal:
+          type: integer
+          format: int64
+        inodesUsed:
+          type: integer
+          format: int64
         mount:
           type: string
+        readOnly:
+          type: boolean
         sizeBytes:
           type: integer
           format: int64
@@ -4097,6 +4109,10 @@ components:
     HostNIC:
       type: object
       properties:
+        driver:
+          type: string
+        duplex:
+          type: string
         ipv4:
           type: array
           items:
@@ -4105,7 +4121,11 @@ components:
           type: array
           items:
             type: string
+        kind:
+          type: string
         mac:
+          type: string
+        master:
           type: string
         mtu:
           type: integer
@@ -4145,15 +4165,25 @@ components:
           format: int64
         arch:
           type: string
+        assetTag:
+          type: string
+        biosDate:
+          type: string
         biosVersion:
           type: string
         blockDevices:
           type: array
           items:
             $ref: '#/components/schemas/HostBlockDevice'
+        boardName:
+          type: string
+        boardSerial:
+          type: string
         bootAt:
           type: string
           format: date-time
+        chassisType:
+          type: string
         connectivityMode:
           type: string
         cpuCores:
@@ -4179,6 +4209,8 @@ components:
           type: number
           format: double
         createdByName:
+          type: string
+        defaultGateway:
           type: string
         description:
           type: string
@@ -4253,6 +4285,10 @@ components:
         origin:
           type: string
         os:
+          type: string
+        osId:
+          type: string
+        osVersionId:
           type: string
         productName:
           type: string

@@ -99,13 +99,21 @@ function barTone(pct: number): string {
   return "bg-primary"
 }
 
+// The same two thresholds as text, for the readings that are a number
+// rather than a bar.
+function textTone(pct: number): string {
+  return pct >= hotPct ? "text-destructive" : "text-warning"
+}
+
 /**
  * Overview: how loaded the machine is, then everything it IS.
  *
- * All 25 scalar fields on one tab, because they fit: four across on a
+ * Every scalar field on one tab, because they fit: four across on a
  * wide screen this is three cards and about one screen, and splitting
  * them earlier bought a second tab click in exchange for a panel that
- * used 349px of an 830px viewport. Tabs earn their place here only for
+ * used 349px of an 830px viewport. The asset fields below are gated on
+ * bare metal, so a guest's card is shorter still. Tabs earn their place
+ * here only for
  * the inventory TABLES, which a real server can fill with a dozen disks
  * and twenty mounts, and for the metrics panel, which is expensive to
  * mount.
@@ -156,6 +164,12 @@ export function HostOverviewTab({ host }: { host: Host }) {
         <Field label={t("compute.host.os")} value={s.os} wide />
         <Field label={t("compute.host.kernel")} value={s.kernelVersion} mono />
         <Field label={t("compute.host.arch")} value={s.arch} />
+        {/* Where on the network this machine sits, next to the address it
+            sits at. osId / osVersionId are deliberately not shown: they
+            are the same facts as os, split so a query can compare them,
+            and a row reading "debian" under one reading "Debian GNU/Linux
+            13" is a second spelling with nothing new in it. */}
+        <Field label={t("compute.host.defaultGateway")} value={s.defaultGateway} mono />
         <Field label={t("compute.host.timezone")} value={s.timezone} />
         <Field
           label={t("compute.host.origin")}
@@ -187,8 +201,23 @@ export function HostOverviewTab({ host }: { host: Host }) {
         <Field label={t("compute.host.systemVendor")} value={s.systemVendor} />
         <Field label={t("compute.host.productName")} value={s.productName} />
         <Field label={t("compute.host.biosVersion")} value={s.biosVersion} />
+        <Field label={t("compute.host.biosDate")} value={s.biosDate} />
+        <Field label={t("compute.host.boardName")} value={s.boardName} wide />
+        {/* The asset-management fields, and they only mean anything on
+            hardware. A guest's serial re-encodes its SMBIOS UUID, its
+            chassis type is whatever "Other" maps to, and its board serial
+            belongs to a board that does not exist -- three plausible
+            looking values that identify nothing an operator can look up. */}
         {physical && (
-          <Field label={t("compute.host.serialNumber")} value={s.serialNumber} wide mono />
+          <>
+            <Field label={t("compute.host.serialNumber")} value={s.serialNumber} wide mono />
+            <Field label={t("compute.host.assetTag")} value={s.assetTag} mono />
+            <Field
+              label={t("compute.host.chassisType")}
+              value={s.chassisType ? <ChassisLabel value={s.chassisType} /> : undefined}
+            />
+            <Field label={t("compute.host.boardSerial")} value={s.boardSerial} wide mono />
+          </>
         )}
       </InfoCard>
 
@@ -243,6 +272,22 @@ function VirtBadge({ value }: { value: string }) {
   return <Badge variant={variant}>{labels[value] ?? value}</Badge>
 }
 
+// Spelled out for the same reason as VirtBadge's map: an interpolated key
+// only compiles behind a cast, and a cast here is the compiler being told
+// to stop checking exactly where a wire value meets a key set.
+function ChassisLabel({ value }: { value: string }) {
+  const { t } = useTranslation()
+  const labels: Record<string, string> = {
+    desktop: t("compute.host.chassis.desktop"),
+    tower: t("compute.host.chassis.tower"),
+    laptop: t("compute.host.chassis.laptop"),
+    server: t("compute.host.chassis.server"),
+    rack: t("compute.host.chassis.rack"),
+    blade: t("compute.host.chassis.blade"),
+  }
+  return <>{labels[value] ?? value}</>
+}
+
 /** Network: the machine's own interfaces, container plumbing excluded. */
 export function HostNetworkTab({ host }: { host: Host }) {
   const { t } = useTranslation()
@@ -259,6 +304,7 @@ export function HostNetworkTab({ host }: { host: Host }) {
               <TableHead>{t("compute.host.nic.name")}</TableHead>
               <TableHead>{t("compute.host.nic.address")}</TableHead>
               <TableHead>{t("compute.host.nic.mac")}</TableHead>
+              <TableHead>{t("compute.host.nic.driver")}</TableHead>
               <TableHead className="text-right">{t("compute.host.nic.speed")}</TableHead>
               <TableHead className="text-right">{t("compute.host.nic.mtu")}</TableHead>
               <TableHead>{t("compute.host.nic.state")}</TableHead>
@@ -267,7 +313,23 @@ export function HostNetworkTab({ host }: { host: Host }) {
           <TableBody>
             {nics.map((n) => (
               <TableRow key={n.name}>
-                <TableCell className="font-mono text-xs">{n.name}</TableCell>
+                <TableCell>
+                  <div className="font-mono text-xs">{n.name}</div>
+                  {/* The kind badge only when it is NOT a physical port: on
+                      an ordinary machine every row would carry the same
+                      word, and the whole reason these rows exist is that
+                      bond / bridge / vlan are the unusual ones. */}
+                  {n.kind && n.kind !== "physical" && (
+                    <Badge variant="secondary" className="mt-1">
+                      <NicKindLabel value={n.kind} />
+                    </Badge>
+                  )}
+                  {n.master && (
+                    <div className="text-muted-foreground mt-1 text-xs">
+                      {t("compute.host.nic.enslavedTo", { master: n.master })}
+                    </div>
+                  )}
+                </TableCell>
                 <TableCell className="font-mono text-xs">
                   {[...(n.ipv4 ?? []), ...(n.ipv6 ?? [])].map((ip) => (
                     <div key={ip} className="truncate">
@@ -277,8 +339,26 @@ export function HostNetworkTab({ host }: { host: Host }) {
                   {!n.ipv4?.length && !n.ipv6?.length && "-"}
                 </TableCell>
                 <TableCell className="font-mono text-xs">{n.mac || "-"}</TableCell>
-                <TableCell className="text-right text-sm tabular-nums">
-                  {n.speedMbps ? `${n.speedMbps} Mb/s` : "-"}
+                <TableCell className="text-muted-foreground font-mono text-xs">
+                  {n.driver || "-"}
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="text-sm tabular-nums">
+                    {n.speedMbps ? `${n.speedMbps} Mb/s` : "-"}
+                  </div>
+                  {/* Half duplex on a server link is a negotiation failure,
+                      so it is called out; full is the expected case and is
+                      left quiet. */}
+                  {n.duplex === "half" && (
+                    <div className="text-warning text-xs">
+                      {t("compute.host.nic.duplexHalf")}
+                    </div>
+                  )}
+                  {n.duplex === "full" && (
+                    <div className="text-muted-foreground text-xs">
+                      {t("compute.host.nic.duplexFull")}
+                    </div>
+                  )}
                 </TableCell>
                 <TableCell className="text-right text-sm tabular-nums">{n.mtu || "-"}</TableCell>
                 <TableCell>
@@ -293,6 +373,24 @@ export function HostNetworkTab({ host }: { host: Host }) {
       </CardContent>
     </Card>
   )
+}
+
+function NicKindLabel({ value }: { value: string }) {
+  const { t } = useTranslation()
+  const labels: Record<string, string> = {
+    bond: t("compute.host.nic.kind.bond"),
+    bridge: t("compute.host.nic.kind.bridge"),
+    vlan: t("compute.host.nic.kind.vlan"),
+  }
+  return <>{labels[value] ?? value}</>
+}
+
+// Inode counts, which run to millions and are not bytes. Decimal steps,
+// because an inode table is a count and nobody thinks of it in 1024s.
+function count(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${Math.round(n / 1_000)}K`
+  return `${n}`
 }
 
 /** Storage: the disks the machine owns, and what is mounted off them. */
@@ -315,7 +413,9 @@ export function HostStorageTab({ host }: { host: Host }) {
               <TableHeader>
                 <TableRow>
                   <TableHead>{t("compute.host.disk.name")}</TableHead>
+                  <TableHead>{t("compute.host.disk.vendor")}</TableHead>
                   <TableHead>{t("compute.host.disk.model")}</TableHead>
+                  <TableHead>{t("compute.host.disk.serial")}</TableHead>
                   <TableHead>{t("compute.host.disk.media")}</TableHead>
                   <TableHead className="text-right">{t("compute.host.disk.size")}</TableHead>
                 </TableRow>
@@ -324,7 +424,19 @@ export function HostStorageTab({ host }: { host: Host }) {
                 {disks.map((d) => (
                   <TableRow key={d.name}>
                     <TableCell className="font-mono text-xs">{d.name}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {d.vendor || "-"}
+                    </TableCell>
                     <TableCell className="text-sm">{d.model || "-"}</TableCell>
+                    {/* A SCSI wwid runs to 40-odd characters and is read
+                        by matching, not by remembering, so it truncates
+                        with the whole value on hover. */}
+                    <TableCell
+                      className="text-muted-foreground max-w-40 truncate font-mono text-xs"
+                      title={d.serial}
+                    >
+                      {d.serial || "-"}
+                    </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {t(d.rotational ? "compute.host.disk.hdd" : "compute.host.disk.ssd")}
                     </TableCell>
@@ -352,14 +464,36 @@ export function HostStorageTab({ host }: { host: Host }) {
                   <TableHead>{t("compute.host.fs.device")}</TableHead>
                   <TableHead>{t("compute.host.fs.type")}</TableHead>
                   <TableHead className="w-48">{t("compute.host.fs.usage")}</TableHead>
+                  <TableHead className="text-right">{t("compute.host.fs.inodes")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {fs.map((f) => {
                   const pct = f.sizeBytes ? ((f.usedBytes ?? 0) / f.sizeBytes) * 100 : undefined
+                  // btrfs and friends allocate inodes on demand and report
+                  // no total, which is "no ceiling" rather than "none
+                  // left" -- so the cell says nothing instead of 100%.
+                  const inodePct = f.inodesTotal
+                    ? ((f.inodesUsed ?? 0) / f.inodesTotal) * 100
+                    : undefined
                   return (
                     <TableRow key={f.mount}>
-                      <TableCell className="font-mono text-xs">{f.mount}</TableCell>
+                      <TableCell>
+                        <div className="font-mono text-xs">{f.mount}</div>
+                        {/* Not a setting. ext4 and xfs mount with
+                            errors=remount-ro, so a local filesystem that
+                            has gone read-only is a disk the kernel gave up
+                            on with services still writing to it. */}
+                        {f.readOnly && (
+                          <Badge
+                            variant="destructive"
+                            className="mt-1"
+                            title={t("compute.host.fs.readOnlyHint")}
+                          >
+                            {t("compute.host.fs.readOnly")}
+                          </Badge>
+                        )}
+                      </TableCell>
                       <TableCell className="font-mono text-xs">{f.device || "-"}</TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {f.fstype || "-"}
@@ -389,6 +523,24 @@ export function HostStorageTab({ host }: { host: Host }) {
                             }
                           />
                         </div>
+                      </TableCell>
+                      {/* Text, not a second bar: running out of inodes is
+                          the rare failure, so it needs to be readable when
+                          somebody looks and to shout when it matters,
+                          which colour does without another row of height. */}
+                      <TableCell className="text-right text-sm tabular-nums">
+                        {inodePct === undefined ? (
+                          "-"
+                        ) : (
+                          <>
+                            <div className={inodePct >= warnPct ? textTone(inodePct) : undefined}>
+                              {Math.round(inodePct)}%
+                            </div>
+                            <div className="text-muted-foreground text-xs">
+                              {count(f.inodesUsed ?? 0)} / {count(f.inodesTotal ?? 0)}
+                            </div>
+                          </>
+                        )}
                       </TableCell>
                     </TableRow>
                   )

@@ -76,6 +76,14 @@ type Host struct {
 	BiosVersion       string    `json:"bios_version"`
 	SerialNumber      string    `json:"serial_number"`
 	Timezone          string    `json:"timezone"`
+	OsID              string    `json:"os_id"`
+	OsVersionID       string    `json:"os_version_id"`
+	BiosDate          string    `json:"bios_date"`
+	BoardName         string    `json:"board_name"`
+	BoardSerial       string    `json:"board_serial"`
+	ChassisType       string    `json:"chassis_type"`
+	AssetTag          string    `json:"asset_tag"`
+	DefaultGateway    string    `json:"default_gateway"`
 }
 
 type HostAgent struct {
