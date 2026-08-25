@@ -396,7 +396,11 @@ function MetricChartImpl({
     <div className="bg-muted/30 rounded-lg border p-3">
       <div className="mb-3 text-sm font-medium">
         {title}
-        {hasData && unit === "bps" && (
+        {/* Every scaled unit, not just bps. Percent writes its sign on
+            each tick and plain has no unit at all; the rest put a bare
+            number on the axis, so without this a latency chart reads
+            "4.6" with nothing saying seconds, milliseconds or minutes. */}
+        {hasData && unit !== "pct" && unit !== "plain" && scale.label !== "" && (
           <span className="text-muted-foreground ml-1 font-normal">({scale.label})</span>
         )}
       </div>

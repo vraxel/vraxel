@@ -310,9 +310,13 @@ export const CHARTS: ChartDef[] = [
   },
 ]
 
-// The overview: the one chart per group an operator opens the page for.
-// Not a summary of each group -- a shortlist, so the first screen answers
-// "is this host healthy" without a click.
+// The default group: the charts an operator opens the page for. Not a
+// summary of each group -- a shortlist, so the first screen answers "is
+// this host healthy" without a click.
+//
+// Labelled "key metrics" rather than "overview" because the page already
+// has an Overview TAB, and two controls with the same word one level
+// apart is a reader guessing which is which.
 const OVERVIEW_IDS = new Set(["cpu.used", "load", "mem.used", "fs.used", "disk.io", "net.bps"])
 
 export function chartsFor(group: GroupKey): ChartDef[] {
