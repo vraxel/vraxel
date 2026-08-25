@@ -29,7 +29,7 @@ export interface ChartSeries {
 
 const PALETTE = ["#0ea5e9", "#10b981", "#f59e0b", "#8b5cf6", "#f43f5e", "#06b6d4"]
 
-export type ChartUnit = "pct" | "bps" | "plain"
+export type ChartUnit = "pct" | "bps" | "bytes" | "sec" | "ops" | "celsius" | "plain"
 
 function hashKey(s: string): number {
   // FNV-1a
@@ -73,51 +73,99 @@ function assignColors(keys: string[]): Map<string, string> {
   return out
 }
 
-// For bps charts, compute a single scale tier from the data max so
-// the title, Y-axis ticks, and tooltip all use the same unit.
-type BpsScale = { divisor: number; label: string }
-const BPS_TIERS: { threshold: number; divisor: number; label: string }[] = [
-  { threshold: 1024 * 1024 * 1024, divisor: 1024 * 1024 * 1024, label: "GB/s" },
-  { threshold: 1024 * 1024, divisor: 1024 * 1024, label: "MB/s" },
-  { threshold: 1024, divisor: 1024, label: "KB/s" },
+// One scale tier per chart, picked from the data max, so the Y-axis
+// ticks and every tooltip on that chart read in the same unit. Per-point
+// scaling would put "900 KB/s" directly above "1.1 MB/s" and make a flat
+// line look like a cliff.
+type Scale = { divisor: number; label: string }
+type Tier = { threshold: number; divisor: number; label: string }
+
+const K = 1024
+const BPS_TIERS: Tier[] = [
+  { threshold: K ** 3, divisor: K ** 3, label: "GB/s" },
+  { threshold: K ** 2, divisor: K ** 2, label: "MB/s" },
+  { threshold: K, divisor: K, label: "KB/s" },
 ]
-function bpsScale(max: number): BpsScale {
-  for (const t of BPS_TIERS) {
+const BYTE_TIERS: Tier[] = [
+  { threshold: K ** 4, divisor: K ** 4, label: "TiB" },
+  { threshold: K ** 3, divisor: K ** 3, label: "GiB" },
+  { threshold: K ** 2, divisor: K ** 2, label: "MiB" },
+  { threshold: K, divisor: K, label: "KiB" },
+]
+// Disk service times land in the hundreds of microseconds on an SSD and
+// the tens of milliseconds on a busy spindle, so seconds alone would
+// draw both as zero.
+const SEC_TIERS: Tier[] = [
+  { threshold: 1, divisor: 1, label: "s" },
+  { threshold: 0.001, divisor: 0.001, label: "ms" },
+]
+
+function tiersFor(unit: ChartUnit): { tiers: Tier[]; base: string } {
+  switch (unit) {
+    case "bps":
+      return { tiers: BPS_TIERS, base: "B/s" }
+    case "bytes":
+      return { tiers: BYTE_TIERS, base: "B" }
+    case "sec":
+      return { tiers: SEC_TIERS, base: "us" }
+    case "ops":
+      return { tiers: [], base: "/s" }
+    case "celsius":
+      return { tiers: [], base: "C" }
+    default:
+      return { tiers: [], base: "" }
+  }
+}
+
+function scaleFor(unit: ChartUnit, max: number): Scale {
+  const { tiers, base } = tiersFor(unit)
+  for (const t of tiers) {
     if (max >= t.threshold) return { divisor: t.divisor, label: t.label }
   }
-  return { divisor: 1, label: "B/s" }
+  return { divisor: unit === "sec" ? 0.000001 : 1, label: base }
 }
 
 function fmtNum(v: number): string {
   return v >= 10 ? String(Math.round(v)) : v.toFixed(1)
 }
 
-// Full format for tooltips: "2.5 KB/s", "54.3%"
-function formatValue(v: number, unit: ChartUnit, scale: BpsScale): string {
+// Full format for tooltips: "2.5 KB/s", "54.3%", "0.3 ms"
+function formatValue(v: number, unit: ChartUnit, scale: Scale): string {
   if (unit === "pct") return `${fmtNum(v)}%`
-  if (unit === "bps") return `${fmtNum(v / scale.divisor)} ${scale.label}`
-  return v >= 10 ? String(Math.round(v)) : v.toFixed(2)
+  if (unit === "plain") return v >= 10 ? String(Math.round(v)) : v.toFixed(2)
+  return `${fmtNum(v / scale.divisor)} ${scale.label}`.trimEnd()
 }
 
 // Y-axis ticks: pure number in the chart's scale ("5.6", "2.9")
-function formatTick(v: number, unit: ChartUnit, scale: BpsScale): string {
+function formatTick(v: number, unit: ChartUnit, scale: Scale): string {
   if (unit === "pct") return `${fmtNum(v)}%`
-  if (unit === "bps") return fmtNum(v / scale.divisor)
-  return v >= 10 ? String(Math.round(v)) : v.toFixed(2)
+  if (unit === "plain") return v >= 10 ? String(Math.round(v)) : v.toFixed(2)
+  return fmtNum(v / scale.divisor)
 }
 
 const Y_AXIS_WIDTH = 40
 const CHART_FONT = 'var(--font-sans, "Inter", sans-serif)'
 
-function niceMax(series: ChartSeries[], unit: ChartUnit): number {
-  if (unit === "pct") return 100
+// The Y range, as [min, max].
+//
+// min is 0 for everything that cannot go below it, which is almost
+// everything -- pinning the floor keeps a chart of small numbers from
+// magnifying noise into mountains. Clock offset is the exception and the
+// reason this returns a pair at all: it is signed, and a host running
+// FAST is exactly as broken as one running slow, so clamping the floor
+// to zero would erase half the failures this series exists to show.
+function niceDomain(series: ChartSeries[], unit: ChartUnit): [number, number] {
+  if (unit === "pct") return [0, 100]
   let max = 0
+  let min = 0
   for (const s of series) {
     for (const v of s.values) {
-      if (typeof v === "number" && v > max) max = v
+      if (typeof v !== "number") continue
+      if (v > max) max = v
+      if (v < min) min = v
     }
   }
-  return max > 0 ? max * 1.15 : 1
+  return [min < 0 ? min * 1.15 : 0, max > 0 ? max * 1.15 : 1]
 }
 
 function toRows(
@@ -309,9 +357,11 @@ function MetricChartImpl({
     () => toRows(series, fromMs, stepSec, count),
     [series, fromMs, stepSec, count],
   )
-  const max = niceMax(series, unit)
+  const [minY, maxY] = niceDomain(series, unit)
   const hasData = series.some((s) => s.values.some((v) => typeof v === "number"))
-  const scale = useMemo(() => bpsScale(max), [max])
+  // Scaled by the larger magnitude, so a signed series picks a unit that
+  // fits both ends.
+  const scale = useMemo(() => scaleFor(unit, Math.max(maxY, -minY)), [unit, maxY, minY])
   const colors = useMemo(() => assignColors(series.map((s) => s.key)), [series])
   const colorOf = (key: string) => colors.get(key) ?? PALETTE[0]
   const gradPrefix = useId().replace(/:/g, "")
@@ -402,7 +452,7 @@ function MetricChartImpl({
                   className="text-muted-foreground"
                 />
                 <YAxis
-                  domain={[0, max]}
+                  domain={[minY, maxY]}
                   tickFormatter={(v: number) => formatTick(v, unit, scale)}
                   tick={{ fontSize: 10, fontFamily: CHART_FONT }}
                   tickLine={false}
