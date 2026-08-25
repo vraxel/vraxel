@@ -2,46 +2,23 @@ package nodemetrics
 
 import (
 	"math"
-	"strings"
 	"time"
 
 	agenttypes "vraxel.io/vraxel/lib/agent/types"
 )
 
-// summaryFSTypes that must not decide DiskUsedPct.
+// What counts as a filesystem and what counts as an interface is decided
+// by agenttypes.RealFSType / RealNetDevice, not here.
 //
-// A full /run or /dev/shm is a memory problem wearing a filesystem's
-// clothes, and it would pin the host list's disk column at a number no
-// operator can act on. They stay in the fs.* chart series -- that is
-// data, and node_exporter reports them too -- but they are kept out of
-// the one field that is meant to be an operational signal.
-var summaryFSTypes = map[string]struct{}{
-	"tmpfs": {}, "ramfs": {}, "devtmpfs": {},
-}
-
-// summaryNetPrefixes are the per-container and per-bridge interface
-// families that must not count toward the summary's rx/tx figure: a
-// packet crossing a bridge is counted again on every veth it traverses,
-// so summing them reports a host pushing multiples of its real traffic.
-// The net.* chart series keep node_exporter's full surface; like
-// summaryFSTypes, this shapes only the one number the host list sorts
-// on.
-var summaryNetPrefixes = []string{
-	"veth", "docker", "br-", "virbr", "cni", "flannel", "cali", "tunl",
-	"nodelocaldns", "kube-ipvs", "dummy", "lxc", "tap",
-}
-
-func summaryNetDevice(name string) bool {
-	if name == "lo" {
-		return false
-	}
-	for _, p := range summaryNetPrefixes {
-		if strings.HasPrefix(name, p) {
-			return false
-		}
-	}
-	return true
-}
+// Those predicates also shape the facts the agent reports for the detail
+// page, and the two views have to agree: a page listing a tmpfs that the
+// host list's disk gauge excluded is a page whose rows do not add up to
+// the number printed beside them. One definition, in the package both
+// sides already import.
+//
+// This shapes only the summary. The fs.* and net.* chart series keep
+// node_exporter's full surface -- a full /run is data; it just must not
+// be the number an operator is asked to act on.
 
 // trendStep / trendPoints shape the CPU sparkline the heartbeat carries:
 // the last 24 hours in half-hour buckets, ~300 bytes a beat. Fixed
@@ -146,7 +123,7 @@ func (r *Ring) summaryDisk(g grid) (worst float64, at string, usedBytes, totalBy
 	counted := map[string]struct{}{}
 	for _, mp := range mounts {
 		size := sizes[mp]
-		if _, skip := summaryFSTypes[size.Label(lFSType)]; skip {
+		if !agenttypes.RealFSType(size.Label(lFSType)) {
 			continue
 		}
 		avail, ok := avails[mp]
@@ -176,7 +153,7 @@ func (r *Ring) summaryNet(g grid, metric string) float64 {
 	devs, names := r.group(metric, lDevice)
 	sum := 0.0
 	for _, d := range names {
-		if !summaryNetDevice(d) {
+		if !agenttypes.RealNetDevice(d) {
 			continue
 		}
 		if v := devs[d].rate(g, 0); !math.IsNaN(v) {

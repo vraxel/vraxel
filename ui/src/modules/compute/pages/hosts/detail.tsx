@@ -2,10 +2,9 @@ import { useState } from "react"
 import { Link, useNavigate, useParams } from "react-router"
 import { ArrowLeft, Pencil, PlugZap, ScrollText, SquareTerminal, Trash2 } from "lucide-react"
 import { toast } from "sonner"
-import { formatDateTime } from "@/shared/lib/format"
 import { Button } from "@/shared/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card"
 import { Skeleton } from "@/shared/ui/skeleton"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs"
 import { useApiQuery } from "@/core/query/hooks"
 import { qk } from "@/core/query/keys"
 import { useQueryClient } from "@tanstack/react-query"
@@ -19,6 +18,12 @@ import { hostsDef } from "@/modules/compute/defs"
 import { AgentStatusBadge } from "@/modules/compute/components/agent-status-badge"
 import { HostEditDialog } from "@/modules/compute/components/host-edit-dialog"
 import { HostMetricsPanel } from "@/modules/compute/components/host-metrics-panel"
+import {
+  HostHardwareTab,
+  HostNetworkTab,
+  HostOverviewTab,
+  HostStorageTab,
+} from "@/modules/compute/components/host-detail-tabs"
 import { AgentInstallDialog } from "@/modules/compute/components/agent-install-dialog"
 import { HostMergeDialog } from "@/modules/compute/components/host-merge-dialog"
 import { HostLogsDialog } from "@/modules/compute/components/host-logs-dialog"
@@ -205,64 +210,40 @@ export default function HostDetailPage() {
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t("compute.host.basicInfo")}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-              <Field label={t("compute.host.ip")} value={host.spec.reportedPrimaryIp} mono />
-              <Field label={t("compute.host.hostname")} value={host.spec.hostname} />
-              <Field label={t("compute.host.os")} value={host.spec.os} />
-              <Field label={t("compute.host.arch")} value={host.spec.arch} />
-              <Field
-                label={t("compute.host.cpu")}
-                value={`${host.spec.cpuCores ?? 0} ${t("compute.host.cores")}`}
-              />
-              <Field
-                label={t("compute.host.memory")}
-                value={`${Math.round((host.spec.memoryMb ?? 0) / 1024)} GiB`}
-              />
-              <Field label={t("compute.host.disk")} value={`${host.spec.diskGb ?? 0} GiB`} />
-              <Field label={t("common.description")} value={host.spec.description} />
-              <Field
-                label={t("compute.host.origin")}
-                value={
-                  host.spec.origin === "agent"
-                    ? t("compute.host.originAgent")
-                    : t("compute.host.originManual")
-                }
-              />
-              <Field label={t("common.createdBy")} value={host.spec.createdByName} />
-              <Field label={t("common.created")} value={formatDateTime(host.metadata.createdAt)} />
-            </dl>
-            <p className="text-muted-foreground mt-4 text-xs">{t("compute.host.reportedNote")}</p>
-          </CardContent>
-        </Card>
+      {/* Tabs rather than one column of cards: the inventory arrives as
+          three tables (NICs, disks, filesystems) that a single scroll
+          would bury the record's own fields under. Each tab answers one
+          question -- how is it doing, what is it, how is it connected,
+          what does it store. */}
+      <Tabs defaultValue="overview">
+        <TabsList>
+          <TabsTrigger value="overview">{t("compute.host.tab.overview")}</TabsTrigger>
+          <TabsTrigger value="hardware">{t("compute.host.tab.hardware")}</TabsTrigger>
+          <TabsTrigger value="network">{t("compute.host.tab.network")}</TabsTrigger>
+          <TabsTrigger value="storage">{t("compute.host.tab.storage")}</TabsTrigger>
+          <TabsTrigger value="metrics">{t("compute.host.tab.metrics")}</TabsTrigger>
+        </TabsList>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t("compute.host.agentSession")}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-              <Field label={t("compute.host.agentVersion")} value={host.spec.agentVersion} />
-              <Field label={t("compute.host.agentId")} value={host.spec.agentId} mono />
-              <Field
-                label={t("compute.host.connectedAt")}
-                value={formatDateTime(host.spec.agentConnectedAt)}
-              />
-              <Field
-                label={t("compute.host.lastSeenAt")}
-                value={formatDateTime(host.spec.agentLastSeenAt)}
-              />
-            </dl>
-          </CardContent>
-        </Card>
-      </div>
-
-      <HostMetricsPanel host={host} scope={scope} />
+        <TabsContent value="overview" className="mt-4">
+          <HostOverviewTab host={host} />
+          <p className="text-muted-foreground mt-4 text-xs">{t("compute.host.reportedNote")}</p>
+        </TabsContent>
+        <TabsContent value="hardware" className="mt-4">
+          <HostHardwareTab host={host} />
+        </TabsContent>
+        <TabsContent value="network" className="mt-4">
+          <HostNetworkTab host={host} />
+        </TabsContent>
+        <TabsContent value="storage" className="mt-4">
+          <HostStorageTab host={host} />
+        </TabsContent>
+        {/* Mounted only while selected: the panel owns a polling query
+            and a chart per series, and paying for those on a page opened
+            to read the hostname is what the tabs are here to avoid. */}
+        <TabsContent value="metrics" className="mt-4">
+          <HostMetricsPanel host={host} scope={scope} />
+        </TabsContent>
+      </Tabs>
 
       <HostEditDialog
         host={editOpen ? host : null}
@@ -311,17 +292,6 @@ export default function HostDetailPage() {
         onConfirm={handleDelete}
         confirmText={t("common.delete")}
       />
-    </div>
-  )
-}
-
-function Field({ label, value, mono }: { label: string; value?: string; mono?: boolean }) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-muted-foreground text-xs">{label}</dt>
-      <dd className={`truncate ${mono ? "font-mono text-xs" : ""}`} title={value}>
-        {value || "-"}
-      </dd>
     </div>
   )
 }

@@ -81,6 +81,12 @@ type AgentStore interface {
 	// every watcher.
 	UpsertMetrics(ctx context.Context, hostID int64, in MetricsInput) error
 
+	// UpsertFacts overwrites the host's inventory. Like UpsertMetrics it
+	// publishes no host event: the agent already sends this only when the
+	// content changed, so the write IS the change -- but the change is a
+	// new BIOS version or an extra disk, which no open page is waiting on.
+	UpsertFacts(ctx context.Context, hostID int64, in FactsInput) error
+
 	// MarkStaleOffline sweeps rows with no heartbeat for staleAfter. The
 	// cutoff is applied against the DB clock, not the caller's.
 	MarkStaleOffline(ctx context.Context, staleAfter time.Duration) error

@@ -46,6 +46,16 @@ SELECT h.*,
     a.conflict_at    AS agent_conflict_at,
     a.foreign_machine_at   AS agent_foreign_machine_at,
     a.foreign_machine_uuid AS agent_foreign_machine_uuid,
+    -- Dated by OUR clock from the uptime counter the agent reports, which
+    -- is why it is trustworthy on a machine whose wall clock is wrong.
+    a.boot_at        AS agent_boot_at,
+    -- The hardware inventory lists. Detail-only: ListHosts must not carry
+    -- these, which is why they live in their own table rather than in
+    -- columns that h.* would sweep into every page of the list.
+    f.nics           AS facts_nics,
+    f.filesystems    AS facts_filesystems,
+    f.block_devices  AS facts_block_devices,
+    f.reported_at    AS facts_reported_at,
     -- How many hosts were built from this host's disk image, this one
     -- included. 1 (or 0 for an agentless record) is the ordinary answer.
     --
@@ -96,6 +106,7 @@ LEFT JOIN workspaces w ON w.id = h.workspace_id
 LEFT JOIN namespaces ns ON ns.id = h.namespace_id
 LEFT JOIN host_agents a ON a.host_id = h.id
 LEFT JOIN host_metrics_latest m ON m.host_id = h.id
+LEFT JOIN host_facts f ON f.host_id = h.id
 WHERE h.id = @id
   AND (sqlc.narg('workspace_id_filter')::BIGINT IS NULL OR h.workspace_id IS NOT DISTINCT FROM sqlc.narg('workspace_id_filter')::BIGINT)
   AND (sqlc.narg('namespace_id_filter')::BIGINT IS NULL OR h.namespace_id IS NOT DISTINCT FROM sqlc.narg('namespace_id_filter')::BIGINT);

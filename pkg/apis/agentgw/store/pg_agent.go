@@ -398,6 +398,42 @@ func (s *pgAgentStore) UpsertMetrics(ctx context.Context, hostID int64, in Metri
 	return nil
 }
 
+// UpsertFacts overwrites the host's inventory in one statement, so the
+// scalars on hosts and the lists in host_facts cannot disagree about
+// which report they came from.
+func (s *pgAgentStore) UpsertFacts(ctx context.Context, hostID int64, in FactsInput) error {
+	err := s.Q().UpsertHostFacts(ctx, generated.UpsertHostFactsParams{
+		HostID:            hostID,
+		Virtualization:    in.Virtualization,
+		CpuModel:          in.CPUModel,
+		CpuSockets:        in.CPUSockets,
+		CpuCoresPerSocket: in.CPUCoresPerSocket,
+		CpuThreadsPerCore: in.CPUThreadsPerCore,
+		KernelVersion:     in.KernelVersion,
+		SystemVendor:      in.SystemVendor,
+		ProductName:       in.ProductName,
+		BiosVersion:       in.BIOSVersion,
+		SerialNumber:      in.SerialNumber,
+		Timezone:          in.Timezone,
+		Nics:              emptyArray(in.NICs),
+		Filesystems:       emptyArray(in.Filesystems),
+		BlockDevices:      emptyArray(in.BlockDevices),
+	})
+	if err != nil {
+		return fmt.Errorf("upsert host facts: %w", err)
+	}
+	return nil
+}
+
+// emptyArray keeps a nil slice out of a NOT NULL jsonb column, where it
+// would be written as SQL NULL rather than as the empty list it means.
+func emptyArray(b []byte) []byte {
+	if len(b) == 0 {
+		return []byte("[]")
+	}
+	return b
+}
+
 func (s *pgAgentStore) MarkOrphansOffline(ctx context.Context, staleAfter time.Duration) error {
 	hostIDs, err := s.Q().MarkOrphanedHostAgentsOffline(ctx, staleAfter.Seconds())
 	if err != nil {

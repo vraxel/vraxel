@@ -4,6 +4,7 @@ import (
 	"context"
 	crand "crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand/v2"
@@ -22,6 +23,11 @@ const (
 	// declares an agent offline after 60s of silence, so four beats fit
 	// inside the window.
 	HeartbeatInterval = 15 * time.Second
+	// FactsInterval is how often the agent re-reads its inventory. An
+	// hour because the things it describes -- sockets, disks, NICs, BIOS
+	// -- change by human action, and an hour is already far tighter than
+	// the reboot that most such changes require anyway.
+	FactsInterval = 1 * time.Hour
 	// reconnectMin / reconnectMax bound the exponential backoff between
 	// reconnect attempts. Capped at 60s because a control channel is
 	// cheap and an agent that stays disconnected is an unmanaged host --
@@ -39,6 +45,13 @@ const (
 	// Sized so the worst case (long names plus 256-byte failure
 	// messages) stays well inside MaxFrameBytes.
 	maxHeartbeatProbes = 128
+	// maxFactsListEntries caps each inventory list, for the same reason
+	// maxHeartbeatProbes exists: an oversize frame is refused by
+	// EncodeFrame, and a host with 500 LVM volumes would then never
+	// report its inventory at all -- losing its CPU model and kernel
+	// version, which fit easily, over a list nobody can read anyway.
+	// Truncation is logged; silent capping would read as completeness.
+	maxFactsListEntries = 128
 )
 
 // bootNonce identifies this agent process for the lifetime of the
@@ -112,6 +125,11 @@ type Channel struct {
 	// Nil results are fine and expected -- the collector needs two
 	// samples before it can say anything honest.
 	MetricsSummary func() *agenttypes.MetricsSummary
+
+	// Facts, if set, is the machine's inventory. Sampled once per session
+	// and then hourly, and sent only when it differs from what this
+	// session already sent -- see factsLoop.
+	Facts func() agenttypes.HostFacts
 
 	// live holds the current session's writer, so callers outside the
 	// frame loop (probe verdicts, pending_restart) can push a frame
@@ -267,6 +285,11 @@ func (c *Channel) session(ctx context.Context) error {
 	// for the kernel's whole TCP retry budget, so without this the agent
 	// stops proving liveness but never reconnects either.
 	go c.heartbeatLoop(sessCtx, send, cancel)
+	// Its own goroutine, and a send failure here does NOT end the session:
+	// inventory is the least urgent thing the channel carries, and a host
+	// whose facts frame was dropped is a host with a stale hardware list,
+	// not a host that has stopped working.
+	go c.factsLoop(sessCtx, send)
 
 	for {
 		_, data, err := conn.ReadMessage(sessCtx)
@@ -336,6 +359,68 @@ func (c *Channel) heartbeatLoop(ctx context.Context, send SendFunc, endSession c
 			}
 		}
 	}
+}
+
+// factsLoop reports the machine's inventory: once as soon as the session
+// is up, then hourly, and each time only if it changed.
+//
+// The dedup state is local to this loop, which makes it per-session, which
+// makes the first frame of every session unconditional. That is the
+// point: the agent cannot know what the server still holds -- the row may
+// have been restored from a backup, or merged, or the facts write may
+// have failed -- and one frame per reconnect is a rounding error against
+// a channel that already beats every 15 seconds. Within a session, where
+// the server's state IS known, nothing is resent.
+//
+// Compared as marshalled JSON rather than by a hash: the struct is a few
+// KB, the comparison happens once an hour, and a hash would add a way for
+// two different inventories to look identical in exchange for nothing.
+func (c *Channel) factsLoop(ctx context.Context, send SendFunc) {
+	if c.Facts == nil {
+		return
+	}
+	ticker := time.NewTicker(FactsInterval)
+	defer ticker.Stop()
+	sent := ""
+	for {
+		facts := c.Facts()
+		// Generic, so a free function rather than a method: Go has no
+		// generic methods.
+		facts.NICs = capFacts(facts.NICs, c.Log, "nics")
+		facts.Filesystems = capFacts(facts.Filesystems, c.Log, "filesystems")
+		facts.BlockDevices = capFacts(facts.BlockDevices, c.Log, "block devices")
+		if encoded, err := json.Marshal(facts); err != nil {
+			c.Log.Warnf("control channel: encode host facts: %v", err)
+		} else if string(encoded) != sent {
+			if err := send(agenttypes.Frame{
+				Type:  agenttypes.FrameTypeHostFacts,
+				ID:    "facts-1",
+				Facts: &facts,
+			}); err != nil {
+				c.Log.Warnf("control channel: send host facts: %v", err)
+			} else {
+				sent = string(encoded)
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+// capFacts trims one inventory list to what a frame can carry, saying so
+// when it has to. Logged on every resample rather than once: this is a
+// standing property of the host, and an hourly line is the only place it
+// is visible at all.
+func capFacts[T any](items []T, log Logger, what string) []T {
+	if len(items) <= maxFactsListEntries {
+		return items
+	}
+	log.Warnf("host facts: reporting %d of %d %s; the rest exceed the control frame limit",
+		maxFactsListEntries, len(items), what)
+	return items[:maxFactsListEntries]
 }
 
 func (c *Channel) handle(ctx context.Context, f agenttypes.Frame, send SendFunc) {

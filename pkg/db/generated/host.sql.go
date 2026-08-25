@@ -164,7 +164,7 @@ func (q *Queries) DeleteHost(ctx context.Context, arg DeleteHostParams) (DeleteH
 }
 
 const getHostByID = `-- name: GetHostByID :one
-SELECT h.id, h.name, h.display_name, h.description, h.hostname, h.os, h.arch, h.cpu_cores, h.memory_mb, h.disk_gb, h.scope, h.workspace_id, h.namespace_id, h.status, h.status_message, h.ssh_port, h.agent_port, h.monitor_status, h.monitor_message, h.log_agent_status, h.log_agent_message, h.origin, h.connectivity_mode, h.reported_ips, h.reported_primary_ip, h.primary_ip_override, h.created_by, h.created_at, h.updated_at,
+SELECT h.id, h.name, h.display_name, h.description, h.hostname, h.os, h.arch, h.cpu_cores, h.memory_mb, h.disk_gb, h.scope, h.workspace_id, h.namespace_id, h.status, h.status_message, h.ssh_port, h.agent_port, h.monitor_status, h.monitor_message, h.log_agent_status, h.log_agent_message, h.origin, h.connectivity_mode, h.reported_ips, h.reported_primary_ip, h.primary_ip_override, h.created_by, h.created_at, h.updated_at, h.virtualization, h.cpu_model, h.cpu_sockets, h.cpu_cores_per_socket, h.cpu_threads_per_core, h.kernel_version, h.system_vendor, h.product_name, h.bios_version, h.serial_number, h.timezone,
     COALESCE(NULLIF(u.display_name, ''), u.username, '') AS creator_name,
     COALESCE(NULLIF(w.display_name, ''), w.name, '') AS workspace_name,
     COALESCE(NULLIF(ns.display_name, ''), ns.name, '') AS namespace_name,
@@ -176,6 +176,16 @@ SELECT h.id, h.name, h.display_name, h.description, h.hostname, h.os, h.arch, h.
     a.conflict_at    AS agent_conflict_at,
     a.foreign_machine_at   AS agent_foreign_machine_at,
     a.foreign_machine_uuid AS agent_foreign_machine_uuid,
+    -- Dated by OUR clock from the uptime counter the agent reports, which
+    -- is why it is trustworthy on a machine whose wall clock is wrong.
+    a.boot_at        AS agent_boot_at,
+    -- The hardware inventory lists. Detail-only: ListHosts must not carry
+    -- these, which is why they live in their own table rather than in
+    -- columns that h.* would sweep into every page of the list.
+    f.nics           AS facts_nics,
+    f.filesystems    AS facts_filesystems,
+    f.block_devices  AS facts_block_devices,
+    f.reported_at    AS facts_reported_at,
     -- How many hosts were built from this host's disk image, this one
     -- included. 1 (or 0 for an agentless record) is the ordinary answer.
     --
@@ -226,6 +236,7 @@ LEFT JOIN workspaces w ON w.id = h.workspace_id
 LEFT JOIN namespaces ns ON ns.id = h.namespace_id
 LEFT JOIN host_agents a ON a.host_id = h.id
 LEFT JOIN host_metrics_latest m ON m.host_id = h.id
+LEFT JOIN host_facts f ON f.host_id = h.id
 WHERE h.id = $1
   AND ($2::BIGINT IS NULL OR h.workspace_id IS NOT DISTINCT FROM $2::BIGINT)
   AND ($3::BIGINT IS NULL OR h.namespace_id IS NOT DISTINCT FROM $3::BIGINT)
@@ -267,6 +278,17 @@ type GetHostByIDRow struct {
 	CreatedBy               *int64          `json:"created_by"`
 	CreatedAt               time.Time       `json:"created_at"`
 	UpdatedAt               time.Time       `json:"updated_at"`
+	Virtualization          string          `json:"virtualization"`
+	CpuModel                string          `json:"cpu_model"`
+	CpuSockets              int32           `json:"cpu_sockets"`
+	CpuCoresPerSocket       int32           `json:"cpu_cores_per_socket"`
+	CpuThreadsPerCore       int32           `json:"cpu_threads_per_core"`
+	KernelVersion           string          `json:"kernel_version"`
+	SystemVendor            string          `json:"system_vendor"`
+	ProductName             string          `json:"product_name"`
+	BiosVersion             string          `json:"bios_version"`
+	SerialNumber            string          `json:"serial_number"`
+	Timezone                string          `json:"timezone"`
 	CreatorName             string          `json:"creator_name"`
 	WorkspaceName           string          `json:"workspace_name"`
 	NamespaceName           string          `json:"namespace_name"`
@@ -278,6 +300,11 @@ type GetHostByIDRow struct {
 	AgentConflictAt         *time.Time      `json:"agent_conflict_at"`
 	AgentForeignMachineAt   *time.Time      `json:"agent_foreign_machine_at"`
 	AgentForeignMachineUuid *string         `json:"agent_foreign_machine_uuid"`
+	AgentBootAt             *time.Time      `json:"agent_boot_at"`
+	FactsNics               json.RawMessage `json:"facts_nics"`
+	FactsFilesystems        json.RawMessage `json:"facts_filesystems"`
+	FactsBlockDevices       json.RawMessage `json:"facts_block_devices"`
+	FactsReportedAt         *time.Time      `json:"facts_reported_at"`
 	ImageGroupSize          int64           `json:"image_group_size"`
 	MetricsSampledAt        *time.Time      `json:"metrics_sampled_at"`
 	MetricsCpuUsedPct       *float32        `json:"metrics_cpu_used_pct"`
@@ -329,6 +356,17 @@ func (q *Queries) GetHostByID(ctx context.Context, arg GetHostByIDParams) (GetHo
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Virtualization,
+		&i.CpuModel,
+		&i.CpuSockets,
+		&i.CpuCoresPerSocket,
+		&i.CpuThreadsPerCore,
+		&i.KernelVersion,
+		&i.SystemVendor,
+		&i.ProductName,
+		&i.BiosVersion,
+		&i.SerialNumber,
+		&i.Timezone,
 		&i.CreatorName,
 		&i.WorkspaceName,
 		&i.NamespaceName,
@@ -340,6 +378,11 @@ func (q *Queries) GetHostByID(ctx context.Context, arg GetHostByIDParams) (GetHo
 		&i.AgentConflictAt,
 		&i.AgentForeignMachineAt,
 		&i.AgentForeignMachineUuid,
+		&i.AgentBootAt,
+		&i.FactsNics,
+		&i.FactsFilesystems,
+		&i.FactsBlockDevices,
+		&i.FactsReportedAt,
 		&i.ImageGroupSize,
 		&i.MetricsSampledAt,
 		&i.MetricsCpuUsedPct,
@@ -381,7 +424,7 @@ func (q *Queries) HostScopeByID(ctx context.Context, id int64) (HostScopeByIDRow
 }
 
 const listHosts = `-- name: ListHosts :many
-SELECT h.id, h.name, h.display_name, h.description, h.hostname, h.os, h.arch, h.cpu_cores, h.memory_mb, h.disk_gb, h.scope, h.workspace_id, h.namespace_id, h.status, h.status_message, h.ssh_port, h.agent_port, h.monitor_status, h.monitor_message, h.log_agent_status, h.log_agent_message, h.origin, h.connectivity_mode, h.reported_ips, h.reported_primary_ip, h.primary_ip_override, h.created_by, h.created_at, h.updated_at,
+SELECT h.id, h.name, h.display_name, h.description, h.hostname, h.os, h.arch, h.cpu_cores, h.memory_mb, h.disk_gb, h.scope, h.workspace_id, h.namespace_id, h.status, h.status_message, h.ssh_port, h.agent_port, h.monitor_status, h.monitor_message, h.log_agent_status, h.log_agent_message, h.origin, h.connectivity_mode, h.reported_ips, h.reported_primary_ip, h.primary_ip_override, h.created_by, h.created_at, h.updated_at, h.virtualization, h.cpu_model, h.cpu_sockets, h.cpu_cores_per_socket, h.cpu_threads_per_core, h.kernel_version, h.system_vendor, h.product_name, h.bios_version, h.serial_number, h.timezone,
     COALESCE(NULLIF(u.display_name, ''), u.username, '') AS creator_name,
     COALESCE(NULLIF(w.display_name, ''), w.name, '') AS workspace_name,
     COALESCE(NULLIF(ns.display_name, ''), ns.name, '') AS namespace_name,
@@ -545,6 +588,17 @@ type ListHostsRow struct {
 	CreatedBy               *int64          `json:"created_by"`
 	CreatedAt               time.Time       `json:"created_at"`
 	UpdatedAt               time.Time       `json:"updated_at"`
+	Virtualization          string          `json:"virtualization"`
+	CpuModel                string          `json:"cpu_model"`
+	CpuSockets              int32           `json:"cpu_sockets"`
+	CpuCoresPerSocket       int32           `json:"cpu_cores_per_socket"`
+	CpuThreadsPerCore       int32           `json:"cpu_threads_per_core"`
+	KernelVersion           string          `json:"kernel_version"`
+	SystemVendor            string          `json:"system_vendor"`
+	ProductName             string          `json:"product_name"`
+	BiosVersion             string          `json:"bios_version"`
+	SerialNumber            string          `json:"serial_number"`
+	Timezone                string          `json:"timezone"`
 	CreatorName             string          `json:"creator_name"`
 	WorkspaceName           string          `json:"workspace_name"`
 	NamespaceName           string          `json:"namespace_name"`
@@ -623,6 +677,17 @@ func (q *Queries) ListHosts(ctx context.Context, arg ListHostsParams) ([]ListHos
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Virtualization,
+			&i.CpuModel,
+			&i.CpuSockets,
+			&i.CpuCoresPerSocket,
+			&i.CpuThreadsPerCore,
+			&i.KernelVersion,
+			&i.SystemVendor,
+			&i.ProductName,
+			&i.BiosVersion,
+			&i.SerialNumber,
+			&i.Timezone,
 			&i.CreatorName,
 			&i.WorkspaceName,
 			&i.NamespaceName,

@@ -91,6 +91,29 @@ type HostRow struct {
 	// detail-only jsonb list naming them, passed through undecoded.
 	AlertsFiring int64
 	FiringAlerts []byte
+
+	// The machine's inventory, from the agent's host.facts report. The
+	// scalars are hosts columns and so come back on the list too; the
+	// three lists are jsonb from host_facts, passed through undecoded,
+	// and are detail-only -- ListHosts does not join that table.
+	Virtualization    string
+	CPUModel          string
+	CPUSockets        int32
+	CPUCoresPerSocket int32
+	CPUThreadsPerCore int32
+	KernelVersion     string
+	SystemVendor      string
+	ProductName       string
+	BIOSVersion       string
+	SerialNumber      string
+	Timezone          string
+	// BootAt is dated by the SERVER's clock from the uptime the agent
+	// reports, which is why it survives a host whose wall clock is wrong.
+	BootAt            *time.Time
+	FactsNICs         []byte
+	FactsFilesystems  []byte
+	FactsBlockDevices []byte
+	FactsReportedAt   *time.Time
 }
 
 // HostCreateInput is a host recorded by hand.
@@ -351,6 +374,17 @@ func listRowToDomain(r *generated.ListHostsRow) HostRow {
 		NetTxBps:                f64(r.MetricsNetTxBps),
 		CPUTrend:                r.MetricsCpuTrend,
 		AlertsFiring:            r.AlertsFiring,
+		Virtualization:          r.Virtualization,
+		CPUModel:                r.CpuModel,
+		CPUSockets:              r.CpuSockets,
+		CPUCoresPerSocket:       r.CpuCoresPerSocket,
+		CPUThreadsPerCore:       r.CpuThreadsPerCore,
+		KernelVersion:           r.KernelVersion,
+		SystemVendor:            r.SystemVendor,
+		ProductName:             r.ProductName,
+		BIOSVersion:             r.BiosVersion,
+		SerialNumber:            r.SerialNumber,
+		Timezone:                r.Timezone,
 	}
 }
 
@@ -389,5 +423,21 @@ func getRowToDomain(r *generated.GetHostByIDRow) HostRow {
 		CPUTrend:                r.MetricsCpuTrend,
 		AlertsFiring:            r.AlertsFiring,
 		FiringAlerts:            r.FiringAlerts,
+		Virtualization:          r.Virtualization,
+		CPUModel:                r.CpuModel,
+		CPUSockets:              r.CpuSockets,
+		CPUCoresPerSocket:       r.CpuCoresPerSocket,
+		CPUThreadsPerCore:       r.CpuThreadsPerCore,
+		KernelVersion:           r.KernelVersion,
+		SystemVendor:            r.SystemVendor,
+		ProductName:             r.ProductName,
+		BIOSVersion:             r.BiosVersion,
+		SerialNumber:            r.SerialNumber,
+		Timezone:                r.Timezone,
+		BootAt:                  r.AgentBootAt,
+		FactsNICs:               r.FactsNics,
+		FactsFilesystems:        r.FactsFilesystems,
+		FactsBlockDevices:       r.FactsBlockDevices,
+		FactsReportedAt:         r.FactsReportedAt,
 	}
 }

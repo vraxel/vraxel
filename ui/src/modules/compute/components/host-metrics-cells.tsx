@@ -64,19 +64,23 @@ function UtilGauge({
   amount,
   value,
   stale,
+  wide,
 }: {
   /** Omitted when nothing can honestly be paired with the percentage,
    *  which then becomes the primary text instead of a suffix. */
   amount?: ReactNode
   value?: number
   stale: boolean
+  /** Fills its container instead of taking the list column's fixed
+   *  width. The detail page shows the same three gauges in cards. */
+  wide?: boolean
 }) {
   const known = typeof value === "number"
   const tone = known && !stale ? toneFor(value) : null
   const pctTone = tone ? tone.text : "text-muted-foreground/60"
 
   return (
-    <div className="w-36 space-y-1">
+    <div className={`${wide ? "w-full" : "w-36"} space-y-1`}>
       <div className="flex items-baseline gap-1">
         {amount === undefined ? (
           <span className={`text-sm tabular-nums ${known ? pctTone : "text-muted-foreground"}`}>
@@ -106,7 +110,7 @@ function UtilGauge({
 const gib = (mb: number) => (mb / 1024).toFixed(1)
 const gibBytes = (b: number) => (b / (1024 * 1024 * 1024)).toFixed(1)
 
-export function HostCpuCell({ spec }: { spec: Host["spec"] }) {
+export function HostCpuCell({ spec, wide }: { spec: Host["spec"]; wide?: boolean }) {
   const { t } = useTranslation()
   // Cores, not "cores in use": a percentage of a core is a number no
   // operator acts on, and the count is what makes the percentage mean
@@ -116,11 +120,12 @@ export function HostCpuCell({ spec }: { spec: Host["spec"] }) {
       amount={spec.cpuCores ? `${spec.cpuCores} ${t("compute.host.cores")}` : "-"}
       value={spec.cpuUsedPct}
       stale={isStale(spec.metricsSampledAt)}
+      wide={wide}
     />
   )
 }
 
-export function HostMemCell({ spec }: { spec: Host["spec"] }) {
+export function HostMemCell({ spec, wide }: { spec: Host["spec"]; wide?: boolean }) {
   const total = spec.memoryMb
   const pct = spec.memUsedPct
   // Used is derived, not reported: memUsedPct is 1 - MemAvailable/MemTotal
@@ -131,10 +136,12 @@ export function HostMemCell({ spec }: { spec: Host["spec"] }) {
     : typeof pct === "number"
       ? `${gib((total * pct) / 100)} / ${gib(total)} GiB`
       : `${gib(total)} GiB`
-  return <UtilGauge amount={amount} value={pct} stale={isStale(spec.metricsSampledAt)} />
+  return (
+    <UtilGauge amount={amount} value={pct} stale={isStale(spec.metricsSampledAt)} wide={wide} />
+  )
 }
 
-export function HostDiskCell({ spec }: { spec: Host["spec"] }) {
+export function HostDiskCell({ spec, wide }: { spec: Host["spec"]; wide?: boolean }) {
   const used = spec.diskUsedBytes
   const total = spec.diskTotalBytes
   const stale = isStale(spec.metricsSampledAt)
@@ -150,5 +157,5 @@ export function HostDiskCell({ spec }: { spec: Host["spec"] }) {
   const hasPair = typeof used === "number" && typeof total === "number" && total > 0
   const pct = hasPair ? (used / total) * 100 : spec.diskUsedPct
   const amount = hasPair ? `${gibBytes(used)} / ${gibBytes(total)} GiB` : undefined
-  return <UtilGauge amount={amount} value={pct} stale={stale} />
+  return <UtilGauge amount={amount} value={pct} stale={stale} wide={wide} />
 }

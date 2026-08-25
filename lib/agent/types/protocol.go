@@ -61,6 +61,14 @@ const (
 	// FrameTypeAgentStatus reports a lifecycle state the server cannot
 	// infer, currently only pending_restart.
 	FrameTypeAgentStatus = "agent.status"
+	// FrameTypeHostFacts carries the machine's inventory (HostFacts).
+	//
+	// Its own frame rather than a heartbeat field, because the two have
+	// opposite economics: a heartbeat is nine numbers every 15s, and
+	// facts are a few KB that change perhaps twice a year. The agent
+	// sends one after hello and then only when the content's hash moves,
+	// so a settled fleet spends nothing on this.
+	FrameTypeHostFacts = "host.facts"
 )
 
 // Agent lifecycle statuses for FrameTypeAgentStatus.
@@ -165,6 +173,9 @@ type Frame struct {
 
 	// --- agent.status ---
 	Status string `json:"status,omitempty"`
+
+	// --- host.facts ---
+	Facts *HostFacts `json:"facts,omitempty"`
 
 	// --- config.reload ---
 	// AllowedPorts narrows the data channel's port allowlist to the
