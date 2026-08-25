@@ -35,6 +35,14 @@
       "description": "Agent 接入令牌：主机侧执行 install-agent.sh 时携带，用于换取长期 agent token。明文只在创建响应中返回一次，库内仅存 SHA-256 哈希。"
     },
     {
+      "name": "HostProcesses",
+      "description": "主机进程：agent 上报的工作负载快照"
+    },
+    {
+      "name": "HostAccounts",
+      "description": "主机账号：可登录的用户、用户组与提权面"
+    },
+    {
       "name": "User",
       "description": "用户管理：平台用户的增删改查，支持密码设置与修改。用户可被添加为租户或项目的成员。"
     },
@@ -696,6 +704,69 @@
         }
       }
     },
+    "/api/compute/v1/hosts/{hostId}/accounts": {
+      "get": {
+        "summary": "List accounts",
+        "operationId": "listHostsAccounts",
+        "tags": [
+          "HostAccounts"
+        ],
+        "parameters": [
+          {
+            "name": "hostId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "sortBy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostAccountsList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/compute/v1/hosts/{hostId}/image-siblings": {
       "get": {
         "summary": "Get image-siblings of Host",
@@ -873,6 +944,69 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MetricList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/compute/v1/hosts/{hostId}/processes": {
+      "get": {
+        "summary": "Get processes of Host",
+        "operationId": "listHostsProcesses",
+        "tags": [
+          "Host"
+        ],
+        "parameters": [
+          {
+            "name": "hostId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "sortBy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcesseList"
                 }
               }
             }
@@ -1535,6 +1669,77 @@
         }
       }
     },
+    "/api/compute/v1/workspaces/{workspaceId}/hosts/{hostId}/accounts": {
+      "get": {
+        "summary": "List accounts",
+        "operationId": "listWorkspacesHostsAccounts",
+        "tags": [
+          "HostAccounts"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hostId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "sortBy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostAccountsList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/compute/v1/workspaces/{workspaceId}/hosts/{hostId}/image-siblings": {
       "get": {
         "summary": "Get image-siblings of Host",
@@ -1744,6 +1949,77 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MetricList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/compute/v1/workspaces/{workspaceId}/hosts/{hostId}/processes": {
+      "get": {
+        "summary": "Get processes of Host",
+        "operationId": "listWorkspacesHostsProcesses",
+        "tags": [
+          "Host"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hostId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "sortBy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcesseList"
                 }
               }
             }
@@ -2534,6 +2810,85 @@
         }
       }
     },
+    "/api/compute/v1/workspaces/{workspaceId}/namespaces/{namespaceId}/hosts/{hostId}/accounts": {
+      "get": {
+        "summary": "List accounts",
+        "operationId": "listWorkspacesNamespacesHostsAccounts",
+        "tags": [
+          "HostAccounts"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "namespaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hostId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "sortBy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostAccountsList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/compute/v1/workspaces/{workspaceId}/namespaces/{namespaceId}/hosts/{hostId}/image-siblings": {
       "get": {
         "summary": "Get image-siblings of Host",
@@ -2775,6 +3130,85 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MetricList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/compute/v1/workspaces/{workspaceId}/namespaces/{namespaceId}/hosts/{hostId}/processes": {
+      "get": {
+        "summary": "Get processes of Host",
+        "operationId": "listWorkspacesNamespacesHostsProcesses",
+        "tags": [
+          "Host"
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "namespaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hostId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "sortBy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcesseList"
                 }
               }
             }
@@ -6496,6 +6930,47 @@
           }
         }
       },
+      "HostAccounts": {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HostUserGroup"
+            }
+          },
+          "reportedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sudoRules": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HostAccount"
+            }
+          }
+        }
+      },
+      "HostAccountsList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HostAccounts"
+            }
+          },
+          "totalCount": {
+            "type": "integer"
+          }
+        }
+      },
       "HostAlertRuleSpec": {
         "type": "object",
         "properties": {
@@ -6683,6 +7158,21 @@
           },
           "state": {
             "type": "string"
+          }
+        }
+      },
+      "HostProcesses": {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HostProcessGroup"
+            }
+          },
+          "reportedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -7386,6 +7876,20 @@
           "scope"
         ]
       },
+      "ProcesseList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "totalCount": {
+            "type": "integer"
+          }
+        }
+      },
       "Role": {
         "type": "object",
         "properties": {
@@ -7790,7 +8294,9 @@
         "HostBlockDevice",
         "HostMetrics",
         "Host",
-        "AgentJoinToken"
+        "AgentJoinToken",
+        "HostProcesses",
+        "HostAccounts"
       ]
     },
     {

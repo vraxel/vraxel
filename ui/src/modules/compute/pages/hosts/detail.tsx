@@ -23,6 +23,7 @@ import {
   HostOverviewTab,
   HostStorageTab,
 } from "@/modules/compute/components/host-detail-tabs"
+import { HostAccountsTab, HostProcessesTab } from "@/modules/compute/components/host-runtime-tabs"
 import { AgentInstallDialog } from "@/modules/compute/components/agent-install-dialog"
 import { HostMergeDialog } from "@/modules/compute/components/host-merge-dialog"
 import { HostLogsDialog } from "@/modules/compute/components/host-logs-dialog"
@@ -221,6 +222,8 @@ export default function HostDetailPage() {
           <TabsTrigger value="overview">{t("compute.host.tab.overview")}</TabsTrigger>
           <TabsTrigger value="network">{t("compute.host.tab.network")}</TabsTrigger>
           <TabsTrigger value="storage">{t("compute.host.tab.storage")}</TabsTrigger>
+          <TabsTrigger value="processes">{t("compute.host.tab.processes")}</TabsTrigger>
+          <TabsTrigger value="accounts">{t("compute.host.tab.accounts")}</TabsTrigger>
           <TabsTrigger value="metrics">{t("compute.host.tab.metrics")}</TabsTrigger>
         </TabsList>
 
@@ -233,6 +236,17 @@ export default function HostDetailPage() {
         </TabsContent>
         <TabsContent value="storage" className="mt-4">
           <HostStorageTab host={host} />
+        </TabsContent>
+        {/* Both fetch, unlike the two tabs above, which read lists already
+            on the host object. Mounted only while selected so a page
+            opened to read the hostname does not pay for two requests --
+            and so a viewer without compute:hosts:accounts:list only sees
+            that tab fail when they choose to open it. */}
+        <TabsContent value="processes" className="mt-4">
+          <HostProcessesTab host={host} scope={scope} />
+        </TabsContent>
+        <TabsContent value="accounts" className="mt-4">
+          <HostAccountsTab host={host} scope={scope} />
         </TabsContent>
         {/* Mounted only while selected: the panel owns a polling query
             and a chart per series, and paying for those on a page opened

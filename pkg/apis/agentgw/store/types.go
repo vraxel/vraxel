@@ -123,6 +123,17 @@ type FactsInput struct {
 	BlockDevices      []byte
 }
 
+// AccountsInput is one host.accounts report, ready to store. Three
+// pre-encoded jsonb payloads and nothing else: the server does not
+// interpret any of it, and the one field that could have been sensitive
+// -- a password hash -- was reduced to a word on the host before it was
+// ever sent.
+type AccountsInput struct {
+	Users     []byte
+	Groups    []byte
+	SudoRules []byte
+}
+
 // BindInput is one machine claiming one host row.
 type BindInput struct {
 	HostID  int64

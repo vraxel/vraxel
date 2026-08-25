@@ -86,12 +86,16 @@ func Registrar(database *db.DB, serverURL string, hub *statushub.Hub, terminals 
 	// store interface rather than pkg/db, the same way every other
 	// cross-module data path in the tree works.
 	tokens := agentgw.NewJoinTokenStore(database)
+	runtime := modstore.NewPGHostRuntimeStore(database)
 	return func(s *apiserver.Server) {
 		backend := NewAgentLiveMetrics(dialer)
 		if metricsQueryURL != "" {
 			backend = NewVMMetrics(metricsQueryURL)
 		}
-		apiserver.Register(s, HostsDef(hosts, agentHosts, agents, hub, terminals, dialer, backend))
+		apiserver.Register(s, HostsDef(hosts, agentHosts, agents, hub, terminals, dialer, backend, runtime))
+		// After HostsDef: a nested resource resolves its parent by
+		// registered path, and an unknown reference panics at startup.
+		apiserver.Register(s, HostAccountsDef(hosts, runtime))
 		apiserver.Register(s, AgentJoinTokensDef(tokens, hosts, serverURL))
 		apiserver.Register(s, AlertRulesDef(modstore.NewPGAlertRuleStore(database)))
 	}

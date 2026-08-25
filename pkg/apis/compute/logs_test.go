@@ -13,7 +13,7 @@ import (
 func logsAction(t *testing.T) apiserver.ActionDef {
 	t.Helper()
 	def := HostsDef(nil, nil, nil, nil, NewTerminalSessions(), NewAgentDialerHolder(),
-		NewAgentLiveMetrics(NewAgentDialerHolder()))
+		NewAgentLiveMetrics(NewAgentDialerHolder()), nil)
 	for _, a := range def.Actions {
 		if a.Name == "logs" {
 			return a

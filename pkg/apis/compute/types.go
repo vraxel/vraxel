@@ -405,3 +405,127 @@ type HostMergeResponse struct {
 	// the one that was absorbed.
 	AgentMoved bool `json:"agentMoved"`
 }
+
+// HostProcesses is what a host is running: the response of
+// GET /hosts/{id}/processes.
+//
+// One object rather than a paginated list, because it is not a
+// collection anybody pages through -- a real machine reports a couple of
+// dozen workloads -- and because the report's timestamp belongs to the
+// report, not to a row inside it.
+// +openapi:description=主机进程：agent 上报的工作负载快照
+type HostProcesses struct {
+	runtime.TypeMeta `json:",inline"`
+	Groups           []HostProcessGroup `json:"groups,omitempty"`
+	// ReportedAt is when the agent last SENT this. The agent stays silent
+	// while the workload sits still, so an old timestamp means "nothing
+	// has changed", not "nobody is looking".
+	ReportedAt *time.Time `json:"reportedAt,omitempty"`
+}
+
+func (h *HostProcesses) GetTypeMeta() *runtime.TypeMeta { return &h.TypeMeta }
+
+// HostProcessGroup is one workload: every process sharing an identity,
+// counted. There is deliberately no PID -- see lib/agent/types.
+type HostProcessGroup struct {
+	// Name is the executable name as the kernel reports it, truncated to
+	// 15 characters ("victoria-metric").
+	Name string `json:"name"`
+	// User is the effective user's name, or a bare uid when the machine
+	// has no passwd entry for it -- which is every container process
+	// running as a uid that exists only inside its image.
+	User  string `json:"user,omitempty"`
+	Count int32  `json:"count"`
+	// Unit is the systemd unit this workload belongs to. Identity comes
+	// from the supervisor rather than the command line, which is not
+	// collected: command lines carry credentials.
+	Unit string `json:"unit,omitempty"`
+	// Container is true when the workload runs in a container. Its NAME
+	// is not here: the cgroup carries only the container's hex id.
+	Container bool `json:"container,omitempty"`
+	// Ports are the sockets this workload listens on, empty for the
+	// workloads that only make outbound connections.
+	Ports []HostListenPort `json:"ports,omitempty"`
+}
+
+// HostListenPort is one listening socket.
+type HostListenPort struct {
+	// Proto is "tcp" or "udp". The v4/v6 split lives in Addr, where
+	// 0.0.0.0 and :: are visibly different bindings.
+	Proto string `json:"proto"`
+	Addr  string `json:"addr,omitempty"`
+	Port  int32  `json:"port"`
+}
+
+// HostAccounts is who can use a host and what they can do on it: the
+// response of GET /hosts/{id}/accounts.
+//
+// Behind its own permission code rather than the host's get, unlike the
+// process list. The reasoning is the one already applied to the journal
+// endpoint: "may read this host's details" should cover how loaded it is
+// and what it runs, and should not automatically cover which accounts
+// exist, which of them can log in and which of them are root.
+// +openapi:description=主机账号：可登录的用户、用户组与提权面
+type HostAccounts struct {
+	runtime.TypeMeta `json:",inline"`
+	Users            []HostAccount   `json:"users,omitempty"`
+	Groups           []HostUserGroup `json:"groups,omitempty"`
+	// SudoRules are the verbatim grant lines of /etc/sudoers and its
+	// includes. Unparsed on purpose: sudo's grammar is real, and a parser
+	// that half-understands it gives a confident wrong answer about the
+	// one account that matters.
+	SudoRules  []string   `json:"sudoRules,omitempty"`
+	ReportedAt *time.Time `json:"reportedAt,omitempty"`
+}
+
+func (h *HostAccounts) GetTypeMeta() *runtime.TypeMeta { return &h.TypeMeta }
+
+// HostAccount is one local account.
+type HostAccount struct {
+	Name string `json:"name"`
+	// int64 because a uid is unsigned 32-bit: the conventional "nobody"
+	// on several systems is 4294967294.
+	UID   int64  `json:"uid"`
+	GID   int64  `json:"gid"`
+	Group string `json:"group,omitempty"`
+	Home  string `json:"home,omitempty"`
+	Shell string `json:"shell,omitempty"`
+	// CanLogin is false for the nologin / false shells most of a passwd
+	// file carries -- what separates the two or three accounts a person
+	// could log into from the twenty a package manager created.
+	CanLogin bool `json:"canLogin,omitempty"`
+	// Password is the SHAPE of the shadow field: "set", "locked",
+	// "disabled" or "empty". The hash is reduced to this word on the host
+	// and never leaves it. "empty" is the one value that is a finding: an
+	// account that can be logged into with no password at all.
+	Password string `json:"password,omitempty"`
+	// Groups are the supplementary groups naming this account.
+	Groups []string `json:"groups,omitempty"`
+	// Privileges names every route this account has to root: "root" (uid
+	// 0), "sudo" (a sudoers rule names it), "docker-group" (can mount the
+	// host filesystem into a container, which appears nowhere in sudoers)
+	// or "disk-group". Empty for an ordinary account.
+	Privileges []string `json:"privileges,omitempty"`
+	// SSHKeys are the keys that let somebody in as this account, by
+	// fingerprint. Key bodies are not collected.
+	SSHKeys []HostSSHKey `json:"sshKeys,omitempty"`
+}
+
+// HostUserGroup is one local group.
+type HostUserGroup struct {
+	Name string `json:"name"`
+	GID  int64  `json:"gid"`
+	// Members are the SUPPLEMENTARY members from /etc/group. A user whose
+	// PRIMARY group this is does not appear here, so this is not the full
+	// answer to "who is in this group" -- HostAccount.Groups is.
+	Members []string `json:"members,omitempty"`
+}
+
+// HostSSHKey is one authorized key, reduced to what identifies it.
+type HostSSHKey struct {
+	Type string `json:"type"`
+	// Fingerprint is the OpenSSH SHA256 form, the same value
+	// ssh-keygen -l prints.
+	Fingerprint string `json:"fingerprint"`
+	Comment     string `json:"comment,omitempty"`
+}

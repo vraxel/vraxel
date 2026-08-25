@@ -28,6 +28,16 @@ const (
 	// -- change by human action, and an hour is already far tighter than
 	// the reboot that most such changes require anyway.
 	FactsInterval = 1 * time.Hour
+	// ProcessesInterval is how often the agent re-reads its workload.
+	// Tighter than facts because this is the one inventory that changes
+	// without anybody touching the machine: a deploy replaces a service,
+	// a container is rescheduled, an operator restarts something. Five
+	// minutes costs a few thousand procfs reads and, on a machine where
+	// nothing moved, sends nothing at all.
+	ProcessesInterval = 5 * time.Minute
+	// AccountsInterval matches facts: accounts change by human action,
+	// and an hour is already tighter than the change itself.
+	AccountsInterval = 1 * time.Hour
 	// reconnectMin / reconnectMax bound the exponential backoff between
 	// reconnect attempts. Capped at 60s because a control channel is
 	// cheap and an agent that stays disconnected is an unmanaged host --
@@ -52,6 +62,23 @@ const (
 	// version, which fit easily, over a list nobody can read anyway.
 	// Truncation is logged; silent capping would read as completeness.
 	maxFactsListEntries = 128
+	// inventoryBudget is how many bytes one report's lists may encode to,
+	// leaving the rest of MaxFrameBytes for the envelope.
+	//
+	// A COUNT cap cannot do this job on its own, because an entry's size
+	// has no bound. One account with forty authorized keys outweighs a
+	// hundred service accounts, so a bastion blows the frame limit at an
+	// entry count nowhere near 128 -- and an oversize frame is REFUSED by
+	// EncodeFrame, which means that host reports no accounts at all
+	// rather than most of them. Measured on an ordinary machine the whole
+	// accounts report is 5.6 KB, so this bites only where it should.
+	inventoryBudget = 48 * 1024
+	// The accounts report carries three lists in ONE frame, so they share
+	// the budget. Users get most of it: they are the largest entries and
+	// the ones anybody reads.
+	accountsUsersBudget  = 32 * 1024
+	accountsGroupsBudget = 8 * 1024
+	accountsRulesBudget  = 8 * 1024
 )
 
 // bootNonce identifies this agent process for the lifetime of the
@@ -130,6 +157,13 @@ type Channel struct {
 	// and then hourly, and sent only when it differs from what this
 	// session already sent -- see factsLoop.
 	Facts func() agenttypes.HostFacts
+
+	// Processes and Accounts are the two runtime inventories, on the same
+	// send-only-when-changed contract as Facts and at their own cadences.
+	// Nil disables the loop entirely, which is what a platform with no
+	// collector for them gets.
+	Processes func() agenttypes.HostProcesses
+	Accounts  func() agenttypes.HostAccounts
 
 	// live holds the current session's writer, so callers outside the
 	// frame loop (probe verdicts, pending_restart) can push a frame
@@ -290,6 +324,8 @@ func (c *Channel) session(ctx context.Context) error {
 	// whose facts frame was dropped is a host with a stale hardware list,
 	// not a host that has stopped working.
 	go c.factsLoop(sessCtx, send)
+	go c.processesLoop(sessCtx, send)
+	go c.accountsLoop(sessCtx, send)
 
 	for {
 		_, data, err := conn.ReadMessage(sessCtx)
@@ -362,42 +398,95 @@ func (c *Channel) heartbeatLoop(ctx context.Context, send SendFunc, endSession c
 }
 
 // factsLoop reports the machine's inventory: once as soon as the session
-// is up, then hourly, and each time only if it changed.
-//
-// The dedup state is local to this loop, which makes it per-session, which
-// makes the first frame of every session unconditional. That is the
-// point: the agent cannot know what the server still holds -- the row may
-// have been restored from a backup, or merged, or the facts write may
-// have failed -- and one frame per reconnect is a rounding error against
-// a channel that already beats every 15 seconds. Within a session, where
-// the server's state IS known, nothing is resent.
-//
-// Compared as marshalled JSON rather than by a hash: the struct is a few
-// KB, the comparison happens once an hour, and a hash would add a way for
-// two different inventories to look identical in exchange for nothing.
+// is up, then hourly, and each time only if it changed. See
+// reportOnChange for why the dedup works the way it does.
 func (c *Channel) factsLoop(ctx context.Context, send SendFunc) {
 	if c.Facts == nil {
 		return
 	}
-	ticker := time.NewTicker(FactsInterval)
+	reportOnChange(ctx, c, send, FactsInterval, "host facts",
+		func() agenttypes.HostFacts {
+			f := c.Facts()
+			// Generic, so a free function rather than a method: Go has no
+			// generic methods.
+			f.NICs = capFacts(f.NICs, c.Log, "nics")
+			f.Filesystems = capFacts(f.Filesystems, c.Log, "filesystems")
+			f.BlockDevices = capFacts(f.BlockDevices, c.Log, "block devices")
+			return f
+		},
+		func(f agenttypes.HostFacts) agenttypes.Frame {
+			return agenttypes.Frame{Type: agenttypes.FrameTypeHostFacts, ID: "facts-1", Facts: &f}
+		})
+}
+
+// processesLoop reports the machine's workload, and accountsLoop who can
+// use it. Same contract as factsLoop in every respect that matters: first
+// frame per session unconditional, then only on change.
+func (c *Channel) processesLoop(ctx context.Context, send SendFunc) {
+	if c.Processes == nil {
+		return
+	}
+	reportOnChange(ctx, c, send, ProcessesInterval, "host processes",
+		func() agenttypes.HostProcesses {
+			p := c.Processes()
+			p.Groups = capBySize(capFacts(p.Groups, c.Log, "process groups"), inventoryBudget, c.Log, "process groups")
+			return p
+		},
+		func(p agenttypes.HostProcesses) agenttypes.Frame {
+			return agenttypes.Frame{Type: agenttypes.FrameTypeHostProcesses, ID: "processes-1", Processes: &p}
+		})
+}
+
+func (c *Channel) accountsLoop(ctx context.Context, send SendFunc) {
+	if c.Accounts == nil {
+		return
+	}
+	reportOnChange(ctx, c, send, AccountsInterval, "host accounts",
+		func() agenttypes.HostAccounts {
+			a := c.Accounts()
+			// Three lists, one frame, one shared budget -- see
+			// inventoryBudget.
+			a.Users = capBySize(capFacts(a.Users, c.Log, "accounts"), accountsUsersBudget, c.Log, "accounts")
+			a.Groups = capBySize(capFacts(a.Groups, c.Log, "groups"), accountsGroupsBudget, c.Log, "groups")
+			a.SudoRules = capBySize(capFacts(a.SudoRules, c.Log, "sudo rules"), accountsRulesBudget, c.Log, "sudo rules")
+			return a
+		},
+		func(a agenttypes.HostAccounts) agenttypes.Frame {
+			return agenttypes.Frame{Type: agenttypes.FrameTypeHostAccounts, ID: "accounts-1", Accounts: &a}
+		})
+}
+
+// reportOnChange is the shared body of the three inventory loops: sample,
+// and send only if the sample differs from the last one this session sent.
+//
+// The dedup state is local to the call, which makes it per-session, which
+// makes the first frame of every session unconditional. That is the
+// point: the agent cannot know what the server still holds -- the row may
+// have been restored from a backup, or merged, or the write may have
+// failed -- and one frame per reconnect is a rounding error against a
+// channel that already beats every 15 seconds. Within a session, where
+// the server's state IS known, nothing is resent.
+//
+// Compared as marshalled JSON rather than by a hash: these are a few KB,
+// the comparison happens minutes apart, and a hash would add a way for two
+// different inventories to look identical in exchange for nothing.
+//
+// A free function because Go has no generic methods.
+func reportOnChange[T any](
+	ctx context.Context, c *Channel, send SendFunc,
+	every time.Duration, what string,
+	sample func() T, build func(T) agenttypes.Frame,
+) {
+	ticker := time.NewTicker(every)
 	defer ticker.Stop()
 	sent := ""
 	for {
-		facts := c.Facts()
-		// Generic, so a free function rather than a method: Go has no
-		// generic methods.
-		facts.NICs = capFacts(facts.NICs, c.Log, "nics")
-		facts.Filesystems = capFacts(facts.Filesystems, c.Log, "filesystems")
-		facts.BlockDevices = capFacts(facts.BlockDevices, c.Log, "block devices")
-		if encoded, err := json.Marshal(facts); err != nil {
-			c.Log.Warnf("control channel: encode host facts: %v", err)
+		v := sample()
+		if encoded, err := json.Marshal(v); err != nil {
+			c.Log.Warnf("control channel: encode %s: %v", what, err)
 		} else if string(encoded) != sent {
-			if err := send(agenttypes.Frame{
-				Type:  agenttypes.FrameTypeHostFacts,
-				ID:    "facts-1",
-				Facts: &facts,
-			}); err != nil {
-				c.Log.Warnf("control channel: send host facts: %v", err)
+			if err := send(build(v)); err != nil {
+				c.Log.Warnf("control channel: send %s: %v", what, err)
 			} else {
 				sent = string(encoded)
 			}
@@ -414,11 +503,45 @@ func (c *Channel) factsLoop(ctx context.Context, send SendFunc) {
 // when it has to. Logged on every resample rather than once: this is a
 // standing property of the host, and an hourly line is the only place it
 // is visible at all.
+// capBySize trims a list until its encoded form fits a byte budget,
+// after capFacts has already applied the count cap.
+//
+// Both caps exist because they catch different things: the count cap
+// bounds a list of small entries (500 LVM volumes), and this bounds a
+// short list of large ones (a jump host's accounts, each with several
+// keys). Either one alone leaves a real machine unable to report.
+//
+// The next length is estimated from the ratio rather than stepped down,
+// so this converges in an iteration or two over a list that may be
+// thousands long.
+func capBySize[T any](items []T, budget int, log Logger, what string) []T {
+	full := len(items)
+	for len(items) > 0 {
+		b, err := json.Marshal(items)
+		if err != nil {
+			return items
+		}
+		if len(b) <= budget {
+			break
+		}
+		next := len(items) * budget / len(b)
+		if next >= len(items) {
+			next = len(items) - 1
+		}
+		items = items[:next]
+	}
+	if len(items) < full {
+		log.Warnf("host inventory: reporting %d of %d %s; the rest exceed the %d-byte frame budget",
+			len(items), full, what, budget)
+	}
+	return items
+}
+
 func capFacts[T any](items []T, log Logger, what string) []T {
 	if len(items) <= maxFactsListEntries {
 		return items
 	}
-	log.Warnf("host facts: reporting %d of %d %s; the rest exceed the control frame limit",
+	log.Warnf("host inventory: reporting %d of %d %s; the rest exceed the control frame limit",
 		maxFactsListEntries, len(items), what)
 	return items[:maxFactsListEntries]
 }

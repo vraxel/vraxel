@@ -37,6 +37,8 @@ type fakeAgentStore struct {
 	foreign []foreignCall
 	metrics []metricsCall
 	facts   []factsCall
+	procs   []procsCall
+	accts   []acctsCall
 	// touchLost makes Touch report that the row belongs to somebody else,
 	// which is what drives the re-claim path.
 	touchLost bool
@@ -108,6 +110,42 @@ func (f *fakeAgentStore) UpsertFacts(_ context.Context, hostID int64, in gwstore
 	defer f.mu.Unlock()
 	f.facts = append(f.facts, factsCall{hostID: hostID, in: in})
 	return nil
+}
+
+type procsCall struct {
+	hostID int64
+	groups []byte
+}
+
+type acctsCall struct {
+	hostID int64
+	in     gwstore.AccountsInput
+}
+
+func (f *fakeAgentStore) UpsertProcesses(_ context.Context, hostID int64, groups []byte) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.procs = append(f.procs, procsCall{hostID: hostID, groups: groups})
+	return nil
+}
+
+func (f *fakeAgentStore) UpsertAccounts(_ context.Context, hostID int64, in gwstore.AccountsInput) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.accts = append(f.accts, acctsCall{hostID: hostID, in: in})
+	return nil
+}
+
+func (f *fakeAgentStore) procsCalls() []procsCall {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]procsCall(nil), f.procs...)
+}
+
+func (f *fakeAgentStore) acctsCalls() []acctsCall {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]acctsCall(nil), f.accts...)
 }
 
 func (f *fakeAgentStore) factsCalls() []factsCall {
