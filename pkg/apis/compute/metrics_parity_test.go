@@ -34,7 +34,7 @@ func allChartSeries() []string {
 		agenttypes.SeriesNetRxErrs, agenttypes.SeriesNetTxErrs,
 		agenttypes.SeriesNetRxDrops, agenttypes.SeriesNetTxDrops,
 		agenttypes.SeriesPSICPUPct, agenttypes.SeriesPSIMemPct, agenttypes.SeriesPSIIOPct,
-		agenttypes.SeriesMemTotal, agenttypes.SeriesMemFree,
+		agenttypes.SeriesMemFree,
 		agenttypes.SeriesMemBuffers, agenttypes.SeriesMemCached,
 		agenttypes.SeriesSwapInPps, agenttypes.SeriesSwapOutPps,
 		agenttypes.SeriesPageFaults, agenttypes.SeriesOOMKills,
@@ -42,7 +42,7 @@ func allChartSeries() []string {
 		agenttypes.SeriesTCPRetrans, agenttypes.SeriesTCPInUse,
 		agenttypes.SeriesSocketsUsed, agenttypes.SeriesConntrackPct,
 		agenttypes.SeriesUptimeSec, agenttypes.SeriesProcsRunning, agenttypes.SeriesProcsBlocked,
-		agenttypes.SeriesFDUsedPct, agenttypes.SeriesTimeDriftSec, agenttypes.SeriesTimeSynced,
+		agenttypes.SeriesFDUsedPct, agenttypes.SeriesTimeDriftSec,
 		agenttypes.SeriesTempCelsius,
 	}
 }

@@ -70,7 +70,6 @@ const (
 	mFDAllocated   = "node_filefd_allocated"
 	mFDMaximum     = "node_filefd_maximum"
 	mTimexOffset   = "node_timex_offset_seconds"
-	mTimexSync     = "node_timex_sync_status"
 	mHwmonTemp     = "node_hwmon_temp_celsius"
 
 	// Label dimensions.
@@ -437,7 +436,6 @@ func (r *Ring) buildMemory(g grid, want func(string) bool, add addFunc) {
 	// The composition behind the percentage. Plain gauges: MemTotal minus
 	// free/buffers/cached is what an operator adds up by eye, and doing
 	// the subtraction here would hide which term moved.
-	r.addGauge(g, want, add, agenttypes.SeriesMemTotal, mMemTotal, 1)
 	r.addGauge(g, want, add, agenttypes.SeriesMemFree, mMemFree, 1)
 	r.addGauge(g, want, add, agenttypes.SeriesMemBuffers, mMemBuffers, 1)
 	r.addGauge(g, want, add, agenttypes.SeriesMemCached, mMemCached, 1)
@@ -718,7 +716,6 @@ func (r *Ring) buildSystem(g grid, want func(string) bool, add addFunc) {
 	r.addGauge(g, want, add, agenttypes.SeriesProcsBlocked, mProcsBlocked, 1)
 	r.addRatioPct(g, want, add, agenttypes.SeriesFDUsedPct, mFDAllocated, mFDMaximum)
 	r.addGauge(g, want, add, agenttypes.SeriesTimeDriftSec, mTimexOffset, 1)
-	r.addGauge(g, want, add, agenttypes.SeriesTimeSynced, mTimexSync, 1)
 	r.buildUptime(g, want, add)
 	r.buildTemperature(g, want, add)
 }

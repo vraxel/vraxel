@@ -85,14 +85,22 @@ export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef 
 
   const online = host.spec.agentStatus === "online"
 
+  // Only the visible group's series are fetched. The full vocabulary is
+  // about fifty series and the VictoriaMetrics backend issues ONE range
+  // query per series, sequentially -- so asking for everything to draw
+  // six charts was fifty round trips per poll, forty-four of them
+  // discarded, every thirty seconds for as long as the page stays open.
+  const wanted = useMemo(() => [...new Set(chartsFor(group).flatMap((c) => c.names))], [group])
+
   const query = useApiQuery({
-    queryKey: ["host-metrics", host.metadata.id, scope.ws, scope.ns, win],
+    queryKey: ["host-metrics", host.metadata.id, scope.ws, scope.ns, win, group],
     queryFn: () => {
       const now = Date.now()
       return hostMetricsApi(scope, host.metadata.id, {
         from_ms: now - preset.ms,
         to_ms: now,
         step_sec: preset.stepSec,
+        series: wanted.join(","),
       })
     },
     // Only while the agent is up: an offline host has no ring to answer
@@ -138,7 +146,24 @@ export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef 
     meta: { skipGlobalError: true },
   })
 
+  // keepPreviousData holds the last response across a key change, which
+  // is what makes switching WINDOW swap in place instead of flashing
+  // skeletons. Switching GROUP changes which series were asked for, so
+  // that same held response has nothing the new charts can draw -- and
+  // rendering it would flash "no data" across every chart on every group
+  // click. Detected by content rather than by tracking the previous
+  // group: if none of what we asked for is in hand, we are not holding
+  // this group's data.
   const res = query.data
+  // Held-over data that belongs to another group. isPlaceholderData alone
+  // is not enough -- it is also true while a WINDOW switch is in flight,
+  // where the old data is exactly what should stay on screen -- and a
+  // content check alone is not enough either, because a group whose
+  // series are all legitimately empty (no hwmon, no PSI) would look
+  // like the wrong group forever and never stop showing skeletons. Both
+  // together: only a PLACEHOLDER that carries none of what we asked for.
+  const holdingOtherGroup =
+    query.isPlaceholderData && !!res && !res.series.some((s) => wanted.includes(s.name))
   const empty = t("compute.host.metrics.noData")
 
   // Memoised on the response: without this, every mousemove would run
@@ -228,7 +253,7 @@ export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef 
           <div className="text-destructive py-8 text-center text-sm">
             {query.error instanceof Error ? query.error.message : empty}
           </div>
-        ) : !res ? (
+        ) : !res || holdingOtherGroup ? (
           <div className="grid gap-3 md:grid-cols-2">
             {charts.map((c) => (
               <Skeleton key={c.id} className="h-[180px]" />
