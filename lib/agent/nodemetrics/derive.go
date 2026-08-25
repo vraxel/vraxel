@@ -36,11 +36,51 @@ const (
 	mNetTx      = "node_network_transmit_bytes_total"
 	mBootTime   = "node_boot_time_seconds"
 
+	mMemFree       = "node_memory_MemFree_bytes"
+	mPSICPU        = "node_pressure_cpu_waiting_seconds_total"
+	mPSIMem        = "node_pressure_memory_waiting_seconds_total"
+	mPSIIO         = "node_pressure_io_waiting_seconds_total"
+	mCtxSwitches   = "node_context_switches_total"
+	mInterrupts    = "node_intr_total"
+	mSwapIn        = "node_vmstat_pswpin"
+	mSwapOut       = "node_vmstat_pswpout"
+	mPgFault       = "node_vmstat_pgfault"
+	mPgMajFault    = "node_vmstat_pgmajfault"
+	mOOMKill       = "node_vmstat_oom_kill"
+	mFSFiles       = "node_filesystem_files"
+	mFSFilesFree   = "node_filesystem_files_free"
+	mDiskReadOps   = "node_disk_reads_completed_total"
+	mDiskWriteOps  = "node_disk_writes_completed_total"
+	mDiskReadTime  = "node_disk_read_time_seconds_total"
+	mDiskWriteTime = "node_disk_write_time_seconds_total"
+	mNetRxPkts     = "node_network_receive_packets_total"
+	mNetTxPkts     = "node_network_transmit_packets_total"
+	mNetRxErrs     = "node_network_receive_errs_total"
+	mNetTxErrs     = "node_network_transmit_errs_total"
+	mNetRxDrops    = "node_network_receive_drop_total"
+	mNetTxDrops    = "node_network_transmit_drop_total"
+	mTCPRetrans    = "node_netstat_Tcp_RetransSegs"
+	mTCPInUse      = "node_sockstat_TCP_inuse"
+	mSocketsUsed   = "node_sockstat_sockets_used"
+	mConntrack     = "node_nf_conntrack_entries"
+	mConntrackMax  = "node_nf_conntrack_entries_limit"
+	mTime          = "node_time_seconds"
+	mProcsRunning  = "node_procs_running"
+	mProcsBlocked  = "node_procs_blocked"
+	mFDAllocated   = "node_filefd_allocated"
+	mFDMaximum     = "node_filefd_maximum"
+	mTimexOffset   = "node_timex_offset_seconds"
+	mTimexSync     = "node_timex_sync_status"
+	mHwmonTemp     = "node_hwmon_temp_celsius"
+
 	// Label dimensions.
 	lMode       = "mode"
 	lDevice     = "device"
 	lMountpoint = "mountpoint"
 	lFSType     = "fstype"
+	lKind       = "kind"
+	lChip       = "chip"
+	lSensor     = "sensor"
 
 	// CPU modes that mean "the CPU was available". iowait belongs here:
 	// the processor was idle waiting on a device, and counting a slow
@@ -201,10 +241,90 @@ func (r *Ring) build(g grid, want func(string) bool) []agenttypes.MetricsSeries 
 	r.buildFilesystems(g, want, add)
 	r.buildDisks(g, want, add)
 	r.buildNetwork(g, want, add)
+	r.buildPressure(g, want, add)
+	r.buildSockets(g, want, add)
+	r.buildSystem(g, want, add)
 	return out
 }
 
 type addFunc func(name string, labels map[string]string, values []agenttypes.MetricValue)
+
+// The four shapes almost every series takes. Written once because the
+// alternative is thirty near-identical fifteen-line blocks, in which a
+// transposed metric name is invisible.
+
+// addGauge adds an unlabelled gauge, optionally scaled.
+func (r *Ring) addGauge(g grid, want func(string) bool, add addFunc, chart, metric string, scale float64) {
+	if !want(chart) {
+		return
+	}
+	s := r.find(metric)
+	if s == nil {
+		return
+	}
+	vs := make([]agenttypes.MetricValue, g.count)
+	for i := range vs {
+		vs[i] = agenttypes.MetricValue(s.gauge(g, i) * scale)
+	}
+	add(chart, nil, vs)
+}
+
+// addRate adds an unlabelled counter as a per-second rate, optionally
+// scaled (PSI wants x100 to read as a percentage).
+func (r *Ring) addRate(g grid, want func(string) bool, add addFunc, chart, metric string, scale float64) {
+	if !want(chart) {
+		return
+	}
+	s := r.find(metric)
+	if s == nil {
+		return
+	}
+	vs := make([]agenttypes.MetricValue, g.count)
+	for i := range vs {
+		vs[i] = agenttypes.MetricValue(s.rate(g, i) * scale)
+	}
+	add(chart, nil, vs)
+}
+
+// addRatioPct adds 100 * num/den from two unlabelled gauges.
+func (r *Ring) addRatioPct(g grid, want func(string) bool, add addFunc, chart, num, den string) {
+	if !want(chart) {
+		return
+	}
+	n, d := r.find(num), r.find(den)
+	if n == nil || d == nil {
+		return
+	}
+	vs := make([]agenttypes.MetricValue, g.count)
+	for i := range vs {
+		vs[i] = agenttypes.MetricValueNone
+		nv, dv := n.gauge(g, i), d.gauge(g, i)
+		if math.IsNaN(nv) || math.IsNaN(dv) || dv <= 0 {
+			continue
+		}
+		vs[i] = agenttypes.MetricValue(clampPct(100 * nv / dv))
+	}
+	add(chart, nil, vs)
+}
+
+// addDevRate adds one per-second rate per value of the given label.
+// keep, when set, drops label values that do not belong on the chart.
+func (r *Ring) addDevRate(g grid, want func(string) bool, add addFunc, chart, metric, label string, keep func(string) bool) {
+	if !want(chart) {
+		return
+	}
+	byLabel, names := r.group(metric, label)
+	for _, d := range names {
+		if keep != nil && !keep(d) {
+			continue
+		}
+		vs := make([]agenttypes.MetricValue, g.count)
+		for i := range vs {
+			vs[i] = agenttypes.MetricValue(byLabel[d].rate(g, i))
+		}
+		add(chart, map[string]string{label: d}, vs)
+	}
+}
 
 // cpuModeRises sums each CPU mode's rise across every series carrying
 // it -- one per core, since node_exporter's cpu collector labels by
@@ -259,6 +379,9 @@ func cpuUsedValues(count int, rises map[string][]float64, totals []float64) []ag
 }
 
 func (r *Ring) buildCPU(g grid, want func(string) bool, add addFunc) {
+	r.addRate(g, want, add, agenttypes.SeriesCtxSwitches, mCtxSwitches, 1)
+	r.addRate(g, want, add, agenttypes.SeriesInterrupts, mInterrupts, 1)
+
 	wantUsed, wantMode := want(agenttypes.SeriesCPUUsedPct), want(agenttypes.SeriesCPUModePct)
 	if !wantUsed && !wantMode {
 		return
@@ -311,6 +434,19 @@ func (r *Ring) buildMemory(g grid, want func(string) bool, add addFunc) {
 		}
 	}
 
+	// The composition behind the percentage. Plain gauges: MemTotal minus
+	// free/buffers/cached is what an operator adds up by eye, and doing
+	// the subtraction here would hide which term moved.
+	r.addGauge(g, want, add, agenttypes.SeriesMemTotal, mMemTotal, 1)
+	r.addGauge(g, want, add, agenttypes.SeriesMemFree, mMemFree, 1)
+	r.addGauge(g, want, add, agenttypes.SeriesMemBuffers, mMemBuffers, 1)
+	r.addGauge(g, want, add, agenttypes.SeriesMemCached, mMemCached, 1)
+
+	r.addRate(g, want, add, agenttypes.SeriesSwapInPps, mSwapIn, 1)
+	r.addRate(g, want, add, agenttypes.SeriesSwapOutPps, mSwapOut, 1)
+	r.buildPageFaults(g, want, add)
+	r.buildOOMKills(g, want, add)
+
 	if !want(agenttypes.SeriesSwapUsed) {
 		return
 	}
@@ -336,6 +472,48 @@ func (r *Ring) buildMemory(g grid, want func(string) bool, add addFunc) {
 	add(agenttypes.SeriesSwapUsed, nil, vs)
 }
 
+// buildPageFaults emits minor and major faults as one series labelled by
+// kind. Minor faults are ordinary -- a healthy host does millions -- and
+// carry no information on their own; they are here so the major line has
+// something to be read against.
+func (r *Ring) buildPageFaults(g grid, want func(string) bool, add addFunc) {
+	if !want(agenttypes.SeriesPageFaults) {
+		return
+	}
+	for _, p := range []struct{ kind, metric string }{
+		{"minor", mPgFault},
+		{"major", mPgMajFault},
+	} {
+		s := r.find(p.metric)
+		if s == nil {
+			continue
+		}
+		vs := make([]agenttypes.MetricValue, g.count)
+		for i := range vs {
+			vs[i] = agenttypes.MetricValue(s.rate(g, i))
+		}
+		add(agenttypes.SeriesPageFaults, map[string]string{lKind: p.kind}, vs)
+	}
+}
+
+// buildOOMKills counts kills per BUCKET rather than per second. The
+// series exists so that one kill is visible; divided by a 60s bucket it
+// would be 0.016 and round away on the chart.
+func (r *Ring) buildOOMKills(g grid, want func(string) bool, add addFunc) {
+	if !want(agenttypes.SeriesOOMKills) {
+		return
+	}
+	s := r.find(mOOMKill)
+	if s == nil {
+		return
+	}
+	vs := make([]agenttypes.MetricValue, g.count)
+	for i := range vs {
+		vs[i] = agenttypes.MetricValue(s.rise(g, i))
+	}
+	add(agenttypes.SeriesOOMKills, nil, vs)
+}
+
 func (r *Ring) buildLoad(g grid, want func(string) bool, add addFunc) {
 	for _, p := range []struct{ chart, metric string }{
 		{agenttypes.SeriesLoad1, mLoad1},
@@ -354,7 +532,44 @@ func (r *Ring) buildLoad(g grid, want func(string) bool, add addFunc) {
 	}
 }
 
+// buildInodes emits inode usage per mountpoint. Its own walk rather than
+// a branch inside buildFilesystems: the inode metrics are a separate pair
+// with their own mountpoint set (a filesystem can report bytes and not
+// inodes), and threading a second optional pair through that loop made
+// the byte path harder to read than this whole function.
+func (r *Ring) buildInodes(g grid, want func(string) bool, add addFunc) {
+	if !want(agenttypes.SeriesFSInodesPct) {
+		return
+	}
+	files, mounts := r.group(mFSFiles, lMountpoint)
+	free, _ := r.group(mFSFilesFree, lMountpoint)
+	for _, mp := range mounts {
+		if !agenttypes.RealFSType(files[mp].Label(lFSType)) {
+			continue
+		}
+		f, ok := free[mp]
+		if !ok {
+			continue
+		}
+		vs := make([]agenttypes.MetricValue, g.count)
+		for i := range vs {
+			vs[i] = agenttypes.MetricValueNone
+			t, a := files[mp].gauge(g, i), f.gauge(g, i)
+			// A filesystem with no inode table (btrfs, xfs with dynamic
+			// allocation) reports 0 total. That is "not applicable", not
+			// "completely full".
+			if math.IsNaN(t) || math.IsNaN(a) || t <= 0 {
+				continue
+			}
+			vs[i] = agenttypes.MetricValue(clampPct(100 * (t - a) / t))
+		}
+		add(agenttypes.SeriesFSInodesPct, map[string]string{lMountpoint: mp}, vs)
+	}
+}
+
 func (r *Ring) buildFilesystems(g grid, want func(string) bool, add addFunc) {
+	r.buildInodes(g, want, add)
+
 	wantPct, wantSize := want(agenttypes.SeriesFSUsedPct), want(agenttypes.SeriesFSSize)
 	if !wantPct && !wantSize {
 		return
@@ -362,8 +577,15 @@ func (r *Ring) buildFilesystems(g grid, want func(string) bool, add addFunc) {
 	sizes, mounts := r.group(mFSSize, lMountpoint)
 	avails, _ := r.group(mFSAvail, lMountpoint)
 	for _, mp := range mounts {
-		labels := map[string]string{lMountpoint: mp}
 		size := sizes[mp]
+		// The same definition of "this machine's storage" the summary's
+		// disk gauge and the reported filesystem list use. Charting a
+		// tmpfs the gauge excluded gives an operator two disk answers
+		// that disagree, with nothing on the page saying which is which.
+		if !agenttypes.RealFSType(size.Label(lFSType)) {
+			continue
+		}
+		labels := map[string]string{lMountpoint: mp}
 		if wantSize {
 			vs := make([]agenttypes.MetricValue, g.count)
 			for i := range vs {
@@ -392,15 +614,40 @@ func (r *Ring) buildDisks(g grid, want func(string) bool, add addFunc) {
 	for _, p := range []struct{ chart, metric string }{
 		{agenttypes.SeriesDiskReadBps, mDiskRead},
 		{agenttypes.SeriesDiskWriteBps, mDiskWrite},
+		{agenttypes.SeriesDiskReadIOPS, mDiskReadOps},
+		{agenttypes.SeriesDiskWriteIOPS, mDiskWriteOps},
+	} {
+		r.addDevRate(g, want, add, p.chart, p.metric, lDevice, nil)
+	}
+
+	// Mean seconds per operation: the rise in accumulated service time
+	// divided by the rise in operation count over the SAME bucket. Not
+	// derivable from either alone, which is why both counters exist.
+	for _, p := range []struct{ chart, timeMetric, opsMetric string }{
+		{agenttypes.SeriesDiskReadWait, mDiskReadTime, mDiskReadOps},
+		{agenttypes.SeriesDiskWriteWait, mDiskWriteTime, mDiskWriteOps},
 	} {
 		if !want(p.chart) {
 			continue
 		}
-		devs, names := r.group(p.metric, lDevice)
+		times, names := r.group(p.timeMetric, lDevice)
+		ops, _ := r.group(p.opsMetric, lDevice)
 		for _, d := range names {
+			o, ok := ops[d]
+			if !ok {
+				continue
+			}
 			vs := make([]agenttypes.MetricValue, g.count)
 			for i := range vs {
-				vs[i] = agenttypes.MetricValue(devs[d].rate(g, i))
+				vs[i] = agenttypes.MetricValueNone
+				secs, n := times[d].rise(g, i), o.rise(g, i)
+				// An idle device did zero operations. Its latency is not
+				// zero, it is undefined -- and a flat zero line reads as
+				// "instant", the opposite of what is worth knowing.
+				if math.IsNaN(secs) || math.IsNaN(n) || n <= 0 {
+					continue
+				}
+				vs[i] = agenttypes.MetricValue(secs / n)
 			}
 			add(p.chart, map[string]string{lDevice: d}, vs)
 		}
@@ -428,18 +675,93 @@ func (r *Ring) buildNetwork(g grid, want func(string) bool, add addFunc) {
 	for _, p := range []struct{ chart, metric string }{
 		{agenttypes.SeriesNetRxBps, mNetRx},
 		{agenttypes.SeriesNetTxBps, mNetTx},
+		{agenttypes.SeriesNetRxPps, mNetRxPkts},
+		{agenttypes.SeriesNetTxPps, mNetTxPkts},
+		{agenttypes.SeriesNetRxErrs, mNetRxErrs},
+		{agenttypes.SeriesNetTxErrs, mNetTxErrs},
+		{agenttypes.SeriesNetRxDrops, mNetRxDrops},
+		{agenttypes.SeriesNetTxDrops, mNetTxDrops},
 	} {
-		if !want(p.chart) {
+		// Container and bridge plumbing is dropped by the same predicate
+		// that shapes the summary's rx/tx and the reported NIC list. A
+		// packet crossing a bridge is counted again on every veth it
+		// traverses, so leaving them in draws a host pushing multiples of
+		// its real traffic -- and on this test host it turned six new
+		// series into sixty lines.
+		r.addDevRate(g, want, add, p.chart, p.metric, lDevice, agenttypes.RealNetDevice)
+	}
+}
+
+// buildPressure emits the PSI shares. Each is a counter of stalled
+// seconds, so its rise per second of wall clock IS the stalled fraction
+// -- the same derivation disk utilisation uses, times 100 to read as a
+// percentage.
+func (r *Ring) buildPressure(g grid, want func(string) bool, add addFunc) {
+	for _, p := range []struct{ chart, metric string }{
+		{agenttypes.SeriesPSICPUPct, mPSICPU},
+		{agenttypes.SeriesPSIMemPct, mPSIMem},
+		{agenttypes.SeriesPSIIOPct, mPSIIO},
+	} {
+		r.addRate(g, want, add, p.chart, p.metric, 100)
+	}
+}
+
+func (r *Ring) buildSockets(g grid, want func(string) bool, add addFunc) {
+	r.addRate(g, want, add, agenttypes.SeriesTCPRetrans, mTCPRetrans, 1)
+	r.addGauge(g, want, add, agenttypes.SeriesTCPInUse, mTCPInUse, 1)
+	r.addGauge(g, want, add, agenttypes.SeriesSocketsUsed, mSocketsUsed, 1)
+	r.addRatioPct(g, want, add, agenttypes.SeriesConntrackPct, mConntrack, mConntrackMax)
+}
+
+func (r *Ring) buildSystem(g grid, want func(string) bool, add addFunc) {
+	r.addGauge(g, want, add, agenttypes.SeriesProcsRunning, mProcsRunning, 1)
+	r.addGauge(g, want, add, agenttypes.SeriesProcsBlocked, mProcsBlocked, 1)
+	r.addRatioPct(g, want, add, agenttypes.SeriesFDUsedPct, mFDAllocated, mFDMaximum)
+	r.addGauge(g, want, add, agenttypes.SeriesTimeDriftSec, mTimexOffset, 1)
+	r.addGauge(g, want, add, agenttypes.SeriesTimeSynced, mTimexSync, 1)
+	r.buildUptime(g, want, add)
+	r.buildTemperature(g, want, add)
+}
+
+// buildUptime derives seconds since boot from the two clock gauges the
+// same sample carries, so the answer is dated by the machine's own view
+// of both and needs no clock from here.
+func (r *Ring) buildUptime(g grid, want func(string) bool, add addFunc) {
+	if !want(agenttypes.SeriesUptimeSec) {
+		return
+	}
+	now, boot := r.find(mTime), r.find(mBootTime)
+	if now == nil || boot == nil {
+		return
+	}
+	vs := make([]agenttypes.MetricValue, g.count)
+	for i := range vs {
+		vs[i] = agenttypes.MetricValueNone
+		n, b := now.gauge(g, i), boot.gauge(g, i)
+		if math.IsNaN(n) || math.IsNaN(b) || n < b {
 			continue
 		}
-		devs, names := r.group(p.metric, lDevice)
-		for _, d := range names {
-			vs := make([]agenttypes.MetricValue, g.count)
-			for i := range vs {
-				vs[i] = agenttypes.MetricValue(devs[d].rate(g, i))
-			}
-			add(p.chart, map[string]string{lDevice: d}, vs)
+		vs[i] = agenttypes.MetricValue(n - b)
+	}
+	add(agenttypes.SeriesUptimeSec, nil, vs)
+}
+
+// buildTemperature emits one series per sensor. Chip AND sensor, because
+// a board reports several sensors per chip and either label alone
+// collapses them onto one line.
+func (r *Ring) buildTemperature(g grid, want func(string) bool, add addFunc) {
+	if !want(agenttypes.SeriesTempCelsius) {
+		return
+	}
+	for _, s := range r.matching(mHwmonTemp) {
+		vs := make([]agenttypes.MetricValue, g.count)
+		for i := range vs {
+			vs[i] = agenttypes.MetricValue(s.gauge(g, i))
 		}
+		add(agenttypes.SeriesTempCelsius, map[string]string{
+			lChip:   s.Label(lChip),
+			lSensor: s.Label(lSensor),
+		}, vs)
 	}
 }
 

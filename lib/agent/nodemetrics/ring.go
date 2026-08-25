@@ -380,6 +380,21 @@ func (r *Ring) group(name, dim string) (map[string]*Series, []string) {
 	return out, keys
 }
 
+// matching returns every series with this name, in stored order, for
+// metrics whose identity needs MORE than one label. hwmon temperatures
+// carry {chip, sensor} and either alone collapses several readings onto
+// one key -- which group() would then resolve by keeping whichever came
+// last.
+func (r *Ring) matching(name string) []*Series {
+	var out []*Series
+	for _, s := range r.order {
+		if s.Name == name {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
 // groupAll is group for dimensions that do NOT identify a series.
 // node_cpu_seconds_total carries {cpu, mode}: grouped by mode, every
 // core contributes one series, and a map to a single *Series would keep

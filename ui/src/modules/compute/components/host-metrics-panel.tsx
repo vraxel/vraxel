@@ -12,8 +12,10 @@ import type { ScopeRef } from "@/core/registry/resource"
 import type { HostMetrics } from "@/generated/compute"
 import { hostMetricsApi } from "@/modules/compute/api/hosts"
 import type { Host } from "@/modules/compute/api/types"
+import { Tabs, TabsList, TabsTrigger } from "@/shared/ui/tabs"
 import { MetricChart, type ChartSeries, type ChartUnit } from "./metric-chart"
 import { HoverTsContext } from "./chart-hover-context"
+import { chartsFor, GROUP_KEYS, type GroupKey } from "./host-metrics-charts"
 
 // The window presets. Steps follow what the agent's ring can answer --
 // 15s exists for the last hour only -- and every preset stays under the
@@ -42,10 +44,6 @@ const REFRESH_OPTIONS = [
 
 type RefreshKey = (typeof REFRESH_OPTIONS)[number]["key"]
 
-// The device dimension for network series labels. Module-level so the
-// charts memo does not close over a per-render function.
-const dev = (_: string, labels?: Record<string, string>) => labels?.device ?? "-"
-
 // One chart's worth of the response: series picked by name, labelled by
 // their distinguishing dimension.
 function pick(
@@ -67,7 +65,7 @@ function pick(
 }
 
 /**
- * The six utilisation charts on a host's detail page, read on demand
+ * The utilisation charts on a host's detail page, read on demand
  * from the host's own agent (the server keeps no metric history). The
  * window slides on every poll: from/to are computed inside the fetch, so
  * a chart left open keeps showing "the last hour", not the hour that was
@@ -78,9 +76,10 @@ export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef 
   const [win, setWin] = useState<WindowKey>("1h")
   const preset = WINDOWS.find((w) => w.key === win) ?? WINDOWS[0]
   const [refreshKey, setRefreshKey] = useState<RefreshKey>("auto")
+  const [group, setGroup] = useState<GroupKey>("overview")
   const refreshMs = REFRESH_OPTIONS.find((r) => r.key === refreshKey)?.ms ?? null
-  // Shared across all six charts, so hovering one shows the crosshair at
-  // the same instant on the others -- which is how a CPU spike and the
+  // Shared across the visible charts, so hovering one shows the crosshair
+  // at the same instant on the others -- which is how a CPU spike and the
   // disk spike that caused it get lined up by eye.
   const [hoverTs, setHoverTs] = useState<number | null>(null)
 
@@ -147,63 +146,23 @@ export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef 
   // made the shared crosshair stutter. Labels go through the non-hook
   // translator so the memo does not depend on `t`, which is rebuilt on
   // every render; `locale` is what actually changes them.
+  // Only the visible group's charts are built. The response carries
+  // every series either way (one query answers the whole page), but
+  // pick() walks it once per chart, and doing that for all 29 on every
+  // poll was measurable on the crosshair.
   const charts = useMemo<{ id: string; title: string; unit: ChartUnit; series: ChartSeries[] }[]>(
-    () => [
-      {
-        id: "cpu",
-        title: translate("compute.host.cpu"),
-        unit: "pct",
-        series: pick(res, ["cpu.used_pct"], () => translate("compute.host.metrics.used")),
-      },
-      {
-        id: "mem",
-        title: translate("compute.host.memory"),
-        unit: "pct",
-        series: pick(res, ["mem.used_pct", "swap.used_pct"], (name) =>
-          name === "swap.used_pct" ? "swap" : translate("compute.host.metrics.used"),
-        ),
-      },
-      {
-        id: "load",
-        title: translate("compute.host.metrics.load"),
-        unit: "plain",
-        series: pick(res, ["load.1", "load.5", "load.15"], (name) =>
-          name.replace("load.", "load "),
-        ),
-      },
-      {
-        id: "fs",
-        title: translate("compute.host.metrics.filesystem"),
-        unit: "pct",
-        series: pick(res, ["fs.used_pct"], (_, labels) => labels?.mountpoint ?? "-"),
-      },
-      {
-        id: "disk",
-        title: translate("compute.host.metrics.diskIO"),
-        unit: "bps",
-        series: pick(
-          res,
-          ["disk.read_bps", "disk.write_bps"],
-          (name, labels) =>
-            `${labels?.device ?? "-"} ${name === "disk.read_bps" ? translate("compute.host.metrics.read") : translate("compute.host.metrics.write")}`,
-        ),
-      },
-      {
-        id: "net",
-        title: translate("compute.host.metrics.network"),
-        unit: "bps",
-        series: pick(
-          res,
-          ["net.rx_bps", "net.tx_bps"],
-          (name, labels) => `${dev(name, labels)} ${name === "net.rx_bps" ? "rx" : "tx"}`,
-        ),
-      },
-    ],
+    () =>
+      chartsFor(group).map((c) => ({
+        id: c.id,
+        title: translate(c.titleKey),
+        unit: c.unit,
+        series: pick(res, c.names, c.label),
+      })),
     // translate() reads the locale from the store at call time, so the
     // rule cannot see that these labels depend on it; drop locale and
     // the titles would stay in the old language until the next poll.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [res, locale],
+    [res, locale, group],
   )
 
   return (
@@ -245,6 +204,19 @@ export function HostMetricsPanel({ host, scope }: { host: Host; scope: ScopeRef 
         </div>
       </CardHeader>
       <CardContent>
+        {/* Sub-tabs inside the card, not a second row of page tabs: the
+            window and refresh controls in the header apply to all of
+            them, and moving the grouping up a level would separate a
+            chart from the controls that shape it. */}
+        <Tabs value={group} onValueChange={(v) => setGroup(v as GroupKey)} className="mb-4">
+          <TabsList>
+            {GROUP_KEYS.map((k) => (
+              <TabsTrigger key={k} value={k}>
+                {t(`compute.host.metrics.group.${k}`)}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
         {!online ? (
           <div className="text-muted-foreground py-8 text-center text-sm">
             {t("compute.host.metrics.offline")}

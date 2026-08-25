@@ -128,6 +128,90 @@ const (
 	SeriesDiskUtilPct  = "disk.util_pct"
 	SeriesNetRxBps     = "net.rx_bps"
 	SeriesNetTxBps     = "net.tx_bps"
+
+	// --- pressure stall information ---
+	// The share of wall clock in which at least one task was stalled on
+	// the resource. Reported because load average cannot separate "waiting
+	// for CPU" from "waiting for a disk" -- it counts both as load -- and
+	// because a host can be at 100% CPU while nothing is actually
+	// contended. PSI is what says whether the machine is short of the
+	// thing, rather than merely busy with it.
+	SeriesPSICPUPct = "psi.cpu_pct"
+	SeriesPSIMemPct = "psi.mem_pct"
+	SeriesPSIIOPct  = "psi.io_pct"
+
+	// --- memory, unlabelled ---
+	// The composition behind mem.used_pct: a host "at 90%" that is 70%
+	// page cache is not short of memory, and the percentage alone cannot
+	// tell an operator which of the two they are looking at.
+	SeriesMemTotal   = "mem.total_bytes"
+	SeriesMemFree    = "mem.free_bytes"
+	SeriesMemBuffers = "mem.buffers_bytes"
+	SeriesMemCached  = "mem.cached_bytes"
+	// Pages swapped per second. Swap USAGE can sit still at a high value
+	// for months on a healthy host; swap TRAFFIC is what says the machine
+	// is thrashing right now, and it is the pair that gets confused.
+	SeriesSwapInPps  = "swap.in_pps"
+	SeriesSwapOutPps = "swap.out_pps"
+	// Kills per bucket, not per second: at one kill in a 60s bucket a rate
+	// reads 0.016, which rounds to nothing on a chart. The whole value of
+	// this series is that a single event is visible.
+	SeriesOOMKills = "mem.oom_kills"
+
+	// --- cpu / system counters, unlabelled ---
+	SeriesCtxSwitches = "sys.ctx_switches"
+	SeriesInterrupts  = "sys.interrupts"
+
+	// --- system state, unlabelled ---
+	SeriesUptimeSec    = "sys.uptime_sec"
+	SeriesProcsRunning = "sys.procs_running"
+	SeriesProcsBlocked = "sys.procs_blocked"
+	SeriesFDUsedPct    = "sys.fd_used_pct"
+	// Offset from true time in seconds, and whether the kernel considers
+	// itself synchronised (1 / 0). A host whose clock has drifted writes
+	// metric timestamps nothing can line up -- observed on this platform
+	// as charts that were simply empty, with no other field able to say
+	// why.
+	SeriesTimeDriftSec = "sys.time_drift_sec"
+	SeriesTimeSynced   = "sys.time_synced"
+
+	// --- sockets, unlabelled ---
+	// Retransmits per second is the single best "is the network healthy"
+	// signal: throughput and packet rate both look fine while a link is
+	// quietly losing and resending.
+	SeriesTCPRetrans  = "tcp.retrans"
+	SeriesTCPInUse    = "tcp.in_use"
+	SeriesSocketsUsed = "sockets.used"
+	// Conntrack fills silently: past the limit the kernel drops packets
+	// and logs nothing an application can see.
+	SeriesConntrackPct = "conntrack.used_pct"
+
+	// Labelled "kind" (minor / major). Major faults are the ones that
+	// actually went to disk.
+	SeriesPageFaults = "mem.page_faults"
+
+	// Labelled "mountpoint". A filesystem out of inodes reports plenty of
+	// free bytes and refuses to create a file.
+	SeriesFSInodesPct = "fs.inodes_used_pct"
+
+	// Labelled "device".
+	// Operations per second, distinct from bytes per second: a device can
+	// be saturated on either without the other moving.
+	SeriesDiskReadIOPS  = "disk.read_iops"
+	SeriesDiskWriteIOPS = "disk.write_iops"
+	// Mean seconds per operation over the bucket -- the direct answer to
+	// "is the disk slow", which utilisation and throughput only imply.
+	SeriesDiskReadWait  = "disk.read_wait_sec"
+	SeriesDiskWriteWait = "disk.write_wait_sec"
+	SeriesNetRxPps      = "net.rx_pps"
+	SeriesNetTxPps      = "net.tx_pps"
+	SeriesNetRxErrs     = "net.rx_errs"
+	SeriesNetTxErrs     = "net.tx_errs"
+	SeriesNetRxDrops    = "net.rx_drops"
+	SeriesNetTxDrops    = "net.tx_drops"
+
+	// Labelled "chip" and "sensor".
+	SeriesTempCelsius = "sys.temp_celsius"
 )
 
 // MetricsMaxPoints caps the number of buckets one query may ask for.
