@@ -13,5 +13,8 @@ import agenttypes "vraxel.io/vraxel/lib/agent/types"
 // Processes returns nothing off Linux.
 func Processes() agenttypes.HostProcesses { return agenttypes.HostProcesses{} }
 
+// ProcessesLive returns nothing off Linux.
+func ProcessesLive() agenttypes.HostProcesses { return agenttypes.HostProcesses{} }
+
 // Accounts returns nothing off Linux.
 func Accounts() agenttypes.HostAccounts { return agenttypes.HostAccounts{} }

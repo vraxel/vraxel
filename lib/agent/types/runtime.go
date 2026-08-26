@@ -62,6 +62,30 @@ type ProcessGroup struct {
 	// connections, which is most of them and is exactly why the process
 	// list is not filtered down to listeners.
 	Ports []ListenPort `json:"ports,omitempty"`
+	// Exe is the resolved path of the running binary. It carries no
+	// credentials -- unlike the command line, which is why that one is not
+	// collected -- and it answers a question Name cannot: /usr/sbin/nginx
+	// and /tmp/nginx report the same comm.
+	Exe string `json:"exe,omitempty"`
+	// StartedAt is when the OLDEST member of this group started, in unix
+	// milliseconds, dated from the machine's boot time rather than read
+	// off a clock.
+	//
+	// A stable field despite describing a moment: it changes when the
+	// workload restarts, and a restart is exactly the event this report
+	// should surface. The oldest member because a prefork server replaces
+	// workers continuously while the service itself has been up for
+	// months.
+	StartedAtMs int64 `json:"startedAtMs,omitempty"`
+
+	// --- live only ---
+	// CPUPct and RSSBytes are filled in ONLY on the process-stats stream,
+	// never on the host.processes frame. Both change every time they are
+	// read, and the frame is sent only when its content changes; carrying
+	// them there would defeat that gate on every sample. Zero means "not
+	// measured", which is what the stored inventory always says.
+	CPUPct   float64 `json:"cpuPct,omitempty"`
+	RSSBytes int64   `json:"rssBytes,omitempty"`
 }
 
 // ListenPort is one listening socket.
@@ -122,6 +146,29 @@ type Account struct {
 	// route, and only the first is visible in /etc/passwd.
 	Privileges []string `json:"privileges,omitempty"`
 	SSHKeys    []SSHKey `json:"sshKeys,omitempty"`
+	// FullName is the first GECOS field. The passwd comment is
+	// comma-separated ("zly,,,") and only the first part is the name;
+	// the rest is office and phone that nobody has filled in since 1985.
+	FullName string `json:"fullName,omitempty"`
+	// PasswordChangedAtMs and ExpiresAtMs come from the shadow entry's
+	// day counters, so they land on midnight UTC and no finer. Both are
+	// the raw fields, not a judgement: how old is too old is a policy
+	// this agent does not hold.
+	PasswordChangedAtMs int64 `json:"passwordChangedAtMs,omitempty"`
+	ExpiresAtMs         int64 `json:"expiresAtMs,omitempty"`
+	// LastLoginAtMs is when this account last logged in, TRUNCATED TO THE
+	// DAY.
+	//
+	// Truncated on purpose. The precise value changes on every login,
+	// and this rides a report that is sent only when its content changes
+	// -- so a jump host would re-send its whole account inventory every
+	// time anybody connected. To the day it changes at most once per
+	// account per day, which costs nothing and still answers the question
+	// worth asking: "has anybody used this account in two years".
+	//
+	// Zero means never logged in, which for a service account is the
+	// expected answer and for a person's account is a finding.
+	LastLoginAtMs int64 `json:"lastLoginAtMs,omitempty"`
 }
 
 // UserGroup is one entry of /etc/group.

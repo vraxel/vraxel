@@ -17,6 +17,7 @@ type passwdEntry struct {
 	name  string
 	uid   int64
 	gid   int64
+	gecos string
 	home  string
 	shell string
 }
@@ -38,7 +39,7 @@ func parsePasswd(data []byte) []passwdEntry {
 		if err1 != nil || err2 != nil {
 			continue
 		}
-		out = append(out, passwdEntry{name: f[0], uid: uid, gid: gid, home: f[5], shell: f[6]})
+		out = append(out, passwdEntry{name: f[0], uid: uid, gid: gid, gecos: f[4], home: f[5], shell: f[6]})
 	}
 	return out
 }
@@ -68,23 +69,64 @@ func parseGroup(data []byte) []agenttypes.UserGroup {
 	return out
 }
 
-// parseShadowStates maps each account to the SHAPE of its password field.
+// shadowEntry is what one /etc/shadow line contributes, with the hash
+// already gone.
+type shadowEntry struct {
+	state string
+	// changedDays and expireDays are days since the epoch, -1 when the
+	// field is blank. Kept as days rather than converted here so the
+	// caller decides what a blank means for it.
+	changedDays int64
+	expireDays  int64
+}
+
+// parseShadow reads /etc/shadow, keeping the SHAPE of the password field
+// and the aging counters beside it.
 //
 // The hash is read and immediately discarded. It never enters a struct,
 // never reaches a frame, and never reaches the database -- what leaves
-// this function is one of four words.
-func parseShadowStates(data []byte) map[string]string {
-	out := map[string]string{}
+// this function is one of four words plus two day counts.
+func parseShadow(data []byte) map[string]shadowEntry {
+	out := map[string]shadowEntry{}
 	sc := bufio.NewScanner(bytes.NewReader(data))
 	for sc.Scan() {
-		name, rest, ok := strings.Cut(sc.Text(), ":")
-		if !ok || name == "" {
+		// name:pass:lastchg:min:max:warn:inactive:expire
+		f := strings.Split(sc.Text(), ":")
+		if len(f) < 2 || f[0] == "" {
 			continue
 		}
-		field, _, _ := strings.Cut(rest, ":")
-		out[name] = passwordState(field)
+		e := shadowEntry{state: passwordState(f[1]), changedDays: -1, expireDays: -1}
+		if len(f) > 2 {
+			e.changedDays = shadowDays(f[2])
+		}
+		if len(f) > 7 {
+			e.expireDays = shadowDays(f[7])
+		}
+		out[f[0]] = e
 	}
 	return out
+}
+
+// shadowDays parses one day counter, -1 for a blank or malformed field.
+//
+// 0 is NOT blank: in the lastchg column it means "must change at next
+// login", which distros set deliberately, and collapsing it to absent
+// would hide exactly the accounts somebody just provisioned.
+func shadowDays(v string) int64 {
+	n, err := strconv.ParseInt(strings.TrimSpace(v), 10, 64)
+	if err != nil || n < 0 {
+		return -1
+	}
+	return n
+}
+
+// daysToUnixMs turns a shadow day counter into unix milliseconds, 0 for
+// absent. The result lands on midnight UTC, which is all the source has.
+func daysToUnixMs(days int64) int64 {
+	if days < 0 {
+		return 0
+	}
+	return days * 86400 * 1000
 }
 
 // passwordState classifies one shadow password field.
@@ -103,6 +145,14 @@ func passwordState(field string) string {
 	default:
 		return agenttypes.PwSet
 	}
+}
+
+// gecosName is the first comma-separated GECOS field, which is the only
+// one anybody fills in. The rest is room number, work phone and home
+// phone from a 1970s campus directory.
+func gecosName(gecos string) string {
+	name, _, _ := strings.Cut(gecos, ",")
+	return strings.TrimSpace(name)
 }
 
 // nonLoginShells are the shells that exist to refuse a login. Matched on
@@ -380,9 +430,10 @@ func sshFingerprint(blob string) (string, bool) {
 func buildAccounts(
 	users []passwdEntry,
 	groups []agenttypes.UserGroup,
-	shadow map[string]string,
+	shadow map[string]shadowEntry,
 	who sudoersWho,
 	keysOf func(home string) []agenttypes.SSHKey,
+	lastLoginOf func(uid int64) int64,
 ) ([]agenttypes.Account, []agenttypes.UserGroup) {
 	byGID := make(map[int64]string, len(groups))
 	supplementary := map[string][]string{}
@@ -395,16 +446,23 @@ func buildAccounts(
 
 	out := make([]agenttypes.Account, 0, len(users))
 	for _, u := range users {
+		sh := shadow[u.name]
 		a := agenttypes.Account{
-			Name:     u.name,
-			UID:      u.uid,
-			GID:      u.gid,
-			Group:    byGID[u.gid],
-			Home:     u.home,
-			Shell:    u.shell,
-			CanLogin: canLogin(u.shell),
-			Password: shadow[u.name],
-			Groups:   supplementary[u.name],
+			Name:                u.name,
+			UID:                 u.uid,
+			GID:                 u.gid,
+			Group:               byGID[u.gid],
+			Home:                u.home,
+			Shell:               u.shell,
+			CanLogin:            canLogin(u.shell),
+			Password:            sh.state,
+			Groups:              supplementary[u.name],
+			FullName:            gecosName(u.gecos),
+			PasswordChangedAtMs: daysToUnixMs(sh.changedDays),
+			ExpiresAtMs:         daysToUnixMs(sh.expireDays),
+		}
+		if lastLoginOf != nil {
+			a.LastLoginAtMs = lastLoginOf(u.uid)
 		}
 		sort.Strings(a.Groups)
 		a.Privileges = privilegesOf(a, who)

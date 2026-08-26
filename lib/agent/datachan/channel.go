@@ -76,6 +76,9 @@ type Config struct {
 	// collect (non-Linux, or the collector failed to start), and every
 	// metrics stream is rejected with a message saying so.
 	Metrics MetricsQuerier
+	// ProcessStats answers process-stats streams. Nil rejects them the
+	// same way, which is what a non-Linux build gets.
+	ProcessStats ProcessStatsQuerier
 	// Log receives connection lifecycle messages.
 	Log Logger
 }
@@ -269,6 +272,8 @@ func (c *Channel) serve(ctx context.Context, stream net.Conn) {
 		c.serveFile(ctx, stream, open)
 	case agenttypes.StreamKindMetrics:
 		c.serveMetrics(ctx, stream, open)
+	case agenttypes.StreamKindProcessStats:
+		c.serveProcessStats(ctx, stream, open)
 	default:
 		reject(stream, agenttypes.StreamErrUnknownKind, "unknown stream kind "+open.Kind)
 	}

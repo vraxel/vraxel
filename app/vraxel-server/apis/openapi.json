@@ -7170,6 +7170,9 @@
               "$ref": "#/components/schemas/HostProcessGroup"
             }
           },
+          "live": {
+            "type": "boolean"
+          },
           "reportedAt": {
             "type": "string",
             "format": "date-time"

@@ -93,9 +93,10 @@ func main() {
 	go metrics.Run(ctx)
 
 	a.data = datachan.New(datachan.Config{
-		ServerURL: st.ServerURL,
-		Token:     a.sessionToken,
-		Metrics:   metrics,
+		ServerURL:    st.ServerURL,
+		Token:        a.sessionToken,
+		Metrics:      metrics,
+		ProcessStats: processStatsQuerier{},
 		// An empty allowlist, which means any LOOPBACK port -- the
 		// loopback restriction itself is hard-coded in the guard and is
 		// not configurable. The operator-facing allowlist narrows it
@@ -344,3 +345,13 @@ type stdLogger struct{ l *log.Logger }
 
 func (s stdLogger) Infof(format string, args ...any) { s.l.Printf(format, args...) }
 func (s stdLogger) Warnf(format string, args ...any) { s.l.Printf("WARN "+format, args...) }
+
+// processStatsQuerier adapts hostinfo to the data channel's interface.
+//
+// A type rather than a func value because the interface names what it
+// does; on a platform with no collector hostinfo returns an empty result
+// and the stream answers "nothing running", which is the truthful answer
+// there.
+type processStatsQuerier struct{}
+
+func (processStatsQuerier) Live() agenttypes.HostProcesses { return hostinfo.ProcessesLive() }

@@ -2,7 +2,9 @@ package compute
 
 import (
 	"encoding/json"
+	"time"
 
+	agenttypes "vraxel.io/vraxel/lib/agent/types"
 	apierrors "vraxel.io/vraxel/lib/api/errors"
 	"vraxel.io/vraxel/lib/apiserver"
 	"vraxel.io/vraxel/lib/list"
@@ -29,6 +31,9 @@ import (
 type hostRuntimeOps struct {
 	hosts   modstore.HostStore
 	runtime modstore.HostRuntimeStore
+	// stats reads the host's live workload. Nil disables the live path
+	// entirely, which is what a server with no agent dialer gets.
+	stats ProcessStatsBackend
 }
 
 // visible resolves the host the caller is asking about, or an error that
@@ -66,24 +71,76 @@ func (o hostRuntimeOps) processes(ctx apiserver.Ctx, id int64, _ list.Query) (an
 	}
 	out := &HostProcesses{}
 	row, err := o.runtime.GetProcesses(ctx, id, sf)
-	if err != nil {
+	switch {
+	case err == nil:
+		// Agent JSON into jsonb and out again, decoded here only because
+		// the API type is concrete for the schema generators. A decode
+		// failure leaves the list empty rather than failing the request:
+		// the next report overwrites it, and a detail page that renders
+		// nothing is better than one that errors.
+		_ = json.Unmarshal(row.Groups, &out.Groups)
+		out.ReportedAt = &row.ReportedAt
+	case notReported(err):
 		// The host is real and the caller may see it -- visible() just
 		// said so -- it has simply never reported. An empty inventory,
 		// not a 404: the host was already found, and "not found" here
 		// would send somebody looking for a host that is on their screen.
-		if notReported(err) {
-			return out, nil
-		}
+		// Falls through to the live read rather than returning here: an
+		// agent that has connected but not yet pushed its first inventory
+		// can still answer, and refusing to ask it would show an empty
+		// table next to a host that is plainly up.
+	default:
 		return nil, domainErr(err)
 	}
-	// Agent JSON into jsonb and out again, decoded here only because the
-	// API type is concrete for the schema generators. A decode failure
-	// leaves the list empty rather than failing the request: the next
-	// report overwrites it, and a detail page that renders nothing is
-	// better than one that errors.
-	_ = json.Unmarshal(row.Groups, &out.Groups)
-	out.ReportedAt = &row.ReportedAt
+	o.enrichLive(ctx, id, out)
 	return out, nil
+}
+
+// enrichLive replaces the stored inventory with what the host reports
+// right now, cpu and memory included.
+//
+// Best effort, and every failure is silent on purpose. The stored
+// inventory is a complete answer to "what runs here"; the live read adds
+// utilisation and freshness on top. A host whose agent is offline, on
+// another replica, or slow should show its last known workload rather
+// than an error page -- and an offline host is exactly when somebody
+// asks what it was running.
+func (o hostRuntimeOps) enrichLive(ctx apiserver.Ctx, hostID int64, out *HostProcesses) {
+	if o.stats == nil {
+		return
+	}
+	live, err := o.stats.Live(ctx, hostID)
+	if err != nil || live == nil || len(live.Groups) == 0 {
+		return
+	}
+	out.Groups = agentProcessGroupsToAPI(live.Groups)
+	// Now, not when the agent last pushed. The two timestamps mean
+	// different things and the UI says which it is showing.
+	now := time.Now()
+	out.ReportedAt = &now
+	out.Live = true
+}
+
+// agentProcessGroupsToAPI converts the wire type to the API type.
+//
+// Hand-written rather than a re-marshal: the two structs are declared in
+// different packages precisely so the agent protocol and the public API
+// can move apart, and a json round trip between them would silently make
+// every field name a shared contract.
+func agentProcessGroupsToAPI(in []agenttypes.ProcessGroup) []HostProcessGroup {
+	out := make([]HostProcessGroup, 0, len(in))
+	for _, g := range in {
+		row := HostProcessGroup{
+			Name: g.Name, User: g.User, Count: g.Count, Unit: g.Unit,
+			Container: g.Container, Exe: g.Exe, StartedAtMs: g.StartedAtMs,
+			CPUPct: g.CPUPct, RSSBytes: g.RSSBytes,
+		}
+		for _, p := range g.Ports {
+			row.Ports = append(row.Ports, HostListenPort{Proto: p.Proto, Addr: p.Addr, Port: p.Port})
+		}
+		out = append(out, row)
+	}
+	return out
 }
 
 // +openapi:summary=查询主机账号

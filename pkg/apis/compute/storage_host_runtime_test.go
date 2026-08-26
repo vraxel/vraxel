@@ -39,7 +39,7 @@ func TestAccountsIsItsOwnResource(t *testing.T) {
 // inherit compute:hosts:get instead of minting a code.
 func TestProcessesIsAVerbOnHosts(t *testing.T) {
 	def := HostsDef(nil, nil, nil, nil, NewTerminalSessions(), NewAgentDialerHolder(),
-		NewAgentLiveMetrics(NewAgentDialerHolder()), nil)
+		NewAgentLiveMetrics(NewAgentDialerHolder()), nil, nil)
 	for _, v := range def.Verbs {
 		if v.Name == "processes" {
 			return

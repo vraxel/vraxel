@@ -48,6 +48,19 @@ const (
 	// than an HTTP endpoint on the agent because the agent listens on
 	// nothing -- the data channel is the only way in.
 	StreamKindMetrics = "metrics"
+	// StreamKindProcessStats answers the machine's workload WITH its
+	// current CPU and memory use. Same request/response shape as metrics:
+	// the agent writes one JSON HostProcesses and closes.
+	//
+	// Separate from the host.processes control frame, and that separation
+	// is the point. The frame carries an INVENTORY -- what runs here --
+	// and is sent only when its content changes, which is what keeps a
+	// settled fleet silent. CPU and memory change every time they are
+	// read, so putting them in that frame would make every sample look
+	// like a change and turn a gated inventory into an ungated metric
+	// stream. Here they are measured only while somebody is looking at
+	// them, and nothing is stored.
+	StreamKindProcessStats = "process-stats"
 )
 
 // MaxStreamHeaderBytes caps the opening header of a stream. The header is

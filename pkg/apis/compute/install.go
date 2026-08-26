@@ -92,7 +92,7 @@ func Registrar(database *db.DB, serverURL string, hub *statushub.Hub, terminals 
 		if metricsQueryURL != "" {
 			backend = NewVMMetrics(metricsQueryURL)
 		}
-		apiserver.Register(s, HostsDef(hosts, agentHosts, agents, hub, terminals, dialer, backend, runtime))
+		apiserver.Register(s, HostsDef(hosts, agentHosts, agents, hub, terminals, dialer, backend, runtime, NewAgentProcessStats(dialer)))
 		// After HostsDef: a nested resource resolves its parent by
 		// registered path, and an unknown reference panics at startup.
 		apiserver.Register(s, HostAccountsDef(hosts, runtime))
