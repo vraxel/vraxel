@@ -49,14 +49,27 @@ export function HostEditDialog({
     defaultValues: { displayName: "", description: "" },
   })
 
+  // Seeded when a host is PUT INTO the dialog -- the caller passes null
+  // while it is closed, so the id going from absent to present is the
+  // open -- and not on every new object for the same host. The detail
+  // page behind this refetches on a timer to keep its utilisation live,
+  // and each response is a new reference: depending on the object reset
+  // the form under whoever was typing in it, every fifteen seconds.
+  //
+  // The consequence is deliberate: a rename landing from another session
+  // while this is open does not reach the fields. Someone editing them is
+  // the one authority on what they should say.
+  const hostId = host?.metadata.id
   useEffect(() => {
-    if (host) {
-      form.reset({
-        displayName: host.spec.displayName ?? "",
-        description: host.spec.description ?? "",
-      })
-    }
-  }, [host, form])
+    if (!hostId) return
+    form.reset({
+      displayName: host?.spec.displayName ?? "",
+      description: host?.spec.description ?? "",
+    })
+    // host is read here but deliberately not depended on; hostId is what
+    // identifies a new subject for this form.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hostId, form])
 
   const onSubmit = async (values: HostEditFormValues) => {
     if (!host) return

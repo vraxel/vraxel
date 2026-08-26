@@ -217,6 +217,15 @@ export function useListQuery<T extends ListRow>(opts: UseListQueryOptions<T>) {
     enabled,
     placeholderData: keepPreviousData,
     refetchInterval: refetchIntervalMs,
+    // A page that asked for an interval is showing something that changes
+    // on its own, and the interval PAUSES while the tab is hidden. Without
+    // this, coming back to a list left open in another window shows
+    // whatever was true when you left until the next tick -- long enough
+    // for the hosts list to grey out every utilisation gauge, which judges
+    // a reading's age against the wall clock. Pages with no interval keep
+    // the global default, which is right for records that only change when
+    // somebody edits them.
+    refetchOnWindowFocus: refetchIntervalMs !== undefined,
   })
   const rows = useMemo(() => query.data?.items ?? [], [query.data])
   const totalCount = query.data?.totalCount ?? 0
