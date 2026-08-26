@@ -12,13 +12,6 @@ import (
 	agenttypes "vraxel.io/vraxel/lib/agent/types"
 )
 
-// statsSampleWindow is how long the live collector waits between its two
-// /proc reads. CPU time is a counter, so a percentage needs two samples
-// and a known gap; 250ms is long enough that the jiffy counter (100 Hz)
-// has resolution to give and short enough that nobody notices it in a
-// page load.
-const statsSampleWindow = 250 * time.Millisecond
-
 // Processes collects the machine's workload.
 //
 // Two passes over /proc, in this order because the second needs the
@@ -38,14 +31,29 @@ func Processes() agenttypes.HostProcesses {
 // somebody watches, and the other is an inventory compared against the
 // last one sent. A single function returning both would put a
 // per-sample-varying number in the frame that must not vary per sample.
+//
+// Both ends of the window are CHEAP passes and the expensive inventory
+// walk runs after the second one. That ordering is the point: the walk
+// costs tens of milliseconds of cpu, and doing it inside the window
+// charged that cost to the agent's own row -- vr-agent read 16% on an
+// idle machine, nearly all of it the measurement measuring itself.
 func ProcessesLive() agenttypes.HostProcesses {
+	start := time.Now()
 	first := sampleJiffies()
 	time.Sleep(statsSampleWindow)
-	return collectProcesses(first)
+	// Both passes walk /proc in the same order doing the same work per
+	// entry, so the gap between the two readings of any one pid is the gap
+	// between the two passes' starts, which is what this measures.
+	// Measured rather than assumed equal to statsSampleWindow: Sleep
+	// promises a floor, not a value, and a loaded machine overshoots it.
+	elapsed := time.Since(start).Seconds()
+	second := sampleJiffies()
+	return collectProcesses(cpuPercent(first, second, elapsed))
 }
 
-// sampleJiffies reads every process's cpu counter, for the earlier half
-// of the live measurement.
+// sampleJiffies reads every process's cpu counter. Deliberately the only
+// thing it reads: it bounds the measurement window, so anything else done
+// here would land inside every process's own reading.
 func sampleJiffies() map[int64]int64 {
 	out := map[int64]int64{}
 	entries, err := os.ReadDir("/proc")
@@ -64,15 +72,14 @@ func sampleJiffies() map[int64]int64 {
 	return out
 }
 
-// collectProcesses walks /proc once. A non-nil prev turns on the live
-// measurement: cpu time is the RISE since that earlier sample, which is
-// the only way a counter becomes a percentage.
-func collectProcesses(prev map[int64]int64) agenttypes.HostProcesses {
+// collectProcesses walks /proc once. A non-nil cpu turns on the live
+// numbers: the percentages were computed before this walk started, so
+// nothing measured here can be distorted by the walk itself.
+func collectProcesses(cpu map[int64]float64) agenttypes.HostProcesses {
 	byInode := listeningSockets()
 	uids := uidNameTable()
 	seen := map[groupKey]*agenttypes.ProcessGroup{}
 	bootMs, hz := bootTimeMs(), clockTicks()
-	elapsed := statsSampleWindow.Seconds()
 
 	entries, err := os.ReadDir("/proc")
 	if err != nil {
@@ -128,16 +135,13 @@ func collectProcesses(prev map[int64]int64) agenttypes.HostProcesses {
 		if started := bootMs + st.startTicks*1000/hz; started > 0 && (g.StartedAtMs == 0 || started < g.StartedAtMs) {
 			g.StartedAtMs = started
 		}
-		if prev == nil {
+		if cpu == nil {
 			continue
 		}
 		g.RSSBytes += st.rssPages * int64(os.Getpagesize())
-		// A process that did not exist at the first sample has no rise to
-		// measure; counting its whole lifetime as if it fell in the window
-		// would report hundreds of percent.
-		if before, seenBefore := prev[pid]; seenBefore && st.jiffies >= before {
-			g.CPUPct += float64(st.jiffies-before) / float64(hz) / elapsed * 100
-		}
+		// Zero for a pid that started inside the window, which is the
+		// honest answer: it has no rise to report.
+		g.CPUPct += cpu[pid]
 	}
 	return agenttypes.HostProcesses{Groups: groupProcesses(seen)}
 }
@@ -247,15 +251,6 @@ func bootTimeMs() int64 {
 	}
 	return 0
 }
-
-// clockTicks is USER_HZ, the unit /proc/pid/stat counts cpu time and
-// start time in.
-//
-// Hardcoded at 100 rather than read through sysconf(_SC_CLK_TCK), which
-// needs cgo. The kernel has defined USER_HZ as 100 on every architecture
-// Linux supports for the whole time this interface has existed -- it is
-// part of the ABI, not the tick rate the kernel actually runs at.
-func clockTicks() int64 { return 100 }
 
 // linkTarget resolves a /proc symlink to its target, empty when it cannot
 // be read.

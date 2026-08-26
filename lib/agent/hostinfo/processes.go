@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	agenttypes "vraxel.io/vraxel/lib/agent/types"
 )
@@ -313,5 +314,46 @@ func groupProcesses(seen map[groupKey]*agenttypes.ProcessGroup) []agenttypes.Pro
 		}
 		return a.User < b.User
 	})
+	return out
+}
+
+// statsSampleWindow is the gap between the two cpu samples of a live
+// read. Its length is a RESOLUTION decision, not a latency one: see
+// clockTicks. At 250ms the smallest non-zero reading is 4%, so every
+// workload under 4% of a core reads exactly 0.0% and everything above
+// lands on a multiple of four. At one second it is 1%.
+const statsSampleWindow = time.Second
+
+// clockTicks is USER_HZ, the unit /proc/pid/stat counts cpu time and
+// start time in.
+//
+// Hardcoded at 100 rather than read through sysconf(_SC_CLK_TCK), which
+// needs cgo. The kernel has defined USER_HZ as 100 on every architecture
+// Linux supports for the whole time this interface has existed -- it is
+// part of the ABI, not the tick rate the kernel actually runs at.
+//
+// It also fixes the resolution of the cpu column: one tick is 10ms, so
+// the smallest non-zero reading a window of length W can produce is
+// 10ms/W. That is what sets statsSampleWindow.
+func clockTicks() int64 { return 100 }
+
+// cpuPercent turns two readings of the same counters into a percentage of
+// one core per pid.
+//
+// Here rather than beside its caller so it is testable off Linux: it is
+// arithmetic on two maps, and nothing about it needs /proc.
+func cpuPercent(first, second map[int64]int64, elapsed float64) map[int64]float64 {
+	out := make(map[int64]float64, len(second))
+	for pid, now := range second {
+		// Absent from the first reading means the process started inside
+		// the window; a counter that went backwards means the kernel
+		// reused the pid. Neither has a rise to measure, and charging a
+		// whole lifetime to one window reports hundreds of percent.
+		before, ok := first[pid]
+		if !ok || now < before {
+			continue
+		}
+		out[pid] = float64(now-before) / float64(clockTicks()) / elapsed * 100
+	}
 	return out
 }

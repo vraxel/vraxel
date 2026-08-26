@@ -221,3 +221,40 @@ func TestParseProcStatStartIsRelativeToBoot(t *testing.T) {
 		t.Errorf("start offset = %dms, want 5000", ms)
 	}
 }
+
+func TestCPUPercent(t *testing.T) {
+	// 100 ticks of 10ms is one full second of cpu; over a one-second
+	// window that is one core, 100%.
+	got := cpuPercent(
+		map[int64]int64{1: 0, 2: 500, 3: 10, 4: 7, 6: 900},
+		map[int64]int64{1: 100, 2: 550, 3: 10, 5: 42, 6: 100},
+		1.0,
+	)
+	want := map[int64]float64{1: 100, 2: 50, 3: 0}
+	for pid, w := range want {
+		if g, ok := got[pid]; !ok || g != w {
+			t.Errorf("pid %d = %v (present %v), want %v", pid, g, ok, w)
+		}
+	}
+	// 4 vanished before the second reading, 5 appeared after the first,
+	// and 6's counter went backwards because the kernel reused the pid.
+	// None of the three has a rise this window can attribute.
+	for _, pid := range []int64{4, 5, 6} {
+		if _, ok := got[pid]; ok {
+			t.Errorf("pid %d reported a rise it cannot have", pid)
+		}
+	}
+}
+
+// The window length is a resolution decision, and getting it wrong is
+// invisible: the column still renders, it just quantises every reading to
+// a multiple of 10ms/window. At the 250ms this shipped with, that was 4%
+// -- every workload under 4% of a core read exactly 0.0%.
+func TestCPUPercentResolution(t *testing.T) {
+	oneTick := func(window float64) float64 {
+		return cpuPercent(map[int64]int64{1: 0}, map[int64]int64{1: 1}, window)[1]
+	}
+	if got := oneTick(statsSampleWindow.Seconds()); got > 1.0 {
+		t.Errorf("smallest non-zero cpu reading is %.1f%%, want <= 1%%", got)
+	}
+}
