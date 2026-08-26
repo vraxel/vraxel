@@ -46,7 +46,7 @@ func (q *Queries) GetHostAccounts(ctx context.Context, arg GetHostAccountsParams
 }
 
 const getHostProcesses = `-- name: GetHostProcesses :one
-SELECT p.groups, p.reported_at
+SELECT p.groups, p.units, p.reported_at
 FROM host_processes p
 JOIN hosts h ON h.id = p.host_id
 WHERE p.host_id = $1
@@ -62,6 +62,7 @@ type GetHostProcessesParams struct {
 
 type GetHostProcessesRow struct {
 	Groups     json.RawMessage `json:"groups"`
+	Units      json.RawMessage `json:"units"`
 	ReportedAt time.Time       `json:"reported_at"`
 }
 
@@ -72,7 +73,7 @@ type GetHostProcessesRow struct {
 func (q *Queries) GetHostProcesses(ctx context.Context, arg GetHostProcessesParams) (GetHostProcessesRow, error) {
 	row := q.db.QueryRow(ctx, getHostProcesses, arg.HostID, arg.WorkspaceIDFilter, arg.NamespaceIDFilter)
 	var i GetHostProcessesRow
-	err := row.Scan(&i.Groups, &i.ReportedAt)
+	err := row.Scan(&i.Groups, &i.Units, &i.ReportedAt)
 	return i, err
 }
 
@@ -105,21 +106,23 @@ func (q *Queries) UpsertHostAccounts(ctx context.Context, arg UpsertHostAccounts
 
 const upsertHostProcesses = `-- name: UpsertHostProcesses :exec
 
-INSERT INTO host_processes (host_id, groups, reported_at)
-VALUES ($1, $2, now())
+INSERT INTO host_processes (host_id, groups, units, reported_at)
+VALUES ($1, $2, $3, now())
 ON CONFLICT (host_id) DO UPDATE SET
     groups      = EXCLUDED.groups,
+    units       = EXCLUDED.units,
     reported_at = EXCLUDED.reported_at
 `
 
 type UpsertHostProcessesParams struct {
 	HostID int64           `json:"host_id"`
 	Groups json.RawMessage `json:"groups"`
+	Units  json.RawMessage `json:"units"`
 }
 
 // Runtime inventory: what a host runs (host_processes) and who can use
 // it (host_accounts). See host_facts.sql for the hardware half.
 func (q *Queries) UpsertHostProcesses(ctx context.Context, arg UpsertHostProcessesParams) error {
-	_, err := q.db.Exec(ctx, upsertHostProcesses, arg.HostID, arg.Groups)
+	_, err := q.db.Exec(ctx, upsertHostProcesses, arg.HostID, arg.Groups, arg.Units)
 	return err
 }

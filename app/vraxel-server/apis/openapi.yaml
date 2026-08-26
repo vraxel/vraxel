@@ -26,6 +26,8 @@ tags:
     description: Agent 接入令牌：主机侧执行 install-agent.sh 时携带，用于换取长期 agent token。明文只在创建响应中返回一次，库内仅存 SHA-256 哈希。
   - name: HostProcesses
     description: 主机进程：agent 上报的工作负载快照
+  - name: HostSystemdUnit
+    description: systemd 服务单元：开机自启配置与当前运行状态。
   - name: HostAccounts
     description: 主机账号：可登录的用户、用户组与提权面
   - name: User
@@ -4462,6 +4464,10 @@ components:
         reportedAt:
           type: string
           format: date-time
+        units:
+          type: array
+          items:
+            $ref: '#/components/schemas/HostSystemdUnit'
     HostSpec:
       type: object
       properties:
@@ -4667,6 +4673,19 @@ components:
         sizeBytes:
           type: integer
           format: int64
+    HostSystemdUnit:
+      type: object
+      properties:
+        active:
+          type: string
+        description:
+          type: string
+        enabled:
+          type: string
+        name:
+          type: string
+        sub:
+          type: string
     Image-siblingList:
       type: object
       properties:
@@ -5292,6 +5311,7 @@ x-tagGroups:
       - Host
       - AgentJoinToken
       - HostProcesses
+      - HostSystemdUnit
       - HostAccounts
   - name: iam
     tags:

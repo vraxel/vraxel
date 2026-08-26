@@ -2,10 +2,11 @@
 -- it (host_accounts). See host_facts.sql for the hardware half.
 
 -- name: UpsertHostProcesses :exec
-INSERT INTO host_processes (host_id, groups, reported_at)
-VALUES (@host_id, @groups, now())
+INSERT INTO host_processes (host_id, groups, units, reported_at)
+VALUES (@host_id, @groups, @units, now())
 ON CONFLICT (host_id) DO UPDATE SET
     groups      = EXCLUDED.groups,
+    units       = EXCLUDED.units,
     reported_at = EXCLUDED.reported_at;
 
 -- name: UpsertHostAccounts :exec
@@ -22,7 +23,7 @@ ON CONFLICT (host_id) DO UPDATE SET
 -- the caller's tenancy filter applies to the same row the host list
 -- applies it to. Reading the child table alone would serve one host's
 -- workload to anybody who could guess its id.
-SELECT p.groups, p.reported_at
+SELECT p.groups, p.units, p.reported_at
 FROM host_processes p
 JOIN hosts h ON h.id = p.host_id
 WHERE p.host_id = @host_id

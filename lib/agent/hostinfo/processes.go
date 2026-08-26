@@ -434,7 +434,11 @@ func cpuPercent(first, second map[int64]int64, elapsed float64) map[int64]float6
 // that set. There is no reverse index in the kernel's text interfaces --
 // a socket knows its inode and a process knows its file descriptors, and
 // /proc/pid/fd is the only place the two meet.
-func Processes() agenttypes.HostProcesses { return collectProcesses(nil) }
+func Processes() agenttypes.HostProcesses {
+	p := collectProcesses(nil)
+	p.Units = SystemdUnits()
+	return p
+}
 
 // CPUSampler keeps a per-process cpu percentage current in the
 // background, and answers the live workload read from it.
@@ -547,6 +551,13 @@ func (s *CPUSampler) Live() agenttypes.HostProcesses {
 	if pct == nil {
 		pct = map[int64]float64{}
 	}
+	// Units are deliberately NOT collected here. They are inventory, not
+	// measurement: they change when an administrator enables or breaks
+	// something, never between two samples a second apart. Asking systemd
+	// on this path cost 430ms of page load against 30-90ms without it --
+	// the two calls return every unit file and every loaded unit -- to
+	// refresh data the five-minute report already carries. The same split
+	// this file already makes for cpu, in the other direction.
 	return collectProcesses(pct)
 }
 

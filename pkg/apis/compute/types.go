@@ -476,6 +476,10 @@ type HostMergeResponse struct {
 type HostProcesses struct {
 	runtime.TypeMeta `json:",inline"`
 	Groups           []HostProcessGroup `json:"groups,omitempty"`
+	// Units is the supervisor's view of the same question. The process
+	// list can only show what is alive, so the one thing it can never
+	// show is the service that should be there and is not.
+	Units []HostSystemdUnit `json:"units,omitempty"`
 	// ReportedAt is when this answer was produced: the moment of the live
 	// read when Live is true, and when the agent last SENT its inventory
 	// when it is false. The agent stays silent while the workload sits
@@ -533,6 +537,26 @@ type HostProcessGroup struct {
 	// counted once each.
 	CPUPct   float64 `json:"cpuPct,omitempty"`
 	RSSBytes int64   `json:"rssBytes,omitempty"`
+}
+
+// HostSystemdUnit is one service unit: what the supervisor was told to
+// run, and whether it is running.
+// +openapi:description=systemd 服务单元：开机自启配置与当前运行状态。
+type HostSystemdUnit struct {
+	Name string `json:"name"`
+	// Enabled is the unit file's install state ("enabled", "static",
+	// "masked"). A unit is listed either because it is enabled -- so it
+	// is meant to be running -- or because it failed, which matters
+	// whatever its install state says.
+	Enabled string `json:"enabled,omitempty"`
+	// Active is the runtime state ("active", "inactive", "failed").
+	// Enabled plus inactive is the finding this list exists for.
+	Active string `json:"active,omitempty"`
+	// Sub is systemd's finer state ("running", "exited", "dead"):
+	// active/exited is normal for a oneshot and alarming for a daemon,
+	// and Active alone cannot tell them apart.
+	Sub         string `json:"sub,omitempty"`
+	Description string `json:"description,omitempty"`
 }
 
 // HostListenPort is one listening socket.

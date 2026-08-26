@@ -195,6 +195,7 @@ type HostProcess struct {
 	HostID     int64           `json:"host_id"`
 	Groups     json.RawMessage `json:"groups"`
 	ReportedAt time.Time       `json:"reported_at"`
+	Units      json.RawMessage `json:"units"`
 }
 
 type LoginThrottle struct {

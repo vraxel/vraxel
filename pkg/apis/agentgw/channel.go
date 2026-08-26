@@ -488,7 +488,7 @@ func (h *protocolHandler) recordProcesses(ctx context.Context, sess *Session, p 
 	if p == nil {
 		return
 	}
-	if err := h.agents.UpsertProcesses(ctx, sess.HostID, marshalList(p.Groups)); err != nil {
+	if err := h.agents.UpsertProcesses(ctx, sess.HostID, marshalList(p.Groups), marshalList(p.Units)); err != nil {
 		logger.Warnf("agentgw: record processes for host %d: %v", sess.HostID, err)
 	}
 }

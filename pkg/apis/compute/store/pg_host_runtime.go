@@ -23,7 +23,10 @@ import (
 // here would only be a third copy of the same struct that could drift
 // from the other two.
 type HostProcessesRow struct {
-	Groups     []byte
+	Groups []byte
+	// Units is the supervisor's half of the same answer -- see
+	// agenttypes.SystemdUnit for why the two travel together.
+	Units      []byte
 	ReportedAt time.Time
 }
 
@@ -72,7 +75,7 @@ func (s *pgHostRuntimeStore) GetProcesses(ctx context.Context, hostID int64, sf 
 		}
 		return nil, fmt.Errorf("get host processes: %w", pgerrors.CheckPG(err))
 	}
-	return &HostProcessesRow{Groups: row.Groups, ReportedAt: row.ReportedAt}, nil
+	return &HostProcessesRow{Groups: row.Groups, Units: row.Units, ReportedAt: row.ReportedAt}, nil
 }
 
 func (s *pgHostRuntimeStore) GetAccounts(ctx context.Context, hostID int64, sf scope.Filter) (*HostAccountsRow, error) {

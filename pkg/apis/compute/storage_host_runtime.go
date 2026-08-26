@@ -79,6 +79,7 @@ func (o hostRuntimeOps) processes(ctx apiserver.Ctx, id int64, _ list.Query) (an
 		// the next report overwrites it, and a detail page that renders
 		// nothing is better than one that errors.
 		_ = json.Unmarshal(row.Groups, &out.Groups)
+		_ = json.Unmarshal(row.Units, &out.Units)
 		out.ReportedAt = &row.ReportedAt
 	case notReported(err):
 		// The host is real and the caller may see it -- visible() just
@@ -114,6 +115,14 @@ func (o hostRuntimeOps) enrichLive(ctx apiserver.Ctx, hostID int64, out *HostPro
 		return
 	}
 	out.Groups = agentProcessGroupsToAPI(live.Groups)
+	// Units are left as the stored report had them. The live read does
+	// not carry them -- they are inventory, and asking systemd for them
+	// on every page load cost five times the latency of the whole rest of
+	// this call -- so overwriting here would blank a list the agent still
+	// has, five minutes fresh, in exchange for nothing.
+	if len(live.Units) > 0 {
+		out.Units = agentSystemdUnitsToAPI(live.Units)
+	}
 	// Now, not when the agent last pushed. The two timestamps mean
 	// different things and the UI says which it is showing.
 	now := time.Now()
@@ -139,6 +148,20 @@ func agentProcessGroupsToAPI(in []agenttypes.ProcessGroup) []HostProcessGroup {
 			row.Ports = append(row.Ports, HostListenPort{Proto: p.Proto, Addr: p.Addr, Port: p.Port})
 		}
 		out = append(out, row)
+	}
+	return out
+}
+
+// agentSystemdUnitsToAPI converts the wire type to the API type, on the
+// same terms as agentProcessGroupsToAPI: hand-written so the agent
+// protocol and the public API can move apart.
+func agentSystemdUnitsToAPI(in []agenttypes.SystemdUnit) []HostSystemdUnit {
+	out := make([]HostSystemdUnit, 0, len(in))
+	for _, u := range in {
+		out = append(out, HostSystemdUnit{
+			Name: u.Name, Enabled: u.Enabled, Active: u.Active,
+			Sub: u.Sub, Description: u.Description,
+		})
 	}
 	return out
 }

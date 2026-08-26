@@ -585,6 +585,12 @@ export interface HostProcesses {
   kind?: string;
   groups?: HostProcessGroup[];
   /**
+   * Units is the supervisor's view of the same question. The process
+   * list can only show what is alive, so the one thing it can never
+   * show is the service that should be there and is not.
+   */
+  units?: HostSystemdUnit[];
+  /**
    * ReportedAt is when this answer was produced: the moment of the live
    * read when Live is true, and when the agent last SENT its inventory
    * when it is false. The agent stays silent while the workload sits
@@ -659,6 +665,33 @@ export interface HostProcessGroup {
    */
   cpuPct?: number /* float64 */;
   rssBytes?: number /* int64 */;
+}
+/**
+ * HostSystemdUnit is one service unit: what the supervisor was told to
+ * run, and whether it is running.
+ * +openapi:description=systemd 服务单元：开机自启配置与当前运行状态。
+ */
+export interface HostSystemdUnit {
+  name: string;
+  /**
+   * Enabled is the unit file's install state ("enabled", "static",
+   * "masked"). A unit is listed either because it is enabled -- so it
+   * is meant to be running -- or because it failed, which matters
+   * whatever its install state says.
+   */
+  enabled?: string;
+  /**
+   * Active is the runtime state ("active", "inactive", "failed").
+   * Enabled plus inactive is the finding this list exists for.
+   */
+  active?: string;
+  /**
+   * Sub is systemd's finer state ("running", "exited", "dead"):
+   * active/exited is normal for a oneshot and alarming for a daemon,
+   * and Active alone cannot tell them apart.
+   */
+  sub?: string;
+  description?: string;
 }
 /**
  * HostListenPort is one listening socket.
