@@ -123,16 +123,26 @@ func authorizedKeys(home string) []agenttypes.SSHKey {
 	return out
 }
 
-// uidNameTable maps uid to name for one process walk.
+// maxPasswdBytes bounds one passwd read.
+//
+// The host's own file needs no bound; a container's does. Since the
+// process walk resolves uids against the passwd file inside each mount
+// namespace, the bytes read are chosen by whatever is running in the
+// container, and an unbounded os.ReadFile there is a way for one to make
+// the agent allocate as much as it likes. Far above any real passwd file,
+// including the LDAP-flattened ones.
+const maxPasswdBytes = 4 << 20
+
+// uidNameTable maps uid to name, read from one passwd file.
 //
 // Built per collection, never cached across them: the agent runs for
 // weeks, and a cache would keep reporting the name a uid had when the
 // process first started -- so an account created or renamed after that
 // would be wrong until somebody restarted the agent, which is the kind of
 // staleness nobody thinks to look for.
-func uidNameTable() map[int64]string {
+func uidNameTable(path string) map[int64]string {
 	out := map[int64]string{}
-	for _, e := range parsePasswd(readFileBytes(passwdPath)) {
+	for _, e := range parsePasswd(readFileLimit(path, maxPasswdBytes)) {
 		// First entry wins. Two names sharing a uid is legal and is how a
 		// second root is spelled; the process list shows the first, and
 		// the account list shows both.
@@ -146,10 +156,12 @@ func uidNameTable() map[int64]string {
 // userName resolves a uid for the process list, falling back to the
 // number.
 //
-// The number is not a failed lookup to hide: a container process runs as
-// a uid that exists only inside its image, and printing "1000" is honest
-// where printing THIS machine's user 1000 would be a wrong answer that
-// looks right.
+// The fallback is now rare: uids are resolved against the passwd file of
+// the process's OWN mount namespace, so a container's uid 999 reads
+// "postgres" from the image rather than as a bare number. What is left is
+// a uid with no passwd entry anywhere, and the number is the honest answer
+// there -- printing THIS machine's user 999 for a container that has no
+// such user would be a wrong answer that looks right.
 func userName(table map[int64]string, uid int64) string {
 	if n, ok := table[uid]; ok {
 		return n

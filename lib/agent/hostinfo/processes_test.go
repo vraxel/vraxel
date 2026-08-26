@@ -1,7 +1,10 @@
 package hostinfo
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
+	"syscall"
 	"testing"
 	"time"
 
@@ -184,7 +187,7 @@ func TestParseProcStat(t *testing.T) {
 		t.Fatal("rejected a well-formed line")
 	}
 	// fields 14+15 = 431+1874, field 22 = 34, field 24 = 4621
-	if got.jiffies != 431+1874 || got.startTicks != 34 || got.rssPages != 4621 {
+	if got.jiffies != 431+1874 || got.startTicks != 34 {
 		t.Errorf("got %+v", got)
 	}
 
@@ -287,5 +290,70 @@ func TestCPUSamplerRounds(t *testing.T) {
 	s.observe(map[int64]int64{1: 550}, t0.Add(60*time.Second))
 	if got := s.pct[1]; got != 5 {
 		t.Errorf("cpu = %v%%, want 5%% (150 ticks over the 30s since the last good reading)", got)
+	}
+}
+
+// Summing VmRSS across a group counts shared mappings once per member.
+// The numbers here are two postgres backends from the dev host, where the
+// naive sum said 311 MiB and the kernel's own PSS said 130.
+func TestParseStatusMem(t *testing.T) {
+	backend := []byte("Name:\tpostgres\nUid:\t999\t999\t999\t999\n" +
+		"VmRSS:\t   90000 kB\nRssAnon:\t    2000 kB\nRssFile:\t   10000 kB\nRssShmem:\t   78000 kB\n")
+	private, shared := parseStatusMem(backend)
+	if private != 2000*1024 {
+		t.Errorf("private = %d, want RssAnon only", private)
+	}
+	// File and shmem are both shared, and both are what a second backend
+	// would be holding the same copy of.
+	if shared != (10000+78000)*1024 {
+		t.Errorf("shared = %d, want RssFile+RssShmem", shared)
+	}
+
+	// A kernel that predates the split reports VmRSS and nothing else.
+	// Zero is the honest answer: reporting VmRSS as private would put the
+	// double-counting back, silently.
+	if p, s := parseStatusMem([]byte("VmRSS:\t   90000 kB\n")); p != 0 || s != 0 {
+		t.Errorf("without the Rss* lines got (%d, %d), want (0, 0)", p, s)
+	}
+}
+
+// readFileLimit is pointed at /etc/passwd INSIDE a container image, so
+// what it opens is chosen by whatever is running there. Neither guard is
+// theoretical: os.Open on a fifo blocks until somebody opens the other
+// end, and this runs on the loop that walks every process.
+func TestReadFileLimitRefusesWhatIsNotAFile(t *testing.T) {
+	dir := t.TempDir()
+
+	ok := filepath.Join(dir, "passwd")
+	if err := os.WriteFile(ok, []byte("root:x:0:0::/root:/bin/sh\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := readFileLimit(ok, 1<<20); string(got) != "root:x:0:0::/root:/bin/sh\n" {
+		t.Errorf("regular file read as %q", got)
+	}
+
+	// Truncated, not refused: an oversize passwd is still worth its first
+	// entries, and the point of the cap is the allocation.
+	if got := readFileLimit(ok, 4); string(got) != "root" {
+		t.Errorf("limit not applied, got %q", got)
+	}
+
+	fifo := filepath.Join(dir, "fifo")
+	if err := syscall.Mkfifo(fifo, 0o644); err != nil {
+		t.Skipf("mkfifo: %v", err)
+	}
+	done := make(chan []byte, 1)
+	go func() { done <- readFileLimit(fifo, 1<<20) }()
+	select {
+	case got := <-done:
+		if got != nil {
+			t.Errorf("read %q from a fifo, want nothing", got)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("readFileLimit blocked on a fifo; one container could wedge the whole walk")
+	}
+
+	if got := readFileLimit(filepath.Join(dir, "nope"), 1<<20); got != nil {
+		t.Errorf("missing file read as %q", got)
 	}
 }

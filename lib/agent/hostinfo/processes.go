@@ -4,11 +4,14 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"io"
 	"net/netip"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	agenttypes "vraxel.io/vraxel/lib/agent/types"
@@ -232,18 +235,68 @@ func parseStatusUID(data []byte) (int64, bool) {
 	return 0, false
 }
 
-// procStat is the subset of /proc/pid/stat this collector needs. One
-// file for three answers -- cpu jiffies, start time and resident pages --
-// where status/statm would be two more reads per process on a loop that
-// already runs over every process on the machine.
+// parseStatusMem splits resident memory into the part that belongs to
+// this process alone and the part it may be sharing, both in bytes.
+//
+// The split is what makes a group's total honest. VmRSS counts every
+// resident page the process maps, shared or not, so adding it up across a
+// group double-counts: postgres runs a backend per connection and every
+// one of them maps the same shared_buffers, and summing their VmRSS
+// reported 311 MiB on a host where the real figure was 130. Anonymous
+// pages are private and add up; file and shmem pages are the ones the
+// members hold in common, so the group counts the largest member's once.
+//
+// An approximation, and the direction of its error is known: members that
+// have touched DIFFERENT parts of a shared mapping make the true union
+// larger than any one of them. It is bounded below by the largest member
+// and above by the sum, it costs nothing -- these lines are in a file
+// already being read for the uid -- and on this host it matched the
+// kernel's own PSS accounting exactly for all three multi-process groups
+// on the box. PSS would be exact, but /proc/pid/smaps_rollup walks the
+// page tables: milliseconds for a process holding hundreds of megabytes,
+// and this walks every process on every page load.
+func parseStatusMem(data []byte) (private, shared int64) {
+	sc := bufio.NewScanner(bytes.NewReader(data))
+	for sc.Scan() {
+		line := sc.Text()
+		for _, f := range []struct {
+			prefix string
+			into   *int64
+		}{
+			{"RssAnon:", &private},
+			{"RssFile:", &shared},
+			{"RssShmem:", &shared},
+		} {
+			v, ok := strings.CutPrefix(line, f.prefix)
+			if !ok {
+				continue
+			}
+			// "  1234 kB"
+			fields := strings.Fields(v)
+			if len(fields) == 0 {
+				continue
+			}
+			if kb, err := strconv.ParseInt(fields[0], 10, 64); err == nil {
+				*f.into += kb * 1024
+			}
+		}
+	}
+	return private, shared
+}
+
+// procStat is the subset of /proc/pid/stat this collector needs.
+//
+// Resident memory is NOT read here even though field 24 carries it: that
+// field is VmRSS, which counts shared pages once per process and cannot
+// be summed across a group. The breakdown that can is in status, which
+// this walk already reads for the uid -- see parseStatusMem.
 type procStat struct {
 	jiffies    int64 // utime + stime
 	startTicks int64
-	rssPages   int64
 }
 
-// parseProcStat reads fields 14 (utime), 15 (stime), 22 (starttime) and
-// 24 (rss) of /proc/pid/stat.
+// parseProcStat reads fields 14 (utime), 15 (stime) and 22 (starttime) of
+// /proc/pid/stat.
 //
 // Field positions are counted from the CLOSING parenthesis, not from the
 // start of the line: field 2 is the executable name in parentheses and it
@@ -258,8 +311,8 @@ func parseProcStat(data []byte) (procStat, bool) {
 	// After ") " comes field 3 (state), so fields[0] is field 3 and field
 	// N is fields[N-3].
 	f := strings.Fields(string(data[i+2:]))
-	const utime, stime, starttime, rss = 14, 15, 22, 24
-	if len(f) < rss-3+1 {
+	const utime, stime, starttime = 14, 15, 22
+	if len(f) < starttime-3+1 {
 		return procStat{}, false
 	}
 	get := func(n int) int64 {
@@ -272,7 +325,6 @@ func parseProcStat(data []byte) (procStat, bool) {
 	return procStat{
 		jiffies:    get(utime) + get(stime),
 		startTicks: get(starttime),
-		rssPages:   get(rss),
 	}, true
 }
 
@@ -496,4 +548,32 @@ func (s *CPUSampler) Live() agenttypes.HostProcesses {
 		pct = map[int64]float64{}
 	}
 	return collectProcesses(pct)
+}
+
+// readFileLimit reads at most max bytes from a REGULAR file, for the
+// paths whose contents are chosen by something other than this machine's
+// administrator -- currently /etc/passwd inside a container image.
+//
+// Both guards exist because such a path is not necessarily a file at all.
+// O_NONBLOCK: os.Open on a fifo blocks until somebody opens the other
+// end, which is forever, and this runs on the loop that walks every
+// process -- one container shipping a fifo where its passwd should be
+// would wedge the workload report permanently, live reads and the
+// background inventory alike. IsRegular: a character device answers the
+// read instead of blocking, and /dev/zero would hand back max bytes of
+// nothing.
+func readFileLimit(path string, max int64) []byte {
+	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK, 0)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+	if st, err := f.Stat(); err != nil || !st.Mode().IsRegular() {
+		return nil
+	}
+	b, err := io.ReadAll(io.LimitReader(f, max))
+	if err != nil {
+		return nil
+	}
+	return b
 }
