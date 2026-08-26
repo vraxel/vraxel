@@ -281,18 +281,19 @@ func parseStatusMem(data []byte) (private, shared int64) {
 	return private, shared
 }
 
-// procStat is the subset of /proc/pid/stat this collector needs. One
-// file for three answers -- cpu jiffies, start time and resident pages --
-// where status/statm would be two more reads per process on a loop that
-// already runs over every process on the machine.
+// procStat is the subset of /proc/pid/stat this collector needs.
+//
+// Resident memory is NOT read here even though field 24 carries it: that
+// field is VmRSS, which counts shared pages once per process and cannot
+// be summed across a group. The breakdown that can is in status, which
+// this walk already reads for the uid -- see parseStatusMem.
 type procStat struct {
 	jiffies    int64 // utime + stime
 	startTicks int64
-	rssPages   int64
 }
 
-// parseProcStat reads fields 14 (utime), 15 (stime), 22 (starttime) and
-// 24 (rss) of /proc/pid/stat.
+// parseProcStat reads fields 14 (utime), 15 (stime) and 22 (starttime) of
+// /proc/pid/stat.
 //
 // Field positions are counted from the CLOSING parenthesis, not from the
 // start of the line: field 2 is the executable name in parentheses and it
@@ -307,8 +308,8 @@ func parseProcStat(data []byte) (procStat, bool) {
 	// After ") " comes field 3 (state), so fields[0] is field 3 and field
 	// N is fields[N-3].
 	f := strings.Fields(string(data[i+2:]))
-	const utime, stime, starttime, rss = 14, 15, 22, 24
-	if len(f) < rss-3+1 {
+	const utime, stime, starttime = 14, 15, 22
+	if len(f) < starttime-3+1 {
 		return procStat{}, false
 	}
 	get := func(n int) int64 {
@@ -321,7 +322,6 @@ func parseProcStat(data []byte) (procStat, bool) {
 	return procStat{
 		jiffies:    get(utime) + get(stime),
 		startTicks: get(starttime),
-		rssPages:   get(rss),
 	}, true
 }
 

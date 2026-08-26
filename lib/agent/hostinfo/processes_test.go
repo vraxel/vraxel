@@ -184,7 +184,7 @@ func TestParseProcStat(t *testing.T) {
 		t.Fatal("rejected a well-formed line")
 	}
 	// fields 14+15 = 431+1874, field 22 = 34, field 24 = 4621
-	if got.jiffies != 431+1874 || got.startTicks != 34 || got.rssPages != 4621 {
+	if got.jiffies != 431+1874 || got.startTicks != 34 {
 		t.Errorf("got %+v", got)
 	}
 

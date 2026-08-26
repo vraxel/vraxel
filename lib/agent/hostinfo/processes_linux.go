@@ -3,6 +3,7 @@
 package hostinfo
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -37,7 +38,7 @@ func sampleJiffies() map[int64]int64 {
 // nothing measured here can be distorted by the walk itself.
 func collectProcesses(cpu map[int64]float64) agenttypes.HostProcesses {
 	sockets := newNetnsSockets()
-	uids := uidNameTable()
+	users := newPasswdTables()
 	seen := map[groupKey]*agenttypes.ProcessGroup{}
 	// Shared memory is counted once per group rather than once per member,
 	// so it cannot be accumulated in the loop -- see parseStatusMem.
@@ -75,7 +76,10 @@ func collectProcesses(cpu map[int64]float64) agenttypes.HostProcesses {
 		status := readFileBytes(filepath.Join(dir, "status"))
 		user := ""
 		if uid, ok := parseStatusUID(status); ok {
-			user = userName(uids, uid)
+			// Against the passwd file of THIS process's mount namespace:
+			// a container's uid 999 is its image's postgres, and the host
+			// has no entry for it at all.
+			user = userName(users.forProcess(dir), uid)
 		}
 
 		k := groupKey{name: name, user: user, unit: unit, container: container}
@@ -218,6 +222,39 @@ func (n *netnsSockets) forProcess(procDir string) map[uint64]procSocket {
 	return t
 }
 
+// passwdTables holds one uid-to-name table per mount namespace.
+//
+// The same defect class as netnsSockets, in a different namespace. Uids
+// are only meaningful against a passwd file, and which passwd file a
+// process means is decided by its mount namespace: a container's uid 999
+// is its image's "postgres" and the host's /etc/passwd has no entry for
+// it, so resolving every process against the host's file left every
+// containerised service showing a bare number in the user column.
+//
+// /proc/<pid>/root is the process's own filesystem root, so a host
+// process resolves through exactly the same code against exactly the host
+// file. There is no special case for the host.
+type passwdTables struct {
+	byNS map[string]map[int64]string
+}
+
+func newPasswdTables() *passwdTables {
+	return &passwdTables{byNS: map[string]map[int64]string{}}
+}
+
+func (p *passwdTables) forProcess(procDir string) map[int64]string {
+	ns := linkTarget(procDir, "ns/mnt")
+	if ns == "" {
+		return nil
+	}
+	if t, ok := p.byNS[ns]; ok {
+		return t
+	}
+	t := uidNameTable(filepath.Join(procDir, "root", passwdPath))
+	p.byNS[ns] = t
+	return t
+}
+
 // listeningSockets indexes every server socket visible from one process's
 // network namespace, by the inode that /proc/pid/fd will name it with.
 func listeningSockets(procDir string) map[uint64]procSocket {
@@ -244,6 +281,21 @@ func listeningSockets(procDir string) map[uint64]procSocket {
 
 func readFileBytes(path string) []byte {
 	b, _ := os.ReadFile(path)
+	return b
+}
+
+// readFileLimit reads at most max bytes, for the files whose size is
+// chosen by something other than this machine's administrator.
+func readFileLimit(path string, max int64) []byte {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+	b, err := io.ReadAll(io.LimitReader(f, max))
+	if err != nil {
+		return nil
+	}
 	return b
 }
 
