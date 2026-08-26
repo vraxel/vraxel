@@ -71,23 +71,27 @@ func (o hostRuntimeOps) processes(ctx apiserver.Ctx, id int64, _ list.Query) (an
 	}
 	out := &HostProcesses{}
 	row, err := o.runtime.GetProcesses(ctx, id, sf)
-	if err != nil {
+	switch {
+	case err == nil:
+		// Agent JSON into jsonb and out again, decoded here only because
+		// the API type is concrete for the schema generators. A decode
+		// failure leaves the list empty rather than failing the request:
+		// the next report overwrites it, and a detail page that renders
+		// nothing is better than one that errors.
+		_ = json.Unmarshal(row.Groups, &out.Groups)
+		out.ReportedAt = &row.ReportedAt
+	case notReported(err):
 		// The host is real and the caller may see it -- visible() just
 		// said so -- it has simply never reported. An empty inventory,
 		// not a 404: the host was already found, and "not found" here
 		// would send somebody looking for a host that is on their screen.
-		if notReported(err) {
-			return out, nil
-		}
+		// Falls through to the live read rather than returning here: an
+		// agent that has connected but not yet pushed its first inventory
+		// can still answer, and refusing to ask it would show an empty
+		// table next to a host that is plainly up.
+	default:
 		return nil, domainErr(err)
 	}
-	// Agent JSON into jsonb and out again, decoded here only because the
-	// API type is concrete for the schema generators. A decode failure
-	// leaves the list empty rather than failing the request: the next
-	// report overwrites it, and a detail page that renders nothing is
-	// better than one that errors.
-	_ = json.Unmarshal(row.Groups, &out.Groups)
-	out.ReportedAt = &row.ReportedAt
 	o.enrichLive(ctx, id, out)
 	return out, nil
 }

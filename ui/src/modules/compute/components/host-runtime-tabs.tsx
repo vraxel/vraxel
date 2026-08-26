@@ -92,14 +92,20 @@ export function HostProcessesTab({ host, scope }: { host: Host; scope: ScopeRef 
       rss: byNumber((g) => g.rssBytes),
       started: byNumber((g) => g.startedAtMs),
     },
-    // Busiest first is what somebody opening this tab is looking for. It
-    // falls back to a stable name order when nothing is live, since every
-    // cpu reads 0 then and the sort would otherwise be arbitrary.
+    // Busiest first is what somebody opening this tab is looking for.
+    // With no live read every cpu is 0, so the ties fall back to the
+    // order the agent sent -- which the agent itself sorts, so the table
+    // is at least the same on every refresh rather than shuffling.
     { by: "cpu", dir: "desc" },
   )
 
   if (query.isPending) return <TableSkeleton rows={8} />
-  if (query.isError) return <LoadError message={t("compute.host.runtimeLoadFailed")} />
+  // Only when there is nothing to show. This polls every 30s, and a
+  // failed refetch keeps the last good rows (TQ v5 sets error and retains
+  // data) -- replacing a loaded table with an error line because one poll
+  // in a hundred timed out loses more than it reports.
+  if (query.isError && groups.length === 0)
+    return <LoadError message={t("compute.host.runtimeLoadFailed")} />
   if (groups.length === 0) return <EmptyRuntime />
 
   return (

@@ -78,7 +78,10 @@ export function useTableView<T>(
   }
 }
 
-/** Sorts undefined and empty last whichever direction is active. */
+/** Missing reads as empty, so it sorts with the empties: first ascending,
+ *  last descending. Not pinned to one end -- that needs the direction,
+ *  which a comparator does not get, and the rows it would move are the
+ *  ones nobody sorted the column to find. */
 export function byText<T>(get: (row: T) => string | undefined) {
   return (a: T, b: T) => (get(a) ?? "").localeCompare(get(b) ?? "")
 }
