@@ -289,3 +289,27 @@ func TestCPUSamplerRounds(t *testing.T) {
 		t.Errorf("cpu = %v%%, want 5%% (150 ticks over the 30s since the last good reading)", got)
 	}
 }
+
+// Summing VmRSS across a group counts shared mappings once per member.
+// The numbers here are two postgres backends from the dev host, where the
+// naive sum said 311 MiB and the kernel's own PSS said 130.
+func TestParseStatusMem(t *testing.T) {
+	backend := []byte("Name:\tpostgres\nUid:\t999\t999\t999\t999\n" +
+		"VmRSS:\t   90000 kB\nRssAnon:\t    2000 kB\nRssFile:\t   10000 kB\nRssShmem:\t   78000 kB\n")
+	private, shared := parseStatusMem(backend)
+	if private != 2000*1024 {
+		t.Errorf("private = %d, want RssAnon only", private)
+	}
+	// File and shmem are both shared, and both are what a second backend
+	// would be holding the same copy of.
+	if shared != (10000+78000)*1024 {
+		t.Errorf("shared = %d, want RssFile+RssShmem", shared)
+	}
+
+	// A kernel that predates the split reports VmRSS and nothing else.
+	// Zero is the honest answer: reporting VmRSS as private would put the
+	// double-counting back, silently.
+	if p, s := parseStatusMem([]byte("VmRSS:\t   90000 kB\n")); p != 0 || s != 0 {
+		t.Errorf("without the Rss* lines got (%d, %d), want (0, 0)", p, s)
+	}
+}

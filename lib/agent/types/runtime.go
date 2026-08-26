@@ -84,6 +84,11 @@ type ProcessGroup struct {
 	// read, and the frame is sent only when its content changes; carrying
 	// them there would defeat that gate on every sample. Zero means "not
 	// measured", which is what the stored inventory always says.
+	//
+	// RSSBytes counts each member's private pages plus ONE copy of what
+	// they share, not the sum of their VmRSS -- see hostinfo.parseStatusMem
+	// for why the naive sum reported 311 MiB for a postgres whose real
+	// footprint was 130.
 	CPUPct   float64 `json:"cpuPct,omitempty"`
 	RSSBytes int64   `json:"rssBytes,omitempty"`
 }

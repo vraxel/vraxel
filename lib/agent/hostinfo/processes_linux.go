@@ -36,9 +36,12 @@ func sampleJiffies() map[int64]int64 {
 // numbers: the percentages were computed before this walk started, so
 // nothing measured here can be distorted by the walk itself.
 func collectProcesses(cpu map[int64]float64) agenttypes.HostProcesses {
-	byInode := listeningSockets()
+	sockets := newNetnsSockets()
 	uids := uidNameTable()
 	seen := map[groupKey]*agenttypes.ProcessGroup{}
+	// Shared memory is counted once per group rather than once per member,
+	// so it cannot be accumulated in the loop -- see parseStatusMem.
+	maxShared := map[groupKey]int64{}
 	bootMs, hz := bootTimeMs(), clockTicks()
 
 	entries, err := os.ReadDir("/proc")
@@ -66,8 +69,12 @@ func collectProcesses(cpu map[int64]float64) agenttypes.HostProcesses {
 			continue
 		}
 		unit, container := parseCgroupWorkload(readFileBytes(filepath.Join(dir, "cgroup")))
+		// One read, two answers: the uid line and the resident-memory
+		// breakdown are in the same file, and this loop runs over every
+		// process on the machine.
+		status := readFileBytes(filepath.Join(dir, "status"))
 		user := ""
-		if uid, ok := parseStatusUID(readFileBytes(filepath.Join(dir, "status"))); ok {
+		if uid, ok := parseStatusUID(status); ok {
 			user = userName(uids, uid)
 		}
 
@@ -84,7 +91,19 @@ func collectProcesses(cpu map[int64]float64) agenttypes.HostProcesses {
 			seen[k] = g
 		}
 		g.Count++
-		addPorts(g, dir, byInode)
+		// Against the socket table of THIS process's network namespace,
+		// not the host's: a bridged container's listener is in its own
+		// namespace, so a host-only table silently reported no ports for
+		// every containerised service on the machine.
+		addPorts(g, dir, sockets.forProcess(dir))
+
+		if cpu != nil {
+			private, shared := parseStatusMem(status)
+			g.RSSBytes += private
+			if shared > maxShared[k] {
+				maxShared[k] = shared
+			}
+		}
 
 		st, ok := parseProcStat(readFileBytes(filepath.Join(dir, "stat")))
 		if !ok {
@@ -98,10 +117,12 @@ func collectProcesses(cpu map[int64]float64) agenttypes.HostProcesses {
 		if cpu == nil {
 			continue
 		}
-		g.RSSBytes += st.rssPages * int64(os.Getpagesize())
 		// Zero for a pid that started inside the window, which is the
 		// honest answer: it has no rise to report.
 		g.CPUPct += cpu[pid]
+	}
+	for k, shared := range maxShared {
+		seen[k].RSSBytes += shared
 	}
 	return agenttypes.HostProcesses{Groups: groupProcesses(seen)}
 }
@@ -157,23 +178,64 @@ func hasPort(ports []agenttypes.ListenPort, p agenttypes.ListenPort) bool {
 	return false
 }
 
-// listeningSockets indexes every server socket on the machine by the
-// inode that /proc/pid/fd will name it with.
-func listeningSockets() map[uint64]procSocket {
+// netnsSockets holds one socket table per network namespace, built on
+// first use.
+//
+// Per namespace because /proc/net is namespaced: the tables under
+// /proc/<pid>/net describe the namespace THAT process is in, and the
+// host's /proc/net lists only the host's. A bridged container's server
+// binds inside its own namespace, so a host-only table matched none of
+// its sockets and every containerised service on the machine reported no
+// listening ports at all -- postgres in a container showed an empty port
+// column while plainly serving 5432.
+//
+// Keyed by the namespace link ("net:[4026532708]") rather than by
+// container or cgroup, because the namespace is the thing that actually
+// determines which table applies: processes sharing a namespace share a
+// table whether or not they are related, and a container run with host
+// networking correctly gets the host's.
+type netnsSockets struct {
+	byNS map[string]map[uint64]procSocket
+}
+
+func newNetnsSockets() *netnsSockets {
+	return &netnsSockets{byNS: map[string]map[uint64]procSocket{}}
+}
+
+// forProcess returns the socket table of one process's namespace, reading
+// it the first time that namespace is seen. Nil when the link cannot be
+// read, which is a process that exited mid-walk.
+func (n *netnsSockets) forProcess(procDir string) map[uint64]procSocket {
+	ns := linkTarget(procDir, "ns/net")
+	if ns == "" {
+		return nil
+	}
+	if t, ok := n.byNS[ns]; ok {
+		return t
+	}
+	t := listeningSockets(procDir)
+	n.byNS[ns] = t
+	return t
+}
+
+// listeningSockets indexes every server socket visible from one process's
+// network namespace, by the inode that /proc/pid/fd will name it with.
+func listeningSockets(procDir string) map[uint64]procSocket {
 	out := map[uint64]procSocket{}
 	for _, src := range []struct {
-		path      string
+		name      string
 		proto     string
 		listening bool
 	}{
-		{"/proc/net/tcp", "tcp", true},
-		{"/proc/net/tcp6", "tcp", true},
+		{"tcp", "tcp", true},
+		{"tcp6", "tcp", true},
 		// UDP has no listening state: a bound socket is already a server,
 		// so filtering by state here would drop every one of them.
-		{"/proc/net/udp", "udp", false},
-		{"/proc/net/udp6", "udp", false},
+		{"udp", "udp", false},
+		{"udp6", "udp", false},
 	} {
-		for _, s := range parseNetSockets(readFileBytes(src.path), src.proto, src.listening) {
+		data := readFileBytes(filepath.Join(procDir, "net", src.name))
+		for _, s := range parseNetSockets(data, src.proto, src.listening) {
 			out[s.inode] = s
 		}
 	}

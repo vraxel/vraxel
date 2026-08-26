@@ -572,6 +572,10 @@ export interface HostProcessGroup {
    * true. They are measured on demand and never stored: both change
    * every time they are read, and the stored inventory is sent only
    * when its content changes.
+   * RSSBytes is the group's footprint, not the sum of its members'
+   * resident sizes: processes that share a mapping -- every postgres
+   * backend maps the same shared_buffers -- would otherwise have it
+   * counted once each.
    */
   cpuPct?: number /* float64 */;
   rssBytes?: number /* int64 */;

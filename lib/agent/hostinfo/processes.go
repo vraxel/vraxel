@@ -232,6 +232,55 @@ func parseStatusUID(data []byte) (int64, bool) {
 	return 0, false
 }
 
+// parseStatusMem splits resident memory into the part that belongs to
+// this process alone and the part it may be sharing, both in bytes.
+//
+// The split is what makes a group's total honest. VmRSS counts every
+// resident page the process maps, shared or not, so adding it up across a
+// group double-counts: postgres runs a backend per connection and every
+// one of them maps the same shared_buffers, and summing their VmRSS
+// reported 311 MiB on a host where the real figure was 130. Anonymous
+// pages are private and add up; file and shmem pages are the ones the
+// members hold in common, so the group counts the largest member's once.
+//
+// An approximation, and the direction of its error is known: members that
+// have touched DIFFERENT parts of a shared mapping make the true union
+// larger than any one of them. It is bounded below by the largest member
+// and above by the sum, it costs nothing -- these lines are in a file
+// already being read for the uid -- and on this host it matched the
+// kernel's own PSS accounting exactly for all three multi-process groups
+// on the box. PSS would be exact, but /proc/pid/smaps_rollup walks the
+// page tables: milliseconds for a process holding hundreds of megabytes,
+// and this walks every process on every page load.
+func parseStatusMem(data []byte) (private, shared int64) {
+	sc := bufio.NewScanner(bytes.NewReader(data))
+	for sc.Scan() {
+		line := sc.Text()
+		for _, f := range []struct {
+			prefix string
+			into   *int64
+		}{
+			{"RssAnon:", &private},
+			{"RssFile:", &shared},
+			{"RssShmem:", &shared},
+		} {
+			v, ok := strings.CutPrefix(line, f.prefix)
+			if !ok {
+				continue
+			}
+			// "  1234 kB"
+			fields := strings.Fields(v)
+			if len(fields) == 0 {
+				continue
+			}
+			if kb, err := strconv.ParseInt(fields[0], 10, 64); err == nil {
+				*f.into += kb * 1024
+			}
+		}
+	}
+	return private, shared
+}
+
 // procStat is the subset of /proc/pid/stat this collector needs. One
 // file for three answers -- cpu jiffies, start time and resident pages --
 // where status/statm would be two more reads per process on a loop that
