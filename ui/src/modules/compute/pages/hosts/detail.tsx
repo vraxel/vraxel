@@ -61,6 +61,24 @@ export default function HostDetailPage() {
     queryKey: qk.detail(hostsDef, scope, hostId ?? ""),
     queryFn: () => hostsApi.get(scope, hostId!),
     enabled: !!hostId,
+    // This response carries live utilisation, not just the host's record,
+    // and useHostWatch cannot keep it fresh: that socket delivers state
+    // CHANGES (an agent going offline, a host appearing), and a machine
+    // quietly heartbeating produces none. Without a timer the page held
+    // its first response forever -- the numbers aged silently and the
+    // gauges greyed out after a minute, because the gauge judges a
+    // reading's age against the wall clock and was telling the truth
+    // about data this page had stopped refreshing.
+    //
+    // 15s is the agent's heartbeat, the rate at which these numbers can
+    // actually change. It also keeps the worst-case age (one heartbeat
+    // plus one interval) inside the 60s the gauge greys at.
+    refetchInterval: 15_000,
+    // The interval pauses while the tab is hidden, so coming back to a
+    // page left open in another window would otherwise show minute-old
+    // numbers until the next tick. Overrides the global default, which is
+    // right for records that only change when somebody edits them.
+    refetchOnWindowFocus: true,
   })
   const host = query.data ?? null
   useHostWatch(scope)

@@ -26,6 +26,8 @@ const compute = {
   "compute.host.originAgent": "Agent 接入",
   "compute.host.originManual": "手工录入",
   "compute.host.cores": "核",
+  "compute.host.util.stale": "读数已超过一分钟未更新，显示的是最后一次上报",
+  "compute.host.util.unknown": "该主机未上报此项读数",
   "compute.host.cpu": "CPU",
   "compute.host.memory": "内存",
   "compute.host.disk": "磁盘",
