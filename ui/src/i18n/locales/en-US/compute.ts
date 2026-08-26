@@ -25,6 +25,8 @@ const compute = {
   "compute.host.originAgent": "Agent",
   "compute.host.originManual": "Manual",
   "compute.host.cores": "cores",
+  "compute.host.util.stale": "Reading is over a minute old; this is the last one reported",
+  "compute.host.util.unknown": "This host reports no such reading",
   "compute.host.cpu": "CPU",
   "compute.host.memory": "Memory",
   "compute.host.disk": "Disk",

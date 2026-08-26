@@ -75,12 +75,17 @@ function UtilGauge({
    *  width. The detail page shows the same three gauges in cards. */
   wide?: boolean
 }) {
+  const { t } = useTranslation()
   const known = typeof value === "number"
   const tone = known && !stale ? toneFor(value) : null
   const pctTone = tone ? tone.text : "text-muted-foreground/60"
+  // A dimmed bar is a state, not a rendering fault, and without this it
+  // had no way to say so -- it was read as a colour bug on a host whose
+  // header said 在线 two inches above.
+  const why = tone ? undefined : t(known ? "compute.host.util.stale" : "compute.host.util.unknown")
 
   return (
-    <div className={`${wide ? "w-full" : "w-36"} space-y-1`}>
+    <div className={`${wide ? "w-full" : "w-36"} space-y-1`} title={why}>
       <div className="flex items-baseline gap-1">
         {amount === undefined ? (
           <span className={`text-sm tabular-nums ${known ? pctTone : "text-muted-foreground"}`}>
