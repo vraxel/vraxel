@@ -122,7 +122,7 @@ type acctsCall struct {
 	in     gwstore.AccountsInput
 }
 
-func (f *fakeAgentStore) UpsertProcesses(_ context.Context, hostID int64, groups []byte) error {
+func (f *fakeAgentStore) UpsertProcesses(_ context.Context, hostID int64, groups, _ []byte) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.procs = append(f.procs, procsCall{hostID: hostID, groups: groups})

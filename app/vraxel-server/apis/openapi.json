@@ -51,6 +51,10 @@
       "description": "主机进程：agent 上报的工作负载快照"
     },
     {
+      "name": "HostSystemdUnit",
+      "description": "systemd 服务单元：开机自启配置与当前运行状态。"
+    },
+    {
       "name": "HostAccounts",
       "description": "主机账号：可登录的用户、用户组与提权面"
     },
@@ -7216,6 +7220,12 @@
           "reportedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "units": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HostSystemdUnit"
+            }
           }
         }
       },
@@ -7510,6 +7520,26 @@
           "sizeBytes": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "HostSystemdUnit": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sub": {
+            "type": "string"
           }
         }
       },
@@ -8388,6 +8418,7 @@
         "Host",
         "AgentJoinToken",
         "HostProcesses",
+        "HostSystemdUnit",
         "HostAccounts"
       ]
     },

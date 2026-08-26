@@ -28,6 +28,11 @@ package types
 // row rather than four hundred.
 type HostProcesses struct {
 	Groups []ProcessGroup `json:"groups,omitempty"`
+	// Units is the supervisor's view of the same question: what this
+	// machine was told to run. The process list can only show what is
+	// alive, so the one thing it can never show is the service that
+	// should be there and is not.
+	Units []SystemdUnit `json:"units,omitempty"`
 }
 
 // ProcessGroup is one workload: every process sharing an identity,
@@ -91,6 +96,36 @@ type ProcessGroup struct {
 	// footprint was 130.
 	CPUPct   float64 `json:"cpuPct,omitempty"`
 	RSSBytes int64   `json:"rssBytes,omitempty"`
+}
+
+// SystemdUnit is one service unit: what the supervisor was told to run,
+// and whether it is running.
+//
+// Carried on this report rather than on host.facts because it answers the
+// same question the process list does -- what does this machine run --
+// from the other side. The process table says what is alive; the unit
+// table says what was SUPPOSED to be, which is the only way to see the
+// thing that is missing. Facts is sampled hourly, and "the service died"
+// an hour ago is not an answer anybody wants.
+type SystemdUnit struct {
+	Name string `json:"name"`
+	// Enabled is the unit file's install state: "enabled", "disabled",
+	// "static", "masked". A unit reaches this list either because it is
+	// enabled -- so it is meant to be running -- or because it has
+	// failed, which matters whatever its install state says.
+	Enabled string `json:"enabled,omitempty"`
+	// Active is the runtime state: "active", "inactive", "failed",
+	// "activating". Enabled + inactive is the finding this list exists
+	// for: something that should be up is not.
+	Active string `json:"active,omitempty"`
+	// Sub is systemd's finer state within Active ("running", "exited",
+	// "dead"). Reported because active/exited is normal for a oneshot and
+	// alarming for a daemon, and Active alone cannot tell them apart.
+	Sub string `json:"sub,omitempty"`
+	// Description is the unit's own summary line. No timestamps, no pids:
+	// this rides a report compared byte for byte against the last one
+	// sent, so anything that varies per sample would defeat that gate.
+	Description string `json:"description,omitempty"`
 }
 
 // ListenPort is one listening socket.

@@ -14,7 +14,12 @@ import { hostAccountsApi, hostProcessesApi } from "@/modules/compute/api/hosts"
 import type { Host } from "@/modules/compute/api/types"
 import { SortHead, TableSearch } from "@/modules/compute/components/host-table-controls"
 import { byNumber, byText, useTableView } from "@/modules/compute/components/host-table-view"
-import type { HostAccount, HostListenPort, HostProcessGroup } from "@/generated/compute"
+import type {
+  HostAccount,
+  HostListenPort,
+  HostProcessGroup,
+  HostSystemdUnit,
+} from "@/generated/compute"
 
 // The two runtime-inventory tabs. Unlike the network and storage tabs,
 // which read lists already on the host object, these fetch: both are
@@ -76,6 +81,7 @@ export function HostProcessesTab({ host, scope }: { host: Host; scope: ScopeRef 
   })
 
   const groups = query.data?.groups ?? []
+  const units = query.data?.units ?? []
   const live = query.data?.live ?? false
   const view = useTableView<HostProcessGroup>(
     groups,
@@ -104,10 +110,160 @@ export function HostProcessesTab({ host, scope }: { host: Host; scope: ScopeRef 
   // failed refetch keeps the last good rows (TQ v5 sets error and retains
   // data) -- replacing a loaded table with an error line because one poll
   // in a hundred timed out loses more than it reports.
-  if (query.isError && groups.length === 0)
+  if (query.isError && groups.length === 0 && units.length === 0)
     return <LoadError message={t("compute.host.runtimeLoadFailed")} />
-  if (groups.length === 0) return <EmptyRuntime />
+  if (groups.length === 0 && units.length === 0) return <EmptyRuntime />
 
+  return (
+    <div className="space-y-4">
+      <ProcessCard
+        view={view}
+        live={live}
+        reportedAt={query.data?.reportedAt}
+        refreshKey={refreshKey}
+        setRefreshKey={setRefreshKey}
+      />
+      {units.length > 0 && <UnitsCard units={units} />}
+    </div>
+  )
+}
+
+/**
+ * The supervisor's half of the same question. Below the process table
+ * rather than above it because this tab is opened to see what is
+ * running; what is NOT running is the second question, and the summary
+ * line says so without making anybody read the list.
+ */
+function UnitsCard({ units }: { units: HostSystemdUnit[] }) {
+  const { t } = useTranslation()
+  const view = useTableView<HostSystemdUnit>(
+    units,
+    (u) => [u.name, u.active, u.enabled, u.description].filter(Boolean).join(" "),
+    {
+      // Problems first, and that is the whole reason this table is here:
+      // a machine with 34 healthy units and one dead one should not make
+      // anybody scan 34 rows to find it.
+      relevance: (a, b) => unitRank(a) - unitRank(b) || a.name.localeCompare(b.name),
+      name: byText((u) => u.name),
+      active: byText((u) => u.active),
+      enabled: byText((u) => u.enabled),
+    },
+    { by: "relevance", dir: "asc" },
+  )
+  // Only failed. See unitRank for why the tier below it is not counted.
+  const broken = units.filter((u) => u.active === "failed").length
+
+  return (
+    <Card>
+      <CardHeader className="gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle className="text-base">
+            {t("compute.host.units")} ({units.length})
+          </CardTitle>
+          <span className={`text-xs ${broken > 0 ? "text-destructive" : "text-muted-foreground"}`}>
+            {broken > 0
+              ? t("compute.host.unitsBroken", { count: broken })
+              : t("compute.host.unitsHealthy")}
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          <TableSearch view={view} name="unit-search" placeholder={t("compute.host.unitSearch")} />
+          {view.query && (
+            <span className="text-muted-foreground text-xs">
+              {t("compute.host.matchCount", { shown: view.rows.length, total: view.total })}
+            </span>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <SortHead view={view} field="name">
+                {t("compute.host.unit.name")}
+              </SortHead>
+              <SortHead view={view} field="active">
+                {t("compute.host.unit.state")}
+              </SortHead>
+              <SortHead view={view} field="enabled">
+                {t("compute.host.unit.enabled")}
+              </SortHead>
+              <TableHead>{t("compute.host.unit.description")}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {view.rows.map((u) => (
+              <TableRow key={u.name}>
+                <TableCell className="font-mono text-xs">{u.name}</TableCell>
+                <TableCell>
+                  <UnitStateBadge unit={u} />
+                </TableCell>
+                <TableCell className="text-muted-foreground text-xs">{u.enabled || "-"}</TableCell>
+                <TableCell className="text-muted-foreground max-w-96 truncate text-xs">
+                  {u.description || "-"}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  )
+}
+
+/**
+ * Sort order only: 0 failed, 1 enabled but not running, 2 the rest.
+ *
+ * Tier 1 is NOT a finding, and saying it was is the mistake this comment
+ * exists to prevent. On an ordinary Debian host eight units sit enabled
+ * and inactive and every one of them is fine: e2scrub_reap, grub-common
+ * and sshd-keygen are oneshots that ran at boot and exited,
+ * netavark-dhcp-proxy is socket-activated. All of them report
+ * Result=success. What separates them from a service that died is
+ * exactly what systemd already decided -- the crashed one is "failed",
+ * with Result=exit-code -- so systemd's own verdict is the signal, and
+ * anything inferred on top of it is a guess with an 8-in-9 false
+ * positive rate, measured.
+ *
+ * They still sort above the healthy ones, because "enabled and not
+ * running" is worth an operator's eye even when it is not wrong.
+ */
+function unitRank(u: HostSystemdUnit): number {
+  if (u.active === "failed") return 0
+  if (u.enabled === "enabled" && u.active !== "active" && u.active !== "activating") return 1
+  return 2
+}
+
+function UnitStateBadge({ unit }: { unit: HostSystemdUnit }) {
+  const rank = unitRank(unit)
+  // The sub-state is what separates a oneshot that finished from a daemon
+  // that died: both read "inactive", and only one of them is a problem.
+  const label = unit.sub ? `${unit.active} (${unit.sub})` : unit.active || "-"
+  // Only a failed unit gets a colour. An enabled-and-inactive one is
+  // ordinary on most hosts, and a warning badge on eight ordinary rows
+  // teaches people to ignore the badge.
+  if (rank === 0) return <Badge variant="destructive">{label}</Badge>
+  return (
+    <Badge variant="outline" className="font-normal">
+      {label}
+    </Badge>
+  )
+}
+
+function ProcessCard({
+  view,
+  live,
+  reportedAt,
+  refreshKey,
+  setRefreshKey,
+}: {
+  view: ReturnType<typeof useTableView<HostProcessGroup>>
+  live: boolean
+  reportedAt?: string
+  refreshKey: RefreshKey
+  setRefreshKey: (k: RefreshKey) => void
+}) {
+  const { t } = useTranslation()
   return (
     <Card>
       <CardHeader className="gap-3">
@@ -116,8 +272,8 @@ export function HostProcessesTab({ host, scope }: { host: Host; scope: ScopeRef 
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground text-xs">
               {live
-                ? t("compute.host.proc.liveAt", { at: formatDateTime(query.data?.reportedAt) })
-                : t("compute.host.proc.storedAt", { at: formatDateTime(query.data?.reportedAt) })}
+                ? t("compute.host.proc.liveAt", { at: formatDateTime(reportedAt) })
+                : t("compute.host.proc.storedAt", { at: formatDateTime(reportedAt) })}
             </span>
             <Select value={refreshKey} onValueChange={(v) => setRefreshKey(v as RefreshKey)}>
               <SelectTrigger

@@ -91,7 +91,7 @@ type AgentStore interface {
 	// inventories, on the same terms as UpsertFacts. Processes takes a
 	// bare jsonb payload rather than a struct because it has exactly one
 	// field and a wrapper would carry no information.
-	UpsertProcesses(ctx context.Context, hostID int64, groups []byte) error
+	UpsertProcesses(ctx context.Context, hostID int64, groups, units []byte) error
 	UpsertAccounts(ctx context.Context, hostID int64, in AccountsInput) error
 
 	// MarkStaleOffline sweeps rows with no heartbeat for staleAfter. The

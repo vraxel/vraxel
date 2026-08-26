@@ -440,10 +440,11 @@ func (s *pgAgentStore) UpsertFacts(ctx context.Context, hostID int64, in FactsIn
 }
 
 // UpsertProcesses overwrites the host's workload snapshot.
-func (s *pgAgentStore) UpsertProcesses(ctx context.Context, hostID int64, groups []byte) error {
+func (s *pgAgentStore) UpsertProcesses(ctx context.Context, hostID int64, groups, units []byte) error {
 	err := s.Q().UpsertHostProcesses(ctx, generated.UpsertHostProcessesParams{
 		HostID: hostID,
 		Groups: emptyArray(groups),
+		Units:  emptyArray(units),
 	})
 	if err != nil {
 		return fmt.Errorf("upsert host processes: %w", err)
