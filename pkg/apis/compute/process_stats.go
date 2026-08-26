@@ -17,10 +17,10 @@ import (
 var errDataPlaneUnwired = errors.New("the agent data plane is not wired on this server")
 
 const (
-	// processStatsTimeout bounds the whole live read. The agent sleeps
-	// 250ms inside it to measure cpu, so this is that plus the round trip
-	// plus room for a busy host, and short enough that a stuck agent does
-	// not hold a page open.
+	// processStatsTimeout bounds the whole live read. The agent walks
+	// /proc inside it, which is tens of milliseconds, so this is that plus
+	// the round trip plus a lot of room for a busy host, and short enough
+	// that a stuck agent does not hold a page open.
 	processStatsTimeout = 10 * time.Second
 	// processStatsMaxBody caps the answer. A capped inventory is 128
 	// groups; this is far above any honest one and far below anything

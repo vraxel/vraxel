@@ -207,9 +207,9 @@ export function HostProcessesTab({ host, scope }: { host: Host; scope: ScopeRef 
                 <TableCell className="text-muted-foreground font-mono text-xs">
                   {g.user || "-"}
                 </TableCell>
-                <TableCell className="text-right text-sm tabular-nums">
-                  {g.count > 1 ? g.count : ""}
-                </TableCell>
+                {/* Always the number, including 1. A blank cell in a
+                    numeric column reads as missing data, not as one. */}
+                <TableCell className="text-right text-sm tabular-nums">{g.count}</TableCell>
                 <TableCell className="text-right text-sm tabular-nums">
                   {live ? `${(g.cpuPct ?? 0).toFixed(1)}%` : "-"}
                 </TableCell>

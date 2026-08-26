@@ -86,6 +86,12 @@ quick: ## Fast pre-commit check: gate integrity + only what changed
 check: ## Run all gates: gofmt, vet, layer guard, Go tests, UI typecheck/lint/tests
 	@out=$$(gofmt -l -s . | grep -vE "^\.worktrees/|^\.anvil-dev/" || true); if [ -n "$$out" ]; then echo "gofmt -s needed:"; echo "$$out"; exit 1; fi
 	go vet ./...
+	# The agent's collectors live in //go:build linux files, which a
+	# developer on macOS never compiles: `go vet ./...` skips them, and an
+	# unused import or a renamed helper in one of them stays invisible
+	# until the release build. This caught exactly that. Vet rather than
+	# build, because it subsumes the compile and costs the same.
+	GOOS=linux GOARCH=amd64 go vet ./...
 	./scripts/check-layer-leak.sh
 	go test ./...
 	node ./scripts/check-lint-config.mjs

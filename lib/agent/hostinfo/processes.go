@@ -3,10 +3,13 @@ package hostinfo
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"net/netip"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	agenttypes "vraxel.io/vraxel/lib/agent/types"
 )
@@ -314,4 +317,183 @@ func groupProcesses(seen map[groupKey]*agenttypes.ProcessGroup) []agenttypes.Pro
 		return a.User < b.User
 	})
 	return out
+}
+
+// cpuSampleStep is how often the sampler re-reads the cpu counters, and
+// therefore the window every percentage is measured over.
+//
+// Deliberately equal to nodemetrics.FineStep -- not imported, because
+// hostinfo must not depend on the metrics collector, but the same number
+// on purpose: per-process cpu and host cpu are then two readings of the
+// same fifteen seconds, and a table that disagrees with the chart above
+// it is a bug report waiting to happen.
+//
+// Fifteen seconds also buys resolution. Per clockTicks the smallest
+// non-zero reading a window can produce is 10ms divided by the window:
+// 0.07% here, against 4% for the 250ms on-demand window this replaced --
+// which is why every reading on an idle host used to be a multiple of
+// four, and everything under 4% of a core read exactly 0.0%.
+const cpuSampleStep = 15 * time.Second
+
+// cpuPrimeStep is the gap before the FIRST rate only, so an agent that
+// has just started has a coarse answer rather than a table of zeros. See
+// Run.
+const cpuPrimeStep = time.Second
+
+// clockTicks is USER_HZ, the unit /proc/pid/stat counts cpu time and
+// start time in.
+//
+// Hardcoded at 100 rather than read through sysconf(_SC_CLK_TCK), which
+// needs cgo. The kernel has defined USER_HZ as 100 on every architecture
+// Linux supports for the whole time this interface has existed -- it is
+// part of the ABI, not the tick rate the kernel actually runs at.
+//
+// It also fixes the resolution of the cpu column: one tick is 10ms, so
+// the smallest non-zero reading a window of length W can produce is
+// 10ms/W. That is what sets cpuSampleStep.
+func clockTicks() int64 { return 100 }
+
+// cpuPercent turns two readings of the same counters into a percentage of
+// one core per pid.
+//
+// Here rather than beside its caller so it is testable off Linux: it is
+// arithmetic on two maps, and nothing about it needs /proc.
+func cpuPercent(first, second map[int64]int64, elapsed float64) map[int64]float64 {
+	out := make(map[int64]float64, len(second))
+	for pid, now := range second {
+		// Absent from the first reading means the process started inside
+		// the window; a counter that went backwards means the kernel
+		// reused the pid. Neither has a rise to measure, and charging a
+		// whole lifetime to one window reports hundreds of percent.
+		before, ok := first[pid]
+		if !ok || now < before {
+			continue
+		}
+		out[pid] = float64(now-before) / float64(clockTicks()) / elapsed * 100
+	}
+	return out
+}
+
+// Processes collects the machine's workload, without utilisation.
+//
+// Two passes over /proc, in this order because the second needs the
+// first: read the listening sockets to get their inode numbers, then walk
+// the processes, and while walking match each one's open sockets against
+// that set. There is no reverse index in the kernel's text interfaces --
+// a socket knows its inode and a process knows its file descriptors, and
+// /proc/pid/fd is the only place the two meet.
+func Processes() agenttypes.HostProcesses { return collectProcesses(nil) }
+
+// CPUSampler keeps a per-process cpu percentage current in the
+// background, and answers the live workload read from it.
+//
+// Background rather than on demand, which is the whole design and was
+// worth changing for three separate reasons.
+//
+// It cannot measure itself. Turning a cpu counter into a percentage needs
+// two readings and the gap between them, and the first version took the
+// second reading during the inventory walk -- the expensive pass that
+// reads cgroup, status, exe and every open fd of every process. The agent
+// charged its own collection cost to its own row and reported 16% on an
+// idle machine. Here both readings are the same cheap counter pass and
+// the walk happens outside them, so nothing the collector does lands
+// inside what it measures.
+//
+// It answers instantly. An on-demand window has to hold the request open
+// for its whole length, which put latency and resolution in direct
+// opposition: the window somebody is willing to wait for is exactly the
+// window too short to resolve anything. Sampling in the background
+// removes the trade -- the window can be fifteen seconds because nobody
+// waits for it.
+//
+// And it reports an interval, not an instant. A one-second sample of a
+// job that runs 200ms every five seconds reads 0% or 100% depending on
+// when the page was opened. Fifteen seconds is the same window the chart
+// above the table already uses.
+//
+// The cost is a permanent one: one small file per process every fifteen
+// seconds. That is the same tick on which this agent already runs a full
+// node_exporter gather, so "free while nobody is looking" was never a
+// property this process had.
+type CPUSampler struct {
+	mu   sync.RWMutex
+	pct  map[int64]float64
+	prev map[int64]int64
+	// prevAt dates prev. The rate is per elapsed second, and elapsed is
+	// measured rather than assumed to be cpuSampleStep: a ticker promises
+	// a cadence, and a machine under load misses ticks.
+	prevAt time.Time
+}
+
+// NewCPUSampler returns a sampler that reports nothing until Run has
+// completed two rounds. Nothing is the honest answer before then: one
+// reading of a counter is not a rate.
+func NewCPUSampler() *CPUSampler { return &CPUSampler{} }
+
+// Run samples until ctx ends.
+func (s *CPUSampler) Run(ctx context.Context) {
+	s.round(time.Now())
+	// A second reading a second later, before settling into the real
+	// cadence. Without it a freshly started agent spends fifteen seconds
+	// reporting 0.0% for every process while still answering live -- and
+	// "everything is at zero" is indistinguishable from an idle machine,
+	// so the table would state something false rather than show a gap.
+	// One second resolves only 1%, but it is replaced by a full-step
+	// reading on the next tick.
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(cpuPrimeStep):
+	}
+	s.round(time.Now())
+
+	t := time.NewTicker(cpuSampleStep)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case now := <-t.C:
+			s.round(now)
+		}
+	}
+}
+
+func (s *CPUSampler) round(now time.Time) { s.observe(sampleJiffies(), now) }
+
+// observe folds one reading in. Split from round so the state machine --
+// first round produces nothing, later rounds divide by the gap actually
+// elapsed -- is testable without /proc.
+func (s *CPUSampler) observe(cur map[int64]int64, now time.Time) {
+	if len(cur) == 0 {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if elapsed := now.Sub(s.prevAt).Seconds(); s.prev != nil && elapsed > 0 {
+		s.pct = cpuPercent(s.prev, cur, elapsed)
+	}
+	s.prev, s.prevAt = cur, now
+}
+
+// Live is the workload with the cpu and memory each part of it is using.
+//
+// The walk is done here, on the request, because the inventory is what
+// the caller asked for and it is only worth reading when somebody is
+// looking. Only the percentages are precomputed.
+func (s *CPUSampler) Live() agenttypes.HostProcesses {
+	// The map is read after the lock is released, which is safe only
+	// because observe REPLACES s.pct and never writes into it. Anything
+	// that starts mutating the published map in place is a data race the
+	// walk below would not survive.
+	s.mu.RLock()
+	pct := s.pct
+	s.mu.RUnlock()
+	// Non-nil even before the second round, so the walk still reports
+	// memory: an empty map means "no cpu rise measured yet", and a nil one
+	// means "this is an inventory, not a measurement".
+	if pct == nil {
+		pct = map[int64]float64{}
+	}
+	return collectProcesses(pct)
 }
