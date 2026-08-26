@@ -170,7 +170,15 @@ export function HostOverviewTab({ host }: { host: Host }) {
             and a row reading "debian" under one reading "Debian GNU/Linux
             13" is a second spelling with nothing new in it. */}
         <Field label={t("compute.host.defaultGateway")} value={s.defaultGateway} mono />
+        {/* Beside the timezone, because they are the two halves of "what
+            time does this machine think it is" -- and a clock nobody
+            disciplined makes every other reading on this page unreliable,
+            including our own judgement of whether they are fresh. */}
         <Field label={t("compute.host.timezone")} value={s.timezone} />
+        <Field
+          label={t("compute.host.clockSync")}
+          value={s.clockSync ? <ClockSyncBadge value={s.clockSync} /> : undefined}
+        />
         <Field
           label={t("compute.host.origin")}
           value={
@@ -181,7 +189,39 @@ export function HostOverviewTab({ host }: { host: Host }) {
         <Field label={t("common.createdBy")} value={s.createdByName} />
         <Field label={t("common.created")} value={formatDateTime(host.metadata.createdAt)} />
         <Field label={t("common.description")} value={s.description} full />
+        {/* What an ssh client pins. Shown because the event worth catching
+            is these CHANGING: a rebuilt or replaced machine has new ones,
+            and every operator's client refuses to connect until somebody
+            decides that was expected. */}
+        {(s.sshHostKeys?.length ?? 0) > 0 && (
+          <Field
+            label={t("compute.host.sshHostKeys")}
+            full
+            value={
+              <div className="space-y-0.5">
+                {s.sshHostKeys?.map((k) => (
+                  <div key={k.fingerprint} className="truncate font-mono text-xs">
+                    <span className="text-muted-foreground">{k.type}</span> {k.fingerprint}
+                  </div>
+                ))}
+              </div>
+            }
+          />
+        )}
       </InfoCard>
+
+      {(s.kernelCmdline || (s.cpuMitigations?.length ?? 0) > 0) && (
+        <InfoCard title={t("compute.host.kernelSection")}>
+          <Field label={t("compute.host.kernelCmdline")} value={s.kernelCmdline} mono full />
+          {(s.cpuMitigations?.length ?? 0) > 0 && (
+            <Field
+              label={t("compute.host.cpuMitigations")}
+              full
+              value={<Mitigations items={s.cpuMitigations ?? []} />}
+            />
+          )}
+        </InfoCard>
+      )}
 
       <InfoCard title={t("compute.host.hardware")}>
         <Field label={t("compute.host.cpuModel")} value={s.cpuModel} wide />
@@ -246,6 +286,64 @@ function GaugeCard({ label, children }: { label: string; children: ReactNode }) 
   )
 }
 
+function ClockSyncBadge({ value }: { value: string }) {
+  const { t } = useTranslation()
+  if (value !== "unsynced") {
+    return <Badge variant="secondary">{t("compute.host.clockSynced")}</Badge>
+  }
+  // Destructive because it invalidates readings elsewhere on this page
+  // rather than being a fact about the machine's hardware.
+  return <Badge variant="destructive">{t("compute.host.clockUnsynced")}</Badge>
+}
+
+/**
+ * The kernel's verdict on each hardware vulnerability it tracks.
+ *
+ * Summarised, not listed: seventeen lines of kernel prose is the whole
+ * card on a host where the answer is "nothing to do". The entries that
+ * are NOT "Not affected" are the ones with something to say, so those are
+ * printed and the rest become a count.
+ *
+ * Statuses are shown verbatim. "Mitigation: PTE Inversion", "Vulnerable"
+ * and "Unknown: Dependent on hypervisor status" are three different
+ * situations, and the third one -- a guest that cannot see its host's
+ * microcode -- is exactly the case a normalised badge would turn into a
+ * claim it has no basis for.
+ */
+function Mitigations({ items }: { items: { name: string; status: string }[] }) {
+  const { t } = useTranslation()
+  const notAffected = items.filter((m) => m.status === "Not affected")
+  const rest = items.filter((m) => m.status !== "Not affected")
+  const vulnerable = rest.filter((m) => m.status.startsWith("Vulnerable"))
+
+  return (
+    <div className="space-y-1">
+      <div className="text-xs">
+        {vulnerable.length > 0 ? (
+          <span className="text-destructive font-medium">
+            {t("compute.host.mitigationVulnerable", { count: vulnerable.length })}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">
+            {t("compute.host.mitigationClear", { count: notAffected.length })}
+          </span>
+        )}
+      </div>
+      {rest.map((m) => (
+        <div key={m.name} className="flex min-w-0 gap-2 font-mono text-xs">
+          <span className="text-muted-foreground w-52 shrink-0 truncate">{m.name}</span>
+          <span
+            className={`truncate ${m.status.startsWith("Vulnerable") ? "text-destructive" : ""}`}
+            title={m.status}
+          >
+            {m.status}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function VirtBadge({ value }: { value: string }) {
   const { t } = useTranslation()
   // Spelled out rather than built as `compute.host.virt.${value}`: the
@@ -292,9 +390,30 @@ function ChassisLabel({ value }: { value: string }) {
 export function HostNetworkTab({ host }: { host: Host }) {
   const { t } = useTranslation()
   const nics = host.spec.nics ?? []
+  const dns = host.spec.dns
 
-  if (nics.length === 0) return <EmptyFacts />
+  if (nics.length === 0 && !dns) return <EmptyFacts />
 
+  return (
+    <div className="space-y-4">
+      {/* Above the interfaces, not below: a host that resolves differently
+          from its neighbours produces an outage that looks like an
+          application fault for hours, and the addresses on the card below
+          are no help in finding it. */}
+      {dns && (
+        <InfoCard title={t("compute.host.dns")}>
+          <Field label={t("compute.host.dnsServers")} value={dns.servers?.join(", ")} mono wide />
+          <Field label={t("compute.host.dnsSearch")} value={dns.search?.join(", ")} mono wide />
+        </InfoCard>
+      )}
+      {nics.length > 0 && <NICTable host={host} />}
+    </div>
+  )
+}
+
+function NICTable({ host }: { host: Host }) {
+  const { t } = useTranslation()
+  const nics = host.spec.nics ?? []
   return (
     <Card>
       <CardContent className="pt-6">
@@ -396,6 +515,7 @@ export function HostStorageTab({ host }: { host: Host }) {
   const { t } = useTranslation()
   const disks = host.spec.blockDevices ?? []
   const fs = host.spec.filesystems ?? []
+  const swaps = host.spec.swaps ?? []
 
   if (disks.length === 0 && fs.length === 0) return <EmptyFacts />
 
@@ -543,6 +663,48 @@ export function HostStorageTab({ host }: { host: Host }) {
                     </TableRow>
                   )
                 })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Configuration only. How much swap is in use is a metric -- it
+          changes every sample, and this inventory is sent only when its
+          content changes, so carrying usage here would defeat that. */}
+      {swaps.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t("compute.host.swap")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("compute.host.swap.device")}</TableHead>
+                  <TableHead>{t("compute.host.swap.kind")}</TableHead>
+                  <TableHead className="text-right">{t("compute.host.swap.size")}</TableHead>
+                  {/* Equal priorities stripe, different ones are a
+                      fallback chain: the same list of devices means two
+                      different things without this column. */}
+                  <TableHead className="text-right">{t("compute.host.swap.priority")}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {swaps.map((sw) => (
+                  <TableRow key={sw.device}>
+                    <TableCell className="font-mono text-xs">{sw.device}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {sw.kind || "-"}
+                    </TableCell>
+                    <TableCell className="text-right text-sm tabular-nums">
+                      {bytes(sw.sizeBytes)}
+                    </TableCell>
+                    <TableCell className="text-right text-sm tabular-nums">
+                      {sw.priority ?? "-"}
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </CardContent>

@@ -211,6 +211,22 @@ export interface HostSpec {
    */
   bootAt?: string;
   /**
+   * KernelCmdline is what the bootloader passed the kernel: where a
+   * fleet's exceptions are actually written down (mitigations=off,
+   * hugepages, an IO scheduler override). A machine behaving unlike its
+   * neighbours usually differs here first.
+   */
+  kernelCmdline?: string;
+  /**
+   * ClockSync is "synced", "unsynced", or empty for an agent that could
+   * not ask the kernel. A wrong clock is invisible in every other
+   * reading and corrupts all of them -- log ordering across hosts,
+   * certificate validation, and this platform's own judgement of
+   * whether a metrics sample is fresh, which is measured against the
+   * agent's clock on purpose.
+   */
+  clockSync?: string;
+  /**
    * Detail-only. The list does not join the table these come from,
    * which is the whole reason they live in one.
    */
@@ -218,11 +234,75 @@ export interface HostSpec {
   filesystems?: HostFilesystem[];
   blockDevices?: HostBlockDevice[];
   /**
+   * Swaps is swap CONFIGURATION. How much is in use belongs to the
+   * metrics stream: it changes every sample, and the report these
+   * arrive on is sent only when its content changes.
+   */
+  swaps?: HostSwap[];
+  /**
+   * DNS is the resolver this machine will actually use. A host that
+   * resolves differently from its neighbours is a class of outage that
+   * looks like an application fault for hours.
+   */
+  dns?: HostDNS;
+  /**
+   * CPUMitigations is the kernel's verdict on each hardware
+   * vulnerability it tracks, verbatim. Not folded into a boolean: "not
+   * affected", "vulnerable" and "unknown, dependent on hypervisor
+   * status" are three different situations.
+   */
+  cpuMitigations?: HostCPUMitigation[];
+  /**
+   * SSHHostKeys is what an ssh client pins, by fingerprint. Public
+   * halves only; no key body ever leaves the machine. A rebuilt or
+   * replaced machine has new ones, which is exactly the event that
+   * makes every operator's client refuse to connect.
+   */
+  sshHostKeys?: HostSSHKey[];
+  /**
    * FactsReportedAt is when the agent last SENT an inventory, which it
    * does only when the content changed. Stale here means "nothing has
    * changed", not "nobody is looking".
    */
   factsReportedAt?: string;
+}
+/**
+ * HostSwap is one configured swap area.
+ * +openapi:description=交换区配置：仅配置，使用量属于监控指标。
+ */
+export interface HostSwap {
+  /**
+   * Device is a partition path or a file path; Kind says which.
+   */
+  device: string;
+  kind?: string;
+  sizeBytes?: number /* int64 */;
+  /**
+   * Priority decides which area the kernel fills first: equal
+   * priorities are striped, different ones are a fallback chain, so the
+   * same list of devices means two different things without it.
+   */
+  priority?: number /* int32 */;
+}
+/**
+ * HostDNS is the machine's resolver configuration.
+ * +openapi:description=主机 DNS 解析配置。
+ */
+export interface HostDNS {
+  servers?: string[];
+  /**
+   * Search is what gets appended to a short name, "domain" and "search"
+   * folded together -- they are two spellings of one setting.
+   */
+  search?: string[];
+}
+/**
+ * HostCPUMitigation is the kernel's verdict on one hardware vulnerability.
+ * +openapi:description=CPU 硬件漏洞缓解状态：内核原文，未做归一化。
+ */
+export interface HostCPUMitigation {
+  name: string;
+  status: string;
 }
 /**
  * HostNIC is one of the machine's network interfaces. Container and

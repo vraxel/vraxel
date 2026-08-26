@@ -31,16 +31,22 @@ WITH scalars AS (
         serial_number        = @serial_number,
         asset_tag            = @asset_tag,
         timezone             = @timezone,
-        default_gateway      = @default_gateway
+        default_gateway      = @default_gateway,
+        kernel_cmdline       = @kernel_cmdline,
+        clock_sync           = @clock_sync
         -- updated_at is deliberately left alone. It means "an operator
         -- changed this record"; a machine describing itself is not that,
         -- and bumping it would make every host look edited once an hour.
     WHERE id = @host_id
 )
-INSERT INTO host_facts (host_id, nics, filesystems, block_devices, reported_at)
-VALUES (@host_id, @nics, @filesystems, @block_devices, now())
+INSERT INTO host_facts (host_id, nics, filesystems, block_devices, swaps, dns, cpu_mitigations, ssh_host_keys, reported_at)
+VALUES (@host_id, @nics, @filesystems, @block_devices, @swaps, @dns, @cpu_mitigations, @ssh_host_keys, now())
 ON CONFLICT (host_id) DO UPDATE SET
     nics          = EXCLUDED.nics,
     filesystems   = EXCLUDED.filesystems,
     block_devices = EXCLUDED.block_devices,
+    swaps           = EXCLUDED.swaps,
+    dns             = EXCLUDED.dns,
+    cpu_mitigations = EXCLUDED.cpu_mitigations,
+    ssh_host_keys   = EXCLUDED.ssh_host_keys,
     reported_at   = EXCLUDED.reported_at;

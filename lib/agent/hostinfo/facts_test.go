@@ -306,3 +306,59 @@ func TestDiskVendor(t *testing.T) {
 		}
 	}
 }
+
+// Real output from `cat /proc/swaps` with a 64 MiB file swapped on. The
+// header is tab-padded and the columns are not aligned with it, which is
+// why this is split on fields rather than on columns.
+func TestParseSwaps(t *testing.T) {
+	data := []byte("Filename\t\t\t\tType\t\tSize\t\tUsed\t\tPriority\n" +
+		"/var/swaptest                           file\t\t65532\t\t0\t\t7\n" +
+		"/dev/dm-1                               partition\t\t1000444\t\t512\t\t-2\n" +
+		// A swapfile whose path contains a space, escaped the way the
+		// mount table escapes one. Verified against the kernel by
+		// swapping on "/var/my swap" and reading the file back.
+		"/var/my\\040swap                          file\t\t65532\t\t0\t\t-3\n")
+	got := parseSwaps(data)
+	if len(got) != 3 {
+		t.Fatalf("got %d areas, want 3: %+v", len(got), got)
+	}
+	if got[2].Device != "/var/my swap" {
+		t.Errorf("escaped path = %q, want it unescaped", got[2].Device)
+	}
+	// Size is in KIBIBYTES despite everything around it in /proc counting
+	// 4K pages. Getting this wrong is a silent factor of four.
+	if got[0].Device != "/var/swaptest" || got[0].Kind != "file" ||
+		got[0].SizeBytes != 65532*1024 || got[0].Priority != 7 {
+		t.Errorf("file area = %+v", got[0])
+	}
+	// A negative priority is ordinary -- it is what swapon assigns when
+	// nobody chose one -- so it must survive as a signed value.
+	if got[1].Priority != -2 {
+		t.Errorf("partition priority = %d, want -2", got[1].Priority)
+	}
+	// Used is never read: it changes every sample, and this rides a report
+	// sent only when its content changes.
+}
+
+func TestParseResolvConf(t *testing.T) {
+	// "domain" and "search" are two spellings of one setting, and a
+	// trailing comment is legal on any line.
+	servers, search := parseResolvConf([]byte(
+		"# generated\ndomain localdomain\nnameserver 10.1.1.2 # internal\n" +
+			"nameserver 8.8.8.8\nsearch corp.example net.example\noptions ndots:2\n"))
+	if len(servers) != 2 || servers[0] != "10.1.1.2" || servers[1] != "8.8.8.8" {
+		t.Errorf("servers = %v", servers)
+	}
+	// The LAST instance wins -- man 5 resolv.conf, "only the search list
+	// from the last instance is used". Accumulating them would report a
+	// host as searching localdomain, which its resolver never will, to
+	// somebody using this page to rule out DNS.
+	if len(search) != 2 || search[0] != "corp.example" || search[1] != "net.example" {
+		t.Errorf("search = %v, want only the last instance", search)
+	}
+	// options is not a resolver this host will query, and a line with one
+	// field is not a setting at all.
+	if s, _ := parseResolvConf([]byte("nameserver\noptions ndots:2\n")); len(s) != 0 {
+		t.Errorf("got servers from a malformed file: %v", s)
+	}
+}

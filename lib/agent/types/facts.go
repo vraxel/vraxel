@@ -98,10 +98,77 @@ type HostFacts struct {
 	// stay silent. A field that changes every sample would make every
 	// resample look like a hardware change.
 
+	// KernelCmdline is what the bootloader passed the kernel. One line,
+	// changed only by editing the bootloader and rebooting, and the place
+	// where a fleet's exceptions are actually written down: mitigations=off,
+	// hugepages, an IO scheduler override, the root device. A machine whose
+	// behaviour differs from its neighbours usually differs here first.
+	KernelCmdline string `json:"kernelCmdline,omitempty"`
+	// ClockSync is whether the kernel considers its clock disciplined:
+	// ClockSynced, ClockUnsynced, or empty when it could not be asked.
+	//
+	// Worth a field of its own because a wrong clock is invisible in every
+	// other reading and corrupts them all -- log ordering across hosts,
+	// certificate validation, and this platform's own judgement of whether
+	// a metrics sample is fresh, which is measured against the AGENT's
+	// clock on purpose.
+	ClockSync string `json:"clockSync,omitempty"`
+
 	// --- lists ---
 	NICs         []NIC         `json:"nics,omitempty"`
 	Filesystems  []Filesystem  `json:"filesystems,omitempty"`
 	BlockDevices []BlockDevice `json:"blockDevices,omitempty"`
+	// Swaps is swap CONFIGURATION, without how much of it is in use.
+	// Usage belongs to the metrics stream: it changes every sample, and
+	// this report is sent only when its content changes.
+	Swaps []Swap `json:"swaps,omitempty"`
+	// DNSServers and DNSSearch are the resolver this machine will actually
+	// use. A host that resolves differently from its neighbours is a class
+	// of outage that looks like an application fault for hours.
+	DNSServers []string `json:"dnsServers,omitempty"`
+	DNSSearch  []string `json:"dnsSearch,omitempty"`
+	// CPUMitigations is the kernel's own verdict on each hardware
+	// vulnerability it knows about, reported verbatim.
+	//
+	// Verbatim because the strings are not an enum: "Mitigation: PTE
+	// Inversion", "Not affected", "Vulnerable" and "Unknown: Dependent on
+	// hypervisor status" are four different situations, and folding them
+	// into a boolean would turn "we cannot tell from inside this guest"
+	// into a claim.
+	CPUMitigations []CPUMitigation `json:"cpuMitigations,omitempty"`
+	// SSHHostKeys identifies the machine, by fingerprint. Public keys
+	// only, and only their fingerprints -- the same treatment the account
+	// inventory gives authorized_keys.
+	//
+	// These are what an ssh client pins. A machine that was rebuilt or
+	// replaced has new ones, which is exactly the event that makes every
+	// operator's client refuse to connect.
+	SSHHostKeys []SSHKey `json:"sshHostKeys,omitempty"`
+}
+
+// Clock synchronisation states.
+const (
+	ClockSynced   = "synced"
+	ClockUnsynced = "unsynced"
+)
+
+// Swap is one swap area, as configured.
+type Swap struct {
+	// Device is a partition path or a file path; Kind says which.
+	Device    string `json:"device"`
+	Kind      string `json:"kind,omitempty"`
+	SizeBytes int64  `json:"sizeBytes,omitempty"`
+	// Priority decides which area the kernel fills first. Reported
+	// because a set of areas with equal priority is striped and one with
+	// different priorities is a fallback chain -- the same list of
+	// devices means two different things.
+	Priority int32 `json:"priority,omitempty"`
+}
+
+// CPUMitigation is one entry of /sys/devices/system/cpu/vulnerabilities.
+type CPUMitigation struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
 }
 
 // Virtualization values. Anything unrecognised is reported as VirtUnknown

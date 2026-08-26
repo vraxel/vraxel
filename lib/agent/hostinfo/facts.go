@@ -348,3 +348,73 @@ func unescapeMount(s string) string {
 	}
 	return b.String()
 }
+
+// parseSwaps reads /proc/swaps.
+//
+// Sizes are in KIBIBYTES, not the 4K pages the file's neighbours in
+// /proc use -- the header says "Size" and the unit is kB, which is the
+// one thing about this file worth writing down. The Used column is
+// deliberately not read: it changes every sample, and this rides a
+// report sent only when its content changes.
+//
+// Paths are escaped the way mountinfo escapes them, verified on a
+// swapfile named "/var/my swap" reading back as "/var/my\040swap", so
+// they go through the same unescape as the mount table's do.
+func parseSwaps(data []byte) []agenttypes.Swap {
+	var out []agenttypes.Swap
+	sc := bufio.NewScanner(bytes.NewReader(data))
+	for sc.Scan() {
+		f := strings.Fields(sc.Text())
+		// Filename Type Size Used Priority
+		if len(f) < 5 || f[0] == "Filename" {
+			continue
+		}
+		kb, err := strconv.ParseInt(f[2], 10, 64)
+		if err != nil {
+			continue
+		}
+		prio, _ := strconv.ParseInt(f[4], 10, 32)
+		out = append(out, agenttypes.Swap{
+			Device: unescapeMount(f[0]), Kind: f[1], SizeBytes: kb * 1024, Priority: int32(prio),
+		})
+	}
+	return out
+}
+
+// parseResolvConf reads the nameserver and search lines of a resolv.conf.
+//
+// "domain" is folded into search: it is the single-entry spelling of the
+// same thing, the two are mutually exclusive, and an operator asking what
+// this host appends to a short name does not care which keyword wrote it.
+//
+// The search list REPLACES rather than accumulates. man 5 resolv.conf:
+// "only the search list from the last instance is used". Appending them
+// would report a host as searching domains the resolver will never try,
+// which is worse than reporting nothing -- it is the answer somebody
+// would use to rule out DNS as the cause.
+//
+// Nameservers are reported as the file lists them, including any past
+// glibc's MAXNS of 3. Truncating would be a claim about which resolver
+// library is in use, and systemd-resolved has no such limit; the file is
+// what an operator edits and what they are looking at here.
+func parseResolvConf(data []byte) (servers, search []string) {
+	sc := bufio.NewScanner(bytes.NewReader(data))
+	for sc.Scan() {
+		line := sc.Text()
+		// Both # and ; start a comment in this file.
+		if i := strings.IndexAny(line, "#;"); i >= 0 {
+			line = line[:i]
+		}
+		f := strings.Fields(line)
+		if len(f) < 2 {
+			continue
+		}
+		switch f[0] {
+		case "nameserver":
+			servers = append(servers, f[1])
+		case "search", "domain":
+			search = f[1:]
+		}
+	}
+	return servers, search
+}

@@ -423,9 +423,15 @@ func (s *pgAgentStore) UpsertFacts(ctx context.Context, hostID int64, in FactsIn
 		AssetTag:          in.AssetTag,
 		Timezone:          in.Timezone,
 		DefaultGateway:    in.DefaultGateway,
+		KernelCmdline:     in.KernelCmdline,
+		ClockSync:         in.ClockSync,
 		Nics:              emptyArray(in.NICs),
 		Filesystems:       emptyArray(in.Filesystems),
 		BlockDevices:      emptyArray(in.BlockDevices),
+		Swaps:             emptyArray(in.Swaps),
+		Dns:               emptyObject(in.DNS),
+		CpuMitigations:    emptyArray(in.CPUMitigations),
+		SshHostKeys:       emptyArray(in.SSHHostKeys),
 	})
 	if err != nil {
 		return fmt.Errorf("upsert host facts: %w", err)
@@ -464,6 +470,16 @@ func (s *pgAgentStore) UpsertAccounts(ctx context.Context, hostID int64, in Acco
 func emptyArray(b []byte) []byte {
 	if len(b) == 0 {
 		return []byte("[]")
+	}
+	return b
+}
+
+// emptyObject is emptyArray for a jsonb column whose empty value is an
+// object. Separate rather than a parameter: passing the wrong literal is
+// a bug the column's type will not catch, since jsonb accepts both.
+func emptyObject(b []byte) []byte {
+	if len(b) == 0 {
+		return []byte("{}")
 	}
 	return b
 }

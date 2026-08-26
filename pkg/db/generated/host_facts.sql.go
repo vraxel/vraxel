@@ -14,36 +14,42 @@ const upsertHostFacts = `-- name: UpsertHostFacts :exec
 
 WITH scalars AS (
     UPDATE hosts SET
-        virtualization       = $5,
-        cpu_model            = $6,
-        cpu_sockets          = $7,
-        cpu_cores_per_socket = $8,
-        cpu_threads_per_core = $9,
-        kernel_version       = $10,
-        os_id                = $11,
-        os_version_id        = $12,
-        system_vendor        = $13,
-        product_name         = $14,
-        bios_version         = $15,
-        bios_date            = $16,
-        board_name           = $17,
-        board_serial         = $18,
-        chassis_type         = $19,
-        serial_number        = $20,
-        asset_tag            = $21,
-        timezone             = $22,
-        default_gateway      = $23
+        virtualization       = $9,
+        cpu_model            = $10,
+        cpu_sockets          = $11,
+        cpu_cores_per_socket = $12,
+        cpu_threads_per_core = $13,
+        kernel_version       = $14,
+        os_id                = $15,
+        os_version_id        = $16,
+        system_vendor        = $17,
+        product_name         = $18,
+        bios_version         = $19,
+        bios_date            = $20,
+        board_name           = $21,
+        board_serial         = $22,
+        chassis_type         = $23,
+        serial_number        = $24,
+        asset_tag            = $25,
+        timezone             = $26,
+        default_gateway      = $27,
+        kernel_cmdline       = $28,
+        clock_sync           = $29
         -- updated_at is deliberately left alone. It means "an operator
         -- changed this record"; a machine describing itself is not that,
         -- and bumping it would make every host look edited once an hour.
     WHERE id = $1
 )
-INSERT INTO host_facts (host_id, nics, filesystems, block_devices, reported_at)
-VALUES ($1, $2, $3, $4, now())
+INSERT INTO host_facts (host_id, nics, filesystems, block_devices, swaps, dns, cpu_mitigations, ssh_host_keys, reported_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
 ON CONFLICT (host_id) DO UPDATE SET
     nics          = EXCLUDED.nics,
     filesystems   = EXCLUDED.filesystems,
     block_devices = EXCLUDED.block_devices,
+    swaps           = EXCLUDED.swaps,
+    dns             = EXCLUDED.dns,
+    cpu_mitigations = EXCLUDED.cpu_mitigations,
+    ssh_host_keys   = EXCLUDED.ssh_host_keys,
     reported_at   = EXCLUDED.reported_at
 `
 
@@ -52,6 +58,10 @@ type UpsertHostFactsParams struct {
 	Nics              json.RawMessage `json:"nics"`
 	Filesystems       json.RawMessage `json:"filesystems"`
 	BlockDevices      json.RawMessage `json:"block_devices"`
+	Swaps             json.RawMessage `json:"swaps"`
+	Dns               json.RawMessage `json:"dns"`
+	CpuMitigations    json.RawMessage `json:"cpu_mitigations"`
+	SshHostKeys       json.RawMessage `json:"ssh_host_keys"`
 	Virtualization    string          `json:"virtualization"`
 	CpuModel          string          `json:"cpu_model"`
 	CpuSockets        int32           `json:"cpu_sockets"`
@@ -71,6 +81,8 @@ type UpsertHostFactsParams struct {
 	AssetTag          string          `json:"asset_tag"`
 	Timezone          string          `json:"timezone"`
 	DefaultGateway    string          `json:"default_gateway"`
+	KernelCmdline     string          `json:"kernel_cmdline"`
+	ClockSync         string          `json:"clock_sync"`
 }
 
 // Host inventory writes. Reads live in host.sql's GetHostByID, because
@@ -90,6 +102,10 @@ func (q *Queries) UpsertHostFacts(ctx context.Context, arg UpsertHostFactsParams
 		arg.Nics,
 		arg.Filesystems,
 		arg.BlockDevices,
+		arg.Swaps,
+		arg.Dns,
+		arg.CpuMitigations,
+		arg.SshHostKeys,
 		arg.Virtualization,
 		arg.CpuModel,
 		arg.CpuSockets,
@@ -109,6 +125,8 @@ func (q *Queries) UpsertHostFacts(ctx context.Context, arg UpsertHostFactsParams
 		arg.AssetTag,
 		arg.Timezone,
 		arg.DefaultGateway,
+		arg.KernelCmdline,
+		arg.ClockSync,
 	)
 	return err
 }

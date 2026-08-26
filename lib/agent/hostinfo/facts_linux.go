@@ -34,6 +34,9 @@ func Facts() agenttypes.HostFacts {
 	osReleaseData, _ := os.ReadFile("/etc/os-release")
 	osID, osVersionID := parseOSRelease(osReleaseData)
 	route, _ := os.ReadFile("/proc/net/route")
+	resolv, _ := os.ReadFile("/etc/resolv.conf")
+	dnsServers, dnsSearch := parseResolvConf(resolv)
+	swaps, _ := os.ReadFile("/proc/swaps")
 
 	return agenttypes.HostFacts{
 		Virtualization:    detectVirt(cpuinfo, vendor, product),
@@ -60,11 +63,100 @@ func Facts() agenttypes.HostFacts {
 		Timezone:       timezone(),
 		DefaultGateway: parseRouteGateway(route),
 
-		NICs:         nics(),
-		Filesystems:  filesystems(),
-		BlockDevices: blockDevices(),
+		KernelCmdline: strings.TrimSpace(readFileString("/proc/cmdline")),
+		ClockSync:     clockSync(),
+
+		NICs:           nics(),
+		Filesystems:    filesystems(),
+		BlockDevices:   blockDevices(),
+		Swaps:          parseSwaps(swaps),
+		DNSServers:     dnsServers,
+		DNSSearch:      dnsSearch,
+		CPUMitigations: cpuMitigations(),
+		SSHHostKeys:    sshHostKeys(),
 	}
 }
+
+// cpuMitigationDir is where the kernel publishes its verdict on each
+// hardware vulnerability it knows about, one file per name.
+const cpuMitigationDir = "/sys/devices/system/cpu/vulnerabilities"
+
+// cpuMitigations reads that directory. Sorted by name, because ReadDir
+// order is not a promise and this rides a report compared byte for byte
+// against the last one sent.
+func cpuMitigations() []agenttypes.CPUMitigation {
+	entries, err := os.ReadDir(cpuMitigationDir)
+	if err != nil {
+		// The directory is absent on architectures with nothing to report
+		// and on kernels built without the reporting. Empty, not an
+		// error: "no known vulnerabilities are tracked here" is the
+		// truthful answer, and it is not the same as "not affected".
+		return nil
+	}
+	out := make([]agenttypes.CPUMitigation, 0, len(entries))
+	for _, e := range entries {
+		status := strings.TrimSpace(readFileString(filepath.Join(cpuMitigationDir, e.Name())))
+		if status == "" {
+			continue
+		}
+		out = append(out, agenttypes.CPUMitigation{Name: e.Name(), Status: status})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}
+
+// sshHostKeys fingerprints the machine's public host keys.
+//
+// Public halves only, by glob on the .pub files -- the private keys sit
+// beside them under the same prefix and are never opened. What leaves the
+// host is the algorithm and a SHA256 fingerprint, the same reduction the
+// account inventory applies to authorized_keys.
+func sshHostKeys() []agenttypes.SSHKey {
+	paths, err := filepath.Glob("/etc/ssh/ssh_host_*_key.pub")
+	if err != nil {
+		return nil
+	}
+	sort.Strings(paths)
+	var out []agenttypes.SSHKey
+	for _, p := range paths {
+		for _, k := range parseAuthorizedKeys(readFileBytes(p)) {
+			// The comment on a host key is the hostname it was generated
+			// on, which is stale on any machine that was ever renamed or
+			// cloned from an image. Dropped rather than shown as fact.
+			out = append(out, agenttypes.SSHKey{Type: k.Type, Fingerprint: k.Fingerprint})
+		}
+	}
+	return out
+}
+
+// clockSync asks the kernel whether its clock is disciplined.
+//
+// adjtimex with no modes set is a pure query -- it cannot change the
+// clock -- and needs no privileges. TIME_ERROR is the state the kernel
+// reports when STA_UNSYNC is set, which is what timedatectl and ntpq are
+// both reading underneath.
+//
+// A syscall rather than a file or a command because there is no portable
+// file: this host runs chrony, which publishes nothing under /run, while
+// the systemd-timesyncd flag file everyone reaches for first
+// (/run/systemd/timesync/synchronized) does not exist here at all. The
+// kernel's own view is the one answer every implementation feeds into.
+func clockSync() string {
+	var tx syscall.Timex
+	state, err := syscall.Adjtimex(&tx)
+	if err != nil {
+		return ""
+	}
+	if state == timeError {
+		return agenttypes.ClockUnsynced
+	}
+	return agenttypes.ClockSynced
+}
+
+// timeError is TIME_ERROR from <sys/timex.h>, the clock state meaning
+// "not synchronised". Not in syscall, and one constant is cheaper than a
+// dependency.
+const timeError = 5
 
 func firstNonEmpty(vs ...string) string {
 	for _, v := range vs {

@@ -55,6 +55,10 @@ SELECT h.*,
     f.nics           AS facts_nics,
     f.filesystems    AS facts_filesystems,
     f.block_devices  AS facts_block_devices,
+    f.swaps          AS facts_swaps,
+    f.dns            AS facts_dns,
+    f.cpu_mitigations AS facts_cpu_mitigations,
+    f.ssh_host_keys  AS facts_ssh_host_keys,
     f.reported_at    AS facts_reported_at,
     -- How many hosts were built from this host's disk image, this one
     -- included. 1 (or 0 for an agentless record) is the ordinary answer.

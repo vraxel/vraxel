@@ -464,9 +464,15 @@ func (h *protocolHandler) recordFacts(ctx context.Context, sess *Session, facts 
 		AssetTag:          facts.AssetTag,
 		Timezone:          facts.Timezone,
 		DefaultGateway:    facts.DefaultGateway,
+		KernelCmdline:     facts.KernelCmdline,
+		ClockSync:         facts.ClockSync,
 		NICs:              marshalList(facts.NICs),
 		Filesystems:       marshalList(facts.Filesystems),
 		BlockDevices:      marshalList(facts.BlockDevices),
+		Swaps:             marshalList(facts.Swaps),
+		DNS:               marshalDNS(facts.DNSServers, facts.DNSSearch),
+		CPUMitigations:    marshalList(facts.CPUMitigations),
+		SSHHostKeys:       marshalList(facts.SSHHostKeys),
 	}
 	if err := h.agents.UpsertFacts(ctx, sess.HostID, in); err != nil {
 		logger.Warnf("agentgw: record facts for host %d: %v", sess.HostID, err)
@@ -511,6 +517,21 @@ func marshalList[T any](items []T) []byte {
 	b, err := json.Marshal(items)
 	if err != nil {
 		return []byte("[]")
+	}
+	return b
+}
+
+// marshalDNS encodes the resolver configuration as one object. Re-encoded
+// here from typed fields rather than passed through, the same as every
+// other list: what reaches the column is this server's encoding of a
+// shape it understands.
+func marshalDNS(servers, search []string) []byte {
+	b, err := json.Marshal(struct {
+		Servers []string `json:"servers,omitempty"`
+		Search  []string `json:"search,omitempty"`
+	}{Servers: servers, Search: search})
+	if err != nil {
+		return []byte("{}")
 	}
 	return b
 }

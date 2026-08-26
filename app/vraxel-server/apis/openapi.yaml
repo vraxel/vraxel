@@ -6,6 +6,12 @@ info:
 tags:
   - name: AuditLog
     description: 审计日志：记录 API 写操作和认证事件
+  - name: HostSwap
+    description: 交换区配置：仅配置，使用量属于监控指标。
+  - name: HostDNS
+    description: 主机 DNS 解析配置。
+  - name: HostCPUMitigation
+    description: CPU 硬件漏洞缓解状态：内核原文，未做归一化。
   - name: HostNIC
     description: 主机网卡：agent 上报，已过滤容器/网桥虚拟接口。
   - name: HostFilesystem
@@ -4347,6 +4353,24 @@ components:
           format: int64
         vendor:
           type: string
+    HostCPUMitigation:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+    HostDNS:
+      type: object
+      properties:
+        search:
+          type: array
+          items:
+            type: string
+        servers:
+          type: array
+          items:
+            type: string
     HostFilesystem:
       type: object
       properties:
@@ -4485,6 +4509,8 @@ components:
           format: date-time
         chassisType:
           type: string
+        clockSync:
+          type: string
         connectivityMode:
           type: string
         cpuCores:
@@ -4493,6 +4519,10 @@ components:
         cpuCoresPerSocket:
           type: integer
           format: int32
+        cpuMitigations:
+          type: array
+          items:
+            $ref: '#/components/schemas/HostCPUMitigation'
         cpuModel:
           type: string
         cpuSockets:
@@ -4531,6 +4561,8 @@ components:
           format: double
         displayName:
           type: string
+        dns:
+          $ref: '#/components/schemas/HostDNS'
         factsReportedAt:
           type: string
           format: date-time
@@ -4548,6 +4580,8 @@ components:
           type: integer
           format: int64
         ip:
+          type: string
+        kernelCmdline:
           type: string
         kernelVersion:
           type: string
@@ -4599,9 +4633,17 @@ components:
           type: string
         serialNumber:
           type: string
+        sshHostKeys:
+          type: array
+          items:
+            $ref: '#/components/schemas/HostSSHKey'
         sshPort:
           type: integer
           format: int32
+        swaps:
+          type: array
+          items:
+            $ref: '#/components/schemas/HostSwap'
         systemVendor:
           type: string
         timezone:
@@ -4612,6 +4654,19 @@ components:
           type: string
         workspaceName:
           type: string
+    HostSwap:
+      type: object
+      properties:
+        device:
+          type: string
+        kind:
+          type: string
+        priority:
+          type: integer
+          format: int32
+        sizeBytes:
+          type: integer
+          format: int64
     Image-siblingList:
       type: object
       properties:
@@ -5227,6 +5282,9 @@ x-tagGroups:
       - AuditLog
   - name: compute
     tags:
+      - HostSwap
+      - HostDNS
+      - HostCPUMitigation
       - HostNIC
       - HostFilesystem
       - HostBlockDevice
