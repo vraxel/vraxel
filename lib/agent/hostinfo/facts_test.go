@@ -313,10 +313,17 @@ func TestDiskVendor(t *testing.T) {
 func TestParseSwaps(t *testing.T) {
 	data := []byte("Filename\t\t\t\tType\t\tSize\t\tUsed\t\tPriority\n" +
 		"/var/swaptest                           file\t\t65532\t\t0\t\t7\n" +
-		"/dev/dm-1                               partition\t\t1000444\t\t512\t\t-2\n")
+		"/dev/dm-1                               partition\t\t1000444\t\t512\t\t-2\n" +
+		// A swapfile whose path contains a space, escaped the way the
+		// mount table escapes one. Verified against the kernel by
+		// swapping on "/var/my swap" and reading the file back.
+		"/var/my\\040swap                          file\t\t65532\t\t0\t\t-3\n")
 	got := parseSwaps(data)
-	if len(got) != 2 {
-		t.Fatalf("got %d areas, want 2: %+v", len(got), got)
+	if len(got) != 3 {
+		t.Fatalf("got %d areas, want 3: %+v", len(got), got)
+	}
+	if got[2].Device != "/var/my swap" {
+		t.Errorf("escaped path = %q, want it unescaped", got[2].Device)
 	}
 	// Size is in KIBIBYTES despite everything around it in /proc counting
 	// 4K pages. Getting this wrong is a silent factor of four.
@@ -342,8 +349,12 @@ func TestParseResolvConf(t *testing.T) {
 	if len(servers) != 2 || servers[0] != "10.1.1.2" || servers[1] != "8.8.8.8" {
 		t.Errorf("servers = %v", servers)
 	}
-	if len(search) != 3 || search[0] != "localdomain" {
-		t.Errorf("search = %v", search)
+	// The LAST instance wins -- man 5 resolv.conf, "only the search list
+	// from the last instance is used". Accumulating them would report a
+	// host as searching localdomain, which its resolver never will, to
+	// somebody using this page to rule out DNS.
+	if len(search) != 2 || search[0] != "corp.example" || search[1] != "net.example" {
+		t.Errorf("search = %v, want only the last instance", search)
 	}
 	// options is not a resolver this host will query, and a line with one
 	// field is not a setting at all.
