@@ -118,9 +118,17 @@ type FactsInput struct {
 	AssetTag          string
 	Timezone          string
 	DefaultGateway    string
+	KernelCmdline     string
+	ClockSync         string
 	NICs              []byte
 	Filesystems       []byte
 	BlockDevices      []byte
+	Swaps             []byte
+	// DNS is an object, not a list: emptyArray would write "[]" into a
+	// column whose empty value is "{}".
+	DNS            []byte
+	CPUMitigations []byte
+	SSHHostKeys    []byte
 }
 
 // AccountsInput is one host.accounts report, ready to store. Three

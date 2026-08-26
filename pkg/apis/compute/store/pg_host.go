@@ -115,13 +115,19 @@ type HostRow struct {
 	AssetTag          string
 	Timezone          string
 	DefaultGateway    string
+	KernelCmdline     string
+	ClockSync         string
 	// BootAt is dated by the SERVER's clock from the uptime the agent
 	// reports, which is why it survives a host whose wall clock is wrong.
-	BootAt            *time.Time
-	FactsNICs         []byte
-	FactsFilesystems  []byte
-	FactsBlockDevices []byte
-	FactsReportedAt   *time.Time
+	BootAt              *time.Time
+	FactsNICs           []byte
+	FactsFilesystems    []byte
+	FactsBlockDevices   []byte
+	FactsSwaps          []byte
+	FactsDNS            []byte
+	FactsCPUMitigations []byte
+	FactsSSHHostKeys    []byte
+	FactsReportedAt     *time.Time
 }
 
 // HostCreateInput is a host recorded by hand.
@@ -459,6 +465,12 @@ func getRowToDomain(r *generated.GetHostByIDRow) HostRow {
 		Timezone:                r.Timezone,
 		DefaultGateway:          r.DefaultGateway,
 		BootAt:                  r.AgentBootAt,
+		KernelCmdline:           r.KernelCmdline,
+		ClockSync:               r.ClockSync,
+		FactsSwaps:              r.FactsSwaps,
+		FactsDNS:                r.FactsDns,
+		FactsCPUMitigations:     r.FactsCpuMitigations,
+		FactsSSHHostKeys:        r.FactsSshHostKeys,
 		FactsNICs:               r.FactsNics,
 		FactsFilesystems:        r.FactsFilesystems,
 		FactsBlockDevices:       r.FactsBlockDevices,

@@ -291,6 +291,8 @@ func hostToAPI(r *modstore.HostRow) Host {
 	h.Spec.AssetTag = r.AssetTag
 	h.Spec.Timezone = r.Timezone
 	h.Spec.DefaultGateway = r.DefaultGateway
+	h.Spec.KernelCmdline = r.KernelCmdline
+	h.Spec.ClockSync = r.ClockSync
 	h.Spec.BootAt = r.BootAt
 	h.Spec.FactsReportedAt = r.FactsReportedAt
 	// Same round trip as CPUTrend above: agent JSON into jsonb and out
@@ -305,6 +307,25 @@ func hostToAPI(r *modstore.HostRow) Host {
 	}
 	if len(r.FactsBlockDevices) > 0 {
 		_ = json.Unmarshal(r.FactsBlockDevices, &h.Spec.BlockDevices)
+	}
+	if len(r.FactsSwaps) > 0 {
+		_ = json.Unmarshal(r.FactsSwaps, &h.Spec.Swaps)
+	}
+	if len(r.FactsCPUMitigations) > 0 {
+		_ = json.Unmarshal(r.FactsCPUMitigations, &h.Spec.CPUMitigations)
+	}
+	if len(r.FactsSSHHostKeys) > 0 {
+		_ = json.Unmarshal(r.FactsSSHHostKeys, &h.Spec.SSHHostKeys)
+	}
+	// Left nil when the object decodes to nothing, so a host that has not
+	// reported a resolver has no dns key at all rather than one holding
+	// two empty lists -- which the UI would have to tell apart from a
+	// machine that genuinely resolves nothing.
+	if len(r.FactsDNS) > 0 {
+		var dns HostDNS
+		if json.Unmarshal(r.FactsDNS, &dns) == nil && (len(dns.Servers) > 0 || len(dns.Search) > 0) {
+			h.Spec.DNS = &dns
+		}
 	}
 	return h
 }

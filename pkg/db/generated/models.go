@@ -84,6 +84,8 @@ type Host struct {
 	ChassisType       string    `json:"chassis_type"`
 	AssetTag          string    `json:"asset_tag"`
 	DefaultGateway    string    `json:"default_gateway"`
+	KernelCmdline     string    `json:"kernel_cmdline"`
+	ClockSync         string    `json:"clock_sync"`
 }
 
 type HostAccount struct {
@@ -161,11 +163,15 @@ type HostAlertState struct {
 }
 
 type HostFact struct {
-	HostID       int64           `json:"host_id"`
-	Nics         json.RawMessage `json:"nics"`
-	Filesystems  json.RawMessage `json:"filesystems"`
-	BlockDevices json.RawMessage `json:"block_devices"`
-	ReportedAt   time.Time       `json:"reported_at"`
+	HostID         int64           `json:"host_id"`
+	Nics           json.RawMessage `json:"nics"`
+	Filesystems    json.RawMessage `json:"filesystems"`
+	BlockDevices   json.RawMessage `json:"block_devices"`
+	ReportedAt     time.Time       `json:"reported_at"`
+	Swaps          json.RawMessage `json:"swaps"`
+	Dns            json.RawMessage `json:"dns"`
+	CpuMitigations json.RawMessage `json:"cpu_mitigations"`
+	SshHostKeys    json.RawMessage `json:"ssh_host_keys"`
 }
 
 type HostMetricsLatest struct {

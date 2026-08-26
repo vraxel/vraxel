@@ -164,7 +164,7 @@ func (q *Queries) DeleteHost(ctx context.Context, arg DeleteHostParams) (DeleteH
 }
 
 const getHostByID = `-- name: GetHostByID :one
-SELECT h.id, h.name, h.display_name, h.description, h.hostname, h.os, h.arch, h.cpu_cores, h.memory_mb, h.disk_gb, h.scope, h.workspace_id, h.namespace_id, h.status, h.status_message, h.ssh_port, h.agent_port, h.monitor_status, h.monitor_message, h.log_agent_status, h.log_agent_message, h.origin, h.connectivity_mode, h.reported_ips, h.reported_primary_ip, h.primary_ip_override, h.created_by, h.created_at, h.updated_at, h.virtualization, h.cpu_model, h.cpu_sockets, h.cpu_cores_per_socket, h.cpu_threads_per_core, h.kernel_version, h.system_vendor, h.product_name, h.bios_version, h.serial_number, h.timezone, h.os_id, h.os_version_id, h.bios_date, h.board_name, h.board_serial, h.chassis_type, h.asset_tag, h.default_gateway,
+SELECT h.id, h.name, h.display_name, h.description, h.hostname, h.os, h.arch, h.cpu_cores, h.memory_mb, h.disk_gb, h.scope, h.workspace_id, h.namespace_id, h.status, h.status_message, h.ssh_port, h.agent_port, h.monitor_status, h.monitor_message, h.log_agent_status, h.log_agent_message, h.origin, h.connectivity_mode, h.reported_ips, h.reported_primary_ip, h.primary_ip_override, h.created_by, h.created_at, h.updated_at, h.virtualization, h.cpu_model, h.cpu_sockets, h.cpu_cores_per_socket, h.cpu_threads_per_core, h.kernel_version, h.system_vendor, h.product_name, h.bios_version, h.serial_number, h.timezone, h.os_id, h.os_version_id, h.bios_date, h.board_name, h.board_serial, h.chassis_type, h.asset_tag, h.default_gateway, h.kernel_cmdline, h.clock_sync,
     COALESCE(NULLIF(u.display_name, ''), u.username, '') AS creator_name,
     COALESCE(NULLIF(w.display_name, ''), w.name, '') AS workspace_name,
     COALESCE(NULLIF(ns.display_name, ''), ns.name, '') AS namespace_name,
@@ -185,6 +185,10 @@ SELECT h.id, h.name, h.display_name, h.description, h.hostname, h.os, h.arch, h.
     f.nics           AS facts_nics,
     f.filesystems    AS facts_filesystems,
     f.block_devices  AS facts_block_devices,
+    f.swaps          AS facts_swaps,
+    f.dns            AS facts_dns,
+    f.cpu_mitigations AS facts_cpu_mitigations,
+    f.ssh_host_keys  AS facts_ssh_host_keys,
     f.reported_at    AS facts_reported_at,
     -- How many hosts were built from this host's disk image, this one
     -- included. 1 (or 0 for an agentless record) is the ordinary answer.
@@ -297,6 +301,8 @@ type GetHostByIDRow struct {
 	ChassisType             string          `json:"chassis_type"`
 	AssetTag                string          `json:"asset_tag"`
 	DefaultGateway          string          `json:"default_gateway"`
+	KernelCmdline           string          `json:"kernel_cmdline"`
+	ClockSync               string          `json:"clock_sync"`
 	CreatorName             string          `json:"creator_name"`
 	WorkspaceName           string          `json:"workspace_name"`
 	NamespaceName           string          `json:"namespace_name"`
@@ -312,6 +318,10 @@ type GetHostByIDRow struct {
 	FactsNics               json.RawMessage `json:"facts_nics"`
 	FactsFilesystems        json.RawMessage `json:"facts_filesystems"`
 	FactsBlockDevices       json.RawMessage `json:"facts_block_devices"`
+	FactsSwaps              json.RawMessage `json:"facts_swaps"`
+	FactsDns                json.RawMessage `json:"facts_dns"`
+	FactsCpuMitigations     json.RawMessage `json:"facts_cpu_mitigations"`
+	FactsSshHostKeys        json.RawMessage `json:"facts_ssh_host_keys"`
 	FactsReportedAt         *time.Time      `json:"facts_reported_at"`
 	ImageGroupSize          int64           `json:"image_group_size"`
 	MetricsSampledAt        *time.Time      `json:"metrics_sampled_at"`
@@ -383,6 +393,8 @@ func (q *Queries) GetHostByID(ctx context.Context, arg GetHostByIDParams) (GetHo
 		&i.ChassisType,
 		&i.AssetTag,
 		&i.DefaultGateway,
+		&i.KernelCmdline,
+		&i.ClockSync,
 		&i.CreatorName,
 		&i.WorkspaceName,
 		&i.NamespaceName,
@@ -398,6 +410,10 @@ func (q *Queries) GetHostByID(ctx context.Context, arg GetHostByIDParams) (GetHo
 		&i.FactsNics,
 		&i.FactsFilesystems,
 		&i.FactsBlockDevices,
+		&i.FactsSwaps,
+		&i.FactsDns,
+		&i.FactsCpuMitigations,
+		&i.FactsSshHostKeys,
 		&i.FactsReportedAt,
 		&i.ImageGroupSize,
 		&i.MetricsSampledAt,
@@ -440,7 +456,7 @@ func (q *Queries) HostScopeByID(ctx context.Context, id int64) (HostScopeByIDRow
 }
 
 const listHosts = `-- name: ListHosts :many
-SELECT h.id, h.name, h.display_name, h.description, h.hostname, h.os, h.arch, h.cpu_cores, h.memory_mb, h.disk_gb, h.scope, h.workspace_id, h.namespace_id, h.status, h.status_message, h.ssh_port, h.agent_port, h.monitor_status, h.monitor_message, h.log_agent_status, h.log_agent_message, h.origin, h.connectivity_mode, h.reported_ips, h.reported_primary_ip, h.primary_ip_override, h.created_by, h.created_at, h.updated_at, h.virtualization, h.cpu_model, h.cpu_sockets, h.cpu_cores_per_socket, h.cpu_threads_per_core, h.kernel_version, h.system_vendor, h.product_name, h.bios_version, h.serial_number, h.timezone, h.os_id, h.os_version_id, h.bios_date, h.board_name, h.board_serial, h.chassis_type, h.asset_tag, h.default_gateway,
+SELECT h.id, h.name, h.display_name, h.description, h.hostname, h.os, h.arch, h.cpu_cores, h.memory_mb, h.disk_gb, h.scope, h.workspace_id, h.namespace_id, h.status, h.status_message, h.ssh_port, h.agent_port, h.monitor_status, h.monitor_message, h.log_agent_status, h.log_agent_message, h.origin, h.connectivity_mode, h.reported_ips, h.reported_primary_ip, h.primary_ip_override, h.created_by, h.created_at, h.updated_at, h.virtualization, h.cpu_model, h.cpu_sockets, h.cpu_cores_per_socket, h.cpu_threads_per_core, h.kernel_version, h.system_vendor, h.product_name, h.bios_version, h.serial_number, h.timezone, h.os_id, h.os_version_id, h.bios_date, h.board_name, h.board_serial, h.chassis_type, h.asset_tag, h.default_gateway, h.kernel_cmdline, h.clock_sync,
     COALESCE(NULLIF(u.display_name, ''), u.username, '') AS creator_name,
     COALESCE(NULLIF(w.display_name, ''), w.name, '') AS workspace_name,
     COALESCE(NULLIF(ns.display_name, ''), ns.name, '') AS namespace_name,
@@ -623,6 +639,8 @@ type ListHostsRow struct {
 	ChassisType             string          `json:"chassis_type"`
 	AssetTag                string          `json:"asset_tag"`
 	DefaultGateway          string          `json:"default_gateway"`
+	KernelCmdline           string          `json:"kernel_cmdline"`
+	ClockSync               string          `json:"clock_sync"`
 	CreatorName             string          `json:"creator_name"`
 	WorkspaceName           string          `json:"workspace_name"`
 	NamespaceName           string          `json:"namespace_name"`
@@ -720,6 +738,8 @@ func (q *Queries) ListHosts(ctx context.Context, arg ListHostsParams) ([]ListHos
 			&i.ChassisType,
 			&i.AssetTag,
 			&i.DefaultGateway,
+			&i.KernelCmdline,
+			&i.ClockSync,
 			&i.CreatorName,
 			&i.WorkspaceName,
 			&i.NamespaceName,

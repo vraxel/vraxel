@@ -348,3 +348,57 @@ func unescapeMount(s string) string {
 	}
 	return b.String()
 }
+
+// parseSwaps reads /proc/swaps.
+//
+// Sizes are in KIBIBYTES, not the 4K pages the file's neighbours in
+// /proc use -- the header says "Size" and the unit is kB, which is the
+// one thing about this file worth writing down. The Used column is
+// deliberately not read: it changes every sample, and this rides a
+// report sent only when its content changes.
+func parseSwaps(data []byte) []agenttypes.Swap {
+	var out []agenttypes.Swap
+	sc := bufio.NewScanner(bytes.NewReader(data))
+	for sc.Scan() {
+		f := strings.Fields(sc.Text())
+		// Filename Type Size Used Priority
+		if len(f) < 5 || f[0] == "Filename" {
+			continue
+		}
+		kb, err := strconv.ParseInt(f[2], 10, 64)
+		if err != nil {
+			continue
+		}
+		prio, _ := strconv.ParseInt(f[4], 10, 32)
+		out = append(out, agenttypes.Swap{
+			Device: f[0], Kind: f[1], SizeBytes: kb * 1024, Priority: int32(prio),
+		})
+	}
+	return out
+}
+
+// parseResolvConf reads the nameserver and search lines of a resolv.conf.
+//
+// "domain" is folded into search: it is the single-entry spelling of the
+// same thing, the two are mutually exclusive, and an operator asking what
+// this host appends to a short name does not care which keyword wrote it.
+func parseResolvConf(data []byte) (servers, search []string) {
+	sc := bufio.NewScanner(bytes.NewReader(data))
+	for sc.Scan() {
+		line := sc.Text()
+		if i := strings.IndexAny(line, "#;"); i >= 0 {
+			line = line[:i]
+		}
+		f := strings.Fields(line)
+		if len(f) < 2 {
+			continue
+		}
+		switch f[0] {
+		case "nameserver":
+			servers = append(servers, f[1])
+		case "search", "domain":
+			search = append(search, f[1:]...)
+		}
+	}
+	return servers, search
+}
