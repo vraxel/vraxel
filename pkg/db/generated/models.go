@@ -94,6 +94,7 @@ type HostAccount struct {
 	Groups     json.RawMessage `json:"groups"`
 	SudoRules  json.RawMessage `json:"sudo_rules"`
 	ReportedAt time.Time       `json:"reported_at"`
+	Sshd       json.RawMessage `json:"sshd"`
 }
 
 type HostAgent struct {

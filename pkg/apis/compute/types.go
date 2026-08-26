@@ -561,8 +561,44 @@ type HostAccounts struct {
 	// includes. Unparsed on purpose: sudo's grammar is real, and a parser
 	// that half-understands it gives a confident wrong answer about the
 	// one account that matters.
-	SudoRules  []string   `json:"sudoRules,omitempty"`
-	ReportedAt *time.Time `json:"reportedAt,omitempty"`
+	SudoRules []string `json:"sudoRules,omitempty"`
+	// SSHD is the daemon's side of the same question. The lists above say
+	// which accounts exist and what they hold; this says which of them
+	// can actually come in over ssh, and how. Absent when sshd is not
+	// installed or would not answer.
+	SSHD       *HostSSHDConfig `json:"sshd,omitempty"`
+	ReportedAt *time.Time      `json:"reportedAt,omitempty"`
+}
+
+// HostSSHDConfig is the ssh daemon's effective configuration.
+// +openapi:description=sshd 生效配置：由 sshd -T 计算，不含 Match 块的条件覆盖。
+type HostSSHDConfig struct {
+	// Ports is every port the daemon listens on.
+	Ports []int32 `json:"ports,omitempty"`
+	// PermitRootLogin has four values, not two: "prohibit-password" is
+	// the common hardened setting and is neither yes nor no.
+	PermitRootLogin string `json:"permitRootLogin,omitempty"`
+	PasswordAuth    bool   `json:"passwordAuth"`
+	// KbdInteractiveAuth is the other password path, through PAM.
+	// Reported beside PasswordAuth because turning that one off and
+	// leaving this one on is a machine that still takes passwords while
+	// its configuration reads as though it does not.
+	KbdInteractiveAuth   bool  `json:"kbdInteractiveAuth"`
+	PubkeyAuth           bool  `json:"pubkeyAuth"`
+	PermitEmptyPasswords bool  `json:"permitEmptyPasswords"`
+	MaxAuthTries         int32 `json:"maxAuthTries,omitempty"`
+	// The four access lists, empty when unset -- which means no
+	// restriction, not an empty allowlist.
+	AllowUsers  []string `json:"allowUsers,omitempty"`
+	AllowGroups []string `json:"allowGroups,omitempty"`
+	DenyUsers   []string `json:"denyUsers,omitempty"`
+	DenyGroups  []string `json:"denyGroups,omitempty"`
+	// MatchBlocks counts the conditional blocks in the configuration.
+	// Everything above is the GLOBAL answer: sshd -T does not evaluate
+	// Match, so a host with conditional overrides has exceptions this
+	// summary does not describe. Counting them says so without inventing
+	// a wrong one.
+	MatchBlocks int32 `json:"matchBlocks,omitempty"`
 }
 
 func (h *HostAccounts) GetTypeMeta() *runtime.TypeMeta { return &h.TypeMeta }

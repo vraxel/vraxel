@@ -116,3 +116,17 @@ func TestAccountCarriesNoSecret(t *testing.T) {
 		}
 	}
 }
+
+// A nil *T inside an any is NOT equal to nil, so an untyped version of
+// marshalObject would write "null" into a jsonb column whose empty value
+// is {} -- the one value it exists to keep out.
+func TestMarshalObjectNilPointer(t *testing.T) {
+	var missing *agenttypes.SSHDConfig
+	if got := string(marshalObject(missing)); got != "{}" {
+		t.Errorf("nil pointer encoded as %q, want {}", got)
+	}
+	present := &agenttypes.SSHDConfig{PermitRootLogin: "prohibit-password"}
+	if got := string(marshalObject(present)); !strings.Contains(got, `"permitRootLogin":"prohibit-password"`) {
+		t.Errorf("encoded as %q", got)
+	}
+}

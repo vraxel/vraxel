@@ -123,6 +123,9 @@ type HostAccounts struct {
 	// field, which is unambiguous, and it lands in Account.Privileges. The
 	// rest is put in front of a human unaltered.
 	SudoRules []string `json:"sudoRules,omitempty"`
+	// SSHD is the daemon's side of the same question: the accounts above
+	// exist, and this says which of them can actually get in.
+	SSHD *SSHDConfig `json:"sshd,omitempty"`
 }
 
 // Account is one entry of /etc/passwd, with what the machine knows about
@@ -174,6 +177,54 @@ type Account struct {
 	// Zero means never logged in, which for a service account is the
 	// expected answer and for a person's account is a finding.
 	LastLoginAtMs int64 `json:"lastLoginAtMs,omitempty"`
+}
+
+// SSHDConfig is the ssh daemon's EFFECTIVE configuration: the settings
+// that decide who can reach this machine and how.
+//
+// The account inventory beside it answers half the question -- root has a
+// password, this user has keys -- and this answers the other half.
+// Neither is a finding alone: root having a password matters only if the
+// daemon accepts passwords and permits root, and those two live here.
+//
+// Read from `sshd -T` and not from sshd_config. The file is not the
+// configuration: Include pulls in a directory, compiled-in defaults fill
+// what nobody wrote, and only sshd knows which is which. A hand parse
+// would produce a confident wrong answer about who can log in.
+type SSHDConfig struct {
+	// Ports is every port the daemon listens on. A list because sshd -T
+	// prints one line per Port directive, and a machine reachable on 22
+	// and 2222 described as "22" is an answer somebody would act on.
+	Ports           []int32 `json:"ports,omitempty"`
+	PermitRootLogin string  `json:"permitRootLogin,omitempty"`
+	PasswordAuth    bool    `json:"passwordAuth"`
+	// KbdInteractiveAuth is the OTHER password path, through PAM.
+	// Reported beside PasswordAuth because turning that one off and
+	// leaving this one on is a machine that still takes passwords while
+	// its configuration looks like it does not.
+	KbdInteractiveAuth   bool  `json:"kbdInteractiveAuth"`
+	PubkeyAuth           bool  `json:"pubkeyAuth"`
+	PermitEmptyPasswords bool  `json:"permitEmptyPasswords"`
+	MaxAuthTries         int32 `json:"maxAuthTries,omitempty"`
+	// The four access lists, empty when unset -- sshd -T prints them only
+	// when configured, and "unset" means no restriction rather than an
+	// empty allowlist. Together with the account inventory they answer
+	// "of the accounts that exist, which can actually come in over ssh".
+	AllowUsers  []string `json:"allowUsers,omitempty"`
+	AllowGroups []string `json:"allowGroups,omitempty"`
+	DenyUsers   []string `json:"denyUsers,omitempty"`
+	DenyGroups  []string `json:"denyGroups,omitempty"`
+	// MatchBlocks counts the conditional blocks in the configuration, and
+	// exists because everything above it is the GLOBAL answer.
+	//
+	// `sshd -T` without -C does not evaluate Match, so a host with
+	// "PasswordAuthentication no" globally and a Match block turning it
+	// back on for one group reports "no" here. Evaluating them would mean
+	// choosing a user and address to evaluate them FOR, and any choice
+	// would be an answer to a question nobody asked. Counting them is the
+	// honest middle: the reader is told this summary has exceptions
+	// without being told a wrong one.
+	MatchBlocks int32 `json:"matchBlocks,omitempty"`
 }
 
 // UserGroup is one entry of /etc/group.

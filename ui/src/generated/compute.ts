@@ -694,7 +694,56 @@ export interface HostAccounts {
    * one account that matters.
    */
   sudoRules?: string[];
+  /**
+   * SSHD is the daemon's side of the same question. The lists above say
+   * which accounts exist and what they hold; this says which of them
+   * can actually come in over ssh, and how. Absent when sshd is not
+   * installed or would not answer.
+   */
+  sshd?: HostSSHDConfig;
   reportedAt?: string;
+}
+/**
+ * HostSSHDConfig is the ssh daemon's effective configuration.
+ * +openapi:description=sshd 生效配置：由 sshd -T 计算，不含 Match 块的条件覆盖。
+ */
+export interface HostSSHDConfig {
+  /**
+   * Ports is every port the daemon listens on.
+   */
+  ports?: number /* int32 */[];
+  /**
+   * PermitRootLogin has four values, not two: "prohibit-password" is
+   * the common hardened setting and is neither yes nor no.
+   */
+  permitRootLogin?: string;
+  passwordAuth: boolean;
+  /**
+   * KbdInteractiveAuth is the other password path, through PAM.
+   * Reported beside PasswordAuth because turning that one off and
+   * leaving this one on is a machine that still takes passwords while
+   * its configuration reads as though it does not.
+   */
+  kbdInteractiveAuth: boolean;
+  pubkeyAuth: boolean;
+  permitEmptyPasswords: boolean;
+  maxAuthTries?: number /* int32 */;
+  /**
+   * The four access lists, empty when unset -- which means no
+   * restriction, not an empty allowlist.
+   */
+  allowUsers?: string[];
+  allowGroups?: string[];
+  denyUsers?: string[];
+  denyGroups?: string[];
+  /**
+   * MatchBlocks counts the conditional blocks in the configuration.
+   * Everything above is the GLOBAL answer: sshd -T does not evaluate
+   * Match, so a host with conditional overrides has exceptions this
+   * summary does not describe. Counting them says so without inventing
+   * a wrong one.
+   */
+  matchBlocks?: number /* int32 */;
 }
 /**
  * HostAccount is one local account.

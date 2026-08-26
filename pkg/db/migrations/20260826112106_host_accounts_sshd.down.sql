@@ -1,0 +1,1 @@
+ALTER TABLE host_accounts DROP COLUMN IF EXISTS sshd;

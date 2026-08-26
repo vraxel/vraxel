@@ -140,6 +140,8 @@ type AccountsInput struct {
 	Users     []byte
 	Groups    []byte
 	SudoRules []byte
+	// SSHD is an object, so its empty value is {} and not [].
+	SSHD []byte
 }
 
 // BindInput is one machine claiming one host row.
