@@ -30,6 +30,8 @@ tags:
     description: systemd 服务单元：开机自启配置与当前运行状态。
   - name: HostAccounts
     description: 主机账号：可登录的用户、用户组与提权面
+  - name: HostSSHDConfig
+    description: sshd 生效配置：由 sshd -T 计算，不含 Match 块的条件覆盖。
   - name: User
     description: 用户管理：平台用户的增删改查，支持密码设置与修改。用户可被添加为租户或项目的成员。
   - name: Workspace
@@ -4288,6 +4290,8 @@ components:
         reportedAt:
           type: string
           format: date-time
+        sshd:
+          $ref: '#/components/schemas/HostSSHDConfig'
         sudoRules:
           type: array
           items:
@@ -4468,6 +4472,46 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/HostSystemdUnit'
+    HostSSHDConfig:
+      type: object
+      properties:
+        allowGroups:
+          type: array
+          items:
+            type: string
+        allowUsers:
+          type: array
+          items:
+            type: string
+        denyGroups:
+          type: array
+          items:
+            type: string
+        denyUsers:
+          type: array
+          items:
+            type: string
+        kbdInteractiveAuth:
+          type: boolean
+        matchBlocks:
+          type: integer
+          format: int32
+        maxAuthTries:
+          type: integer
+          format: int32
+        passwordAuth:
+          type: boolean
+        permitEmptyPasswords:
+          type: boolean
+        permitRootLogin:
+          type: string
+        ports:
+          type: array
+          items:
+            type: integer
+            format: int32
+        pubkeyAuth:
+          type: boolean
     HostSpec:
       type: object
       properties:
@@ -5313,6 +5357,7 @@ x-tagGroups:
       - HostProcesses
       - HostSystemdUnit
       - HostAccounts
+      - HostSSHDConfig
   - name: iam
     tags:
       - User

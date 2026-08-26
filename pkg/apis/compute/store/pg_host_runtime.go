@@ -32,9 +32,11 @@ type HostProcessesRow struct {
 
 // HostAccountsRow is one host's account inventory, on the same terms.
 type HostAccountsRow struct {
-	Users      []byte
-	Groups     []byte
-	SudoRules  []byte
+	Users     []byte
+	Groups    []byte
+	SudoRules []byte
+	// SSHD decides which of the accounts above can actually get in.
+	SSHD       []byte
 	ReportedAt time.Time
 }
 
@@ -94,6 +96,7 @@ func (s *pgHostRuntimeStore) GetAccounts(ctx context.Context, hostID int64, sf s
 		Users:      row.Users,
 		Groups:     row.Groups,
 		SudoRules:  row.SudoRules,
+		SSHD:       row.Sshd,
 		ReportedAt: row.ReportedAt,
 	}, nil
 }

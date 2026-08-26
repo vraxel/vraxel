@@ -37,7 +37,7 @@ func Accounts() agenttypes.HostAccounts {
 
 	accounts, groups := buildAccounts(users, groups, shadow, who, authorizedKeys,
 		func(uid int64) int64 { return logins[uid] })
-	return agenttypes.HostAccounts{Users: accounts, Groups: groups, SudoRules: rules}
+	return agenttypes.HostAccounts{Users: accounts, Groups: groups, SudoRules: rules, SSHD: sshdConfig()}
 }
 
 // sudoersFiles reads /etc/sudoers and every file it includes.

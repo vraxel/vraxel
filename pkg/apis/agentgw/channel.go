@@ -501,10 +501,30 @@ func (h *protocolHandler) recordAccounts(ctx context.Context, sess *Session, a *
 		Users:     marshalList(a.Users),
 		Groups:    marshalList(a.Groups),
 		SudoRules: marshalList(a.SudoRules),
+		SSHD:      marshalObject(a.SSHD),
 	}
 	if err := h.agents.UpsertAccounts(ctx, sess.HostID, in); err != nil {
 		logger.Warnf("agentgw: record accounts for host %d: %v", sess.HostID, err)
 	}
+}
+
+// marshalObject encodes one optional inventory object, rendering a
+// missing one as {} rather than as JSON null -- valid jsonb, but a second
+// spelling of "nothing here" every reader would have to know.
+//
+// Generic over the pointer rather than taking any, because a nil *T
+// stored in an any is not equal to nil: the check would pass, Marshal
+// would write "null", and the column would hold the one value this
+// function exists to keep out of it.
+func marshalObject[T any](v *T) []byte {
+	if v == nil {
+		return []byte("{}")
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return []byte("{}")
+	}
+	return b
 }
 
 // marshalList encodes one inventory list, rendering an empty or

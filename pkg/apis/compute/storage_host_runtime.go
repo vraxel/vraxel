@@ -192,6 +192,19 @@ func (o hostRuntimeOps) accounts(ctx apiserver.Ctx) (*HostAccounts, error) {
 	_ = json.Unmarshal(row.Users, &out.Users)
 	_ = json.Unmarshal(row.Groups, &out.Groups)
 	_ = json.Unmarshal(row.SudoRules, &out.SudoRules)
+	// Left nil when the object holds nothing, so a host whose sshd never
+	// answered has no sshd key at all rather than one full of zero
+	// values -- which would read as a daemon that permits nothing.
+	if len(row.SSHD) > 0 {
+		var cfg HostSSHDConfig
+		// Ports is the emptiness test because sshd -T always prints at
+		// least one port line -- verified against a real daemon -- so its
+		// absence means the object is the "{}" a host writes when its
+		// sshd never answered, not a daemon with nothing to say.
+		if json.Unmarshal(row.SSHD, &cfg) == nil && len(cfg.Ports) > 0 {
+			out.SSHD = &cfg
+		}
+	}
 	out.ReportedAt = &row.ReportedAt
 	return out, nil
 }

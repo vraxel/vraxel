@@ -1,3 +1,4 @@
+import type { ReactNode } from "react"
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card"
@@ -18,6 +19,7 @@ import type {
   HostAccount,
   HostListenPort,
   HostProcessGroup,
+  HostSSHDConfig,
   HostSystemdUnit,
 } from "@/generated/compute"
 
@@ -425,6 +427,7 @@ export function HostAccountsTab({ host, scope }: { host: Host; scope: ScopeRef }
   const users = query.data?.users ?? []
   const groups = query.data?.groups ?? []
   const sudoRules = query.data?.sudoRules ?? []
+  const sshd = query.data?.sshd
 
   if (query.isPending) return <TableSkeleton rows={8} />
   if (query.isError) {
@@ -444,6 +447,12 @@ export function HostAccountsTab({ host, scope }: { host: Host; scope: ScopeRef }
 
   return (
     <div className="space-y-4">
+      {/* Above the tabs, not inside one. The lists below say which
+          accounts exist and what they hold; this says which of them can
+          actually get in, and neither half is a finding without the
+          other -- root having a password matters only if the daemon
+          permits root and takes passwords. */}
+      {sshd && <SSHDCard cfg={sshd} />}
       <Tabs defaultValue="users">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <TabsList>
@@ -472,6 +481,122 @@ export function HostAccountsTab({ host, scope }: { host: Host; scope: ScopeRef }
           <SudoRules rules={sudoRules} />
         </TabsContent>
       </Tabs>
+    </div>
+  )
+}
+
+/**
+ * The ssh daemon's effective configuration.
+ *
+ * Colour only where a setting widens who can get in: password
+ * authentication and root login are the two halves of the path an
+ * account inventory cannot show on its own. Everything else is printed
+ * plain -- a page where six things are highlighted has highlighted
+ * nothing.
+ */
+function SSHDCard({ cfg }: { cfg: HostSSHDConfig }) {
+  const { t } = useTranslation()
+  // prohibit-password and forced-commands-only are hardened settings, not
+  // findings; only a plain "yes" opens the door.
+  const rootOpen = cfg.permitRootLogin === "yes"
+  // Two doors, and closing one while leaving the other open is the
+  // configuration that reads as safe and is not.
+  const passwords = cfg.passwordAuth || cfg.kbdInteractiveAuth
+  const restricted = [
+    ...(cfg.allowUsers ?? []),
+    ...(cfg.allowGroups ?? []),
+    ...(cfg.denyUsers ?? []),
+    ...(cfg.denyGroups ?? []),
+  ]
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle className="text-base">{t("compute.host.sshd")}</CardTitle>
+          {/* Said once, plainly: everything on this card is the global
+              answer, and sshd -T does not evaluate Match. */}
+          {(cfg.matchBlocks ?? 0) > 0 && (
+            <span className="text-muted-foreground text-xs">
+              {t("compute.host.sshd.matchNote", { count: cfg.matchBlocks ?? 0 })}
+            </span>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-3 lg:grid-cols-4">
+          <SSHDField label={t("compute.host.sshd.port")} value={cfg.ports?.join(", ")} mono />
+          <SSHDField
+            label={t("compute.host.sshd.rootLogin")}
+            value={cfg.permitRootLogin}
+            warn={rootOpen}
+          />
+          <SSHDField
+            label={t("compute.host.sshd.password")}
+            value={
+              cfg.passwordAuth
+                ? t("compute.host.sshd.on")
+                : cfg.kbdInteractiveAuth
+                  ? t("compute.host.sshd.viaPam")
+                  : t("compute.host.sshd.off")
+            }
+            warn={passwords}
+          />
+          <SSHDField
+            label={t("compute.host.sshd.pubkey")}
+            value={cfg.pubkeyAuth ? t("compute.host.sshd.on") : t("compute.host.sshd.off")}
+          />
+          <SSHDField
+            label={t("compute.host.sshd.emptyPassword")}
+            value={
+              cfg.permitEmptyPasswords ? t("compute.host.sshd.on") : t("compute.host.sshd.off")
+            }
+            warn={cfg.permitEmptyPasswords}
+          />
+          <SSHDField label={t("compute.host.sshd.maxAuthTries")} value={cfg.maxAuthTries} />
+          {restricted.length > 0 && (
+            <SSHDField
+              label={t("compute.host.sshd.access")}
+              wide
+              value={
+                <div className="space-y-0.5 text-xs">
+                  {(["allowUsers", "allowGroups", "denyUsers", "denyGroups"] as const).map((k) =>
+                    (cfg[k] ?? []).length > 0 ? (
+                      <div key={k} className="font-mono">
+                        <span className="text-muted-foreground">{k}</span> {cfg[k]?.join(" ")}
+                      </div>
+                    ) : null,
+                  )}
+                </div>
+              }
+            />
+          )}
+        </dl>
+      </CardContent>
+    </Card>
+  )
+}
+
+function SSHDField({
+  label,
+  value,
+  warn,
+  mono,
+  wide,
+}: {
+  label: string
+  value?: ReactNode
+  warn?: boolean
+  mono?: boolean
+  wide?: boolean
+}) {
+  const empty = value === undefined || value === null || value === ""
+  return (
+    <div className={`min-w-0 ${wide ? "col-span-2 lg:col-span-4" : ""}`}>
+      <dt className="text-muted-foreground text-xs">{label}</dt>
+      <dd className={`${mono ? "font-mono text-xs" : "text-sm"} ${warn ? "text-warning" : ""}`}>
+        {empty ? <span className="text-muted-foreground">-</span> : value}
+      </dd>
     </div>
   )
 }

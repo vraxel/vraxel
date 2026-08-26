@@ -10,12 +10,13 @@ ON CONFLICT (host_id) DO UPDATE SET
     reported_at = EXCLUDED.reported_at;
 
 -- name: UpsertHostAccounts :exec
-INSERT INTO host_accounts (host_id, users, groups, sudo_rules, reported_at)
-VALUES (@host_id, @users, @groups, @sudo_rules, now())
+INSERT INTO host_accounts (host_id, users, groups, sudo_rules, sshd, reported_at)
+VALUES (@host_id, @users, @groups, @sudo_rules, @sshd, now())
 ON CONFLICT (host_id) DO UPDATE SET
     users       = EXCLUDED.users,
     groups      = EXCLUDED.groups,
     sudo_rules  = EXCLUDED.sudo_rules,
+    sshd        = EXCLUDED.sshd,
     reported_at = EXCLUDED.reported_at;
 
 -- name: GetHostProcesses :one
@@ -31,7 +32,7 @@ WHERE p.host_id = @host_id
   AND (sqlc.narg('namespace_id_filter')::BIGINT IS NULL OR h.namespace_id IS NOT DISTINCT FROM sqlc.narg('namespace_id_filter')::BIGINT);
 
 -- name: GetHostAccounts :one
-SELECT a.users, a.groups, a.sudo_rules, a.reported_at
+SELECT a.users, a.groups, a.sudo_rules, a.sshd, a.reported_at
 FROM host_accounts a
 JOIN hosts h ON h.id = a.host_id
 WHERE a.host_id = @host_id

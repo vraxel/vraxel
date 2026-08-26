@@ -12,7 +12,7 @@ import (
 )
 
 const getHostAccounts = `-- name: GetHostAccounts :one
-SELECT a.users, a.groups, a.sudo_rules, a.reported_at
+SELECT a.users, a.groups, a.sudo_rules, a.sshd, a.reported_at
 FROM host_accounts a
 JOIN hosts h ON h.id = a.host_id
 WHERE a.host_id = $1
@@ -30,6 +30,7 @@ type GetHostAccountsRow struct {
 	Users      json.RawMessage `json:"users"`
 	Groups     json.RawMessage `json:"groups"`
 	SudoRules  json.RawMessage `json:"sudo_rules"`
+	Sshd       json.RawMessage `json:"sshd"`
 	ReportedAt time.Time       `json:"reported_at"`
 }
 
@@ -40,6 +41,7 @@ func (q *Queries) GetHostAccounts(ctx context.Context, arg GetHostAccountsParams
 		&i.Users,
 		&i.Groups,
 		&i.SudoRules,
+		&i.Sshd,
 		&i.ReportedAt,
 	)
 	return i, err
@@ -78,12 +80,13 @@ func (q *Queries) GetHostProcesses(ctx context.Context, arg GetHostProcessesPara
 }
 
 const upsertHostAccounts = `-- name: UpsertHostAccounts :exec
-INSERT INTO host_accounts (host_id, users, groups, sudo_rules, reported_at)
-VALUES ($1, $2, $3, $4, now())
+INSERT INTO host_accounts (host_id, users, groups, sudo_rules, sshd, reported_at)
+VALUES ($1, $2, $3, $4, $5, now())
 ON CONFLICT (host_id) DO UPDATE SET
     users       = EXCLUDED.users,
     groups      = EXCLUDED.groups,
     sudo_rules  = EXCLUDED.sudo_rules,
+    sshd        = EXCLUDED.sshd,
     reported_at = EXCLUDED.reported_at
 `
 
@@ -92,6 +95,7 @@ type UpsertHostAccountsParams struct {
 	Users     json.RawMessage `json:"users"`
 	Groups    json.RawMessage `json:"groups"`
 	SudoRules json.RawMessage `json:"sudo_rules"`
+	Sshd      json.RawMessage `json:"sshd"`
 }
 
 func (q *Queries) UpsertHostAccounts(ctx context.Context, arg UpsertHostAccountsParams) error {
@@ -100,6 +104,7 @@ func (q *Queries) UpsertHostAccounts(ctx context.Context, arg UpsertHostAccounts
 		arg.Users,
 		arg.Groups,
 		arg.SudoRules,
+		arg.Sshd,
 	)
 	return err
 }

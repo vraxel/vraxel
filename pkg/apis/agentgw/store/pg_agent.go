@@ -459,6 +459,7 @@ func (s *pgAgentStore) UpsertAccounts(ctx context.Context, hostID int64, in Acco
 		Users:     emptyArray(in.Users),
 		Groups:    emptyArray(in.Groups),
 		SudoRules: emptyArray(in.SudoRules),
+		Sshd:      emptyObject(in.SSHD),
 	})
 	if err != nil {
 		return fmt.Errorf("upsert host accounts: %w", err)
