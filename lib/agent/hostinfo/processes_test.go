@@ -3,6 +3,7 @@ package hostinfo
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	agenttypes "vraxel.io/vraxel/lib/agent/types"
 )
@@ -246,15 +247,45 @@ func TestCPUPercent(t *testing.T) {
 	}
 }
 
-// The window length is a resolution decision, and getting it wrong is
+// The sampling step is a resolution decision, and getting it wrong is
 // invisible: the column still renders, it just quantises every reading to
-// a multiple of 10ms/window. At the 250ms this shipped with, that was 4%
-// -- every workload under 4% of a core read exactly 0.0%.
-func TestCPUPercentResolution(t *testing.T) {
-	oneTick := func(window float64) float64 {
-		return cpuPercent(map[int64]int64{1: 0}, map[int64]int64{1: 1}, window)[1]
+// a multiple of 10ms/step. At the 250ms on-demand window this replaced
+// that was 4% -- every workload under 4% of a core read exactly 0.0% and
+// the rest landed on multiples of four.
+func TestCPUSampleStepResolution(t *testing.T) {
+	oneTick := cpuPercent(map[int64]int64{1: 0}, map[int64]int64{1: 1}, cpuSampleStep.Seconds())[1]
+	if oneTick > 0.5 {
+		t.Errorf("smallest non-zero cpu reading is %.2f%%, want <= 0.5%%", oneTick)
 	}
-	if got := oneTick(statsSampleWindow.Seconds()); got > 1.0 {
-		t.Errorf("smallest non-zero cpu reading is %.1f%%, want <= 1%%", got)
+}
+
+func TestCPUSamplerRounds(t *testing.T) {
+	s := NewCPUSampler()
+	t0 := time.Unix(1700000000, 0)
+
+	// One reading of a counter is not a rate, and reporting zero for
+	// everything would be indistinguishable from an idle machine.
+	s.observe(map[int64]int64{1: 100}, t0)
+	if s.pct != nil {
+		t.Fatalf("reported %v after one round, want nothing", s.pct)
+	}
+
+	// Divided by the gap that actually elapsed, not by cpuSampleStep: a
+	// ticker promises a cadence, and a loaded machine misses ticks.
+	s.observe(map[int64]int64{1: 400}, t0.Add(30*time.Second))
+	if got := s.pct[1]; got != 10 {
+		t.Errorf("cpu = %v%%, want 10%% (300 ticks over 30s)", got)
+	}
+
+	// An empty reading is a failed /proc walk, not an idle machine. It
+	// must not become the baseline, or the next round divides a whole
+	// lifetime by one step.
+	s.observe(nil, t0.Add(45*time.Second))
+	if got := s.pct[1]; got != 10 {
+		t.Errorf("cpu = %v%% after an empty reading, want the last good 10%%", got)
+	}
+	s.observe(map[int64]int64{1: 550}, t0.Add(60*time.Second))
+	if got := s.pct[1]; got != 5 {
+		t.Errorf("cpu = %v%%, want 5%% (150 ticks over the 30s since the last good reading)", got)
 	}
 }

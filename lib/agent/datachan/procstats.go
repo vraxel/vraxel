@@ -13,10 +13,12 @@ import (
 // using". Declared here rather than importing the collector, so the data
 // channel stays wiring-agnostic the way it is for Metrics and Shell.
 type ProcessStatsQuerier interface {
-	// Live samples cpu over a window, so it BLOCKS for about a second.
-	// That is why it rides the data channel and not the control channel:
-	// a control frame handler that sleeps would stall every other frame
-	// behind it.
+	// Live walks /proc, so it costs tens of milliseconds. That is why it
+	// rides the data channel and not the control channel: a control frame
+	// handler doing that much work would stall every other frame behind
+	// it. The cpu percentages themselves are already measured -- the
+	// implementation samples in the background, so nothing here waits for
+	// a window to close.
 	Live() agenttypes.HostProcesses
 }
 

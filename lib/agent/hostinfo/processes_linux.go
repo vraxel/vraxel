@@ -12,45 +12,6 @@ import (
 	agenttypes "vraxel.io/vraxel/lib/agent/types"
 )
 
-// Processes collects the machine's workload.
-//
-// Two passes over /proc, in this order because the second needs the
-// first: read the listening sockets to get their inode numbers, then walk
-// the processes, and while walking match each one's open sockets against
-// that set. There is no reverse index in the kernel's text interfaces --
-// a socket knows its inode and a process knows its file descriptors, and
-// /proc/pid/fd is the only place the two meet.
-func Processes() agenttypes.HostProcesses {
-	return collectProcesses(nil)
-}
-
-// ProcessesLive is Processes plus what each workload is USING right now.
-//
-// Separate entry point rather than a flag on Processes, because the two
-// answers have opposite contracts: this one is measured on demand while
-// somebody watches, and the other is an inventory compared against the
-// last one sent. A single function returning both would put a
-// per-sample-varying number in the frame that must not vary per sample.
-//
-// Both ends of the window are CHEAP passes and the expensive inventory
-// walk runs after the second one. That ordering is the point: the walk
-// costs tens of milliseconds of cpu, and doing it inside the window
-// charged that cost to the agent's own row -- vr-agent read 16% on an
-// idle machine, nearly all of it the measurement measuring itself.
-func ProcessesLive() agenttypes.HostProcesses {
-	start := time.Now()
-	first := sampleJiffies()
-	time.Sleep(statsSampleWindow)
-	// Both passes walk /proc in the same order doing the same work per
-	// entry, so the gap between the two readings of any one pid is the gap
-	// between the two passes' starts, which is what this measures.
-	// Measured rather than assumed equal to statsSampleWindow: Sleep
-	// promises a floor, not a value, and a loaded machine overshoots it.
-	elapsed := time.Since(start).Seconds()
-	second := sampleJiffies()
-	return collectProcesses(cpuPercent(first, second, elapsed))
-}
-
 // sampleJiffies reads every process's cpu counter. Deliberately the only
 // thing it reads: it bounds the measurement window, so anything else done
 // here would land inside every process's own reading.
