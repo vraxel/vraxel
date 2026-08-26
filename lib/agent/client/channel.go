@@ -79,6 +79,14 @@ const (
 	accountsUsersBudget  = 32 * 1024
 	accountsGroupsBudget = 8 * 1024
 	accountsRulesBudget  = 8 * 1024
+	// The sshd summary rides the same frame. All of it is fixed-size
+	// except the four access lists, and those are the only part a
+	// configuration can make arbitrarily long -- AllowUsers takes as many
+	// names as somebody types. Small on purpose: the three budgets above
+	// already add up to inventoryBudget, so this comes out of the
+	// envelope headroom, and an access list nobody can read on a screen
+	// is not worth the whole report being refused.
+	accountsSSHDListBudget = 1024
 )
 
 // bootNonce identifies this agent process for the lifetime of the
@@ -449,6 +457,7 @@ func (c *Channel) accountsLoop(ctx context.Context, send SendFunc) {
 			a.Users = capBySize(capFacts(a.Users, c.Log, "accounts"), accountsUsersBudget, c.Log, "accounts")
 			a.Groups = capBySize(capFacts(a.Groups, c.Log, "groups"), accountsGroupsBudget, c.Log, "groups")
 			a.SudoRules = capBySize(capFacts(a.SudoRules, c.Log, "sudo rules"), accountsRulesBudget, c.Log, "sudo rules")
+			capSSHDLists(a.SSHD, c.Log)
 			return a
 		},
 		func(a agenttypes.HostAccounts) agenttypes.Frame {
@@ -503,6 +512,23 @@ func reportOnChange[T any](
 // when it has to. Logged on every resample rather than once: this is a
 // standing property of the host, and an hourly line is the only place it
 // is visible at all.
+// capSSHDLists bounds the only part of the sshd summary a configuration
+// can make arbitrarily long.
+//
+// Same reason as every other cap here: an oversize frame is REFUSED by
+// EncodeFrame, so one host with a thousand names in AllowUsers would
+// report no accounts at all -- losing the user list, the groups and the
+// sudo rules over an access list nobody was going to read.
+func capSSHDLists(c *agenttypes.SSHDConfig, log Logger) {
+	if c == nil {
+		return
+	}
+	c.AllowUsers = capBySize(c.AllowUsers, accountsSSHDListBudget, log, "sshd allowUsers")
+	c.AllowGroups = capBySize(c.AllowGroups, accountsSSHDListBudget, log, "sshd allowGroups")
+	c.DenyUsers = capBySize(c.DenyUsers, accountsSSHDListBudget, log, "sshd denyUsers")
+	c.DenyGroups = capBySize(c.DenyGroups, accountsSSHDListBudget, log, "sshd denyGroups")
+}
+
 // capBySize trims a list until its encoded form fits a byte budget,
 // after capFacts has already applied the count cap.
 //

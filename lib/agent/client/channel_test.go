@@ -2,8 +2,11 @@ package client
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"testing"
 	"time"
+
+	agenttypes "vraxel.io/vraxel/lib/agent/types"
 )
 
 // TestBootNonceIsStableWithinTheProcess pins the property the whole
@@ -46,4 +49,35 @@ func TestJitteredWithinHalfToFull(t *testing.T) {
 			}
 		}
 	}
+}
+
+// The sshd summary rides the accounts frame, and its access lists are
+// the only part of it a configuration can make arbitrarily long. An
+// oversize frame is refused outright, so an uncapped AllowUsers would
+// cost the host its whole account inventory.
+func TestCapSSHDLists(t *testing.T) {
+	many := make([]string, 2000)
+	for i := range many {
+		many[i] = "serviceaccount-with-a-long-name"
+	}
+	cfg := &agenttypes.SSHDConfig{
+		Ports: []int32{22}, AllowUsers: many, AllowGroups: many,
+		DenyUsers: many, DenyGroups: many,
+	}
+	capSSHDLists(cfg, nopLogger{})
+
+	for name, got := range map[string][]string{
+		"allowUsers": cfg.AllowUsers, "allowGroups": cfg.AllowGroups,
+		"denyUsers": cfg.DenyUsers, "denyGroups": cfg.DenyGroups,
+	} {
+		if len(got) == 0 || len(got) >= len(many) {
+			t.Errorf("%s = %d entries, want it trimmed but not emptied", name, len(got))
+		}
+		b, _ := json.Marshal(got)
+		if len(b) > accountsSSHDListBudget {
+			t.Errorf("%s encodes to %d bytes, over the %d budget", name, len(b), accountsSSHDListBudget)
+		}
+	}
+	// Nil is what a host without sshd reports, and it must not panic.
+	capSSHDLists(nil, nopLogger{})
 }

@@ -174,6 +174,10 @@ func (o hostRuntimeOps) accounts(ctx apiserver.Ctx) (*HostAccounts, error) {
 	// values -- which would read as a daemon that permits nothing.
 	if len(row.SSHD) > 0 {
 		var cfg HostSSHDConfig
+		// Ports is the emptiness test because sshd -T always prints at
+		// least one port line -- verified against a real daemon -- so its
+		// absence means the object is the "{}" a host writes when its
+		// sshd never answered, not a daemon with nothing to say.
 		if json.Unmarshal(row.SSHD, &cfg) == nil && len(cfg.Ports) > 0 {
 			out.SSHD = &cfg
 		}
