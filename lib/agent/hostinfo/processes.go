@@ -4,11 +4,14 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"io"
 	"net/netip"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	agenttypes "vraxel.io/vraxel/lib/agent/types"
@@ -545,4 +548,32 @@ func (s *CPUSampler) Live() agenttypes.HostProcesses {
 		pct = map[int64]float64{}
 	}
 	return collectProcesses(pct)
+}
+
+// readFileLimit reads at most max bytes from a REGULAR file, for the
+// paths whose contents are chosen by something other than this machine's
+// administrator -- currently /etc/passwd inside a container image.
+//
+// Both guards exist because such a path is not necessarily a file at all.
+// O_NONBLOCK: os.Open on a fifo blocks until somebody opens the other
+// end, which is forever, and this runs on the loop that walks every
+// process -- one container shipping a fifo where its passwd should be
+// would wedge the workload report permanently, live reads and the
+// background inventory alike. IsRegular: a character device answers the
+// read instead of blocking, and /dev/zero would hand back max bytes of
+// nothing.
+func readFileLimit(path string, max int64) []byte {
+	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK, 0)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+	if st, err := f.Stat(); err != nil || !st.Mode().IsRegular() {
+		return nil
+	}
+	b, err := io.ReadAll(io.LimitReader(f, max))
+	if err != nil {
+		return nil
+	}
+	return b
 }

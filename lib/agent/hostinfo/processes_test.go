@@ -1,7 +1,10 @@
 package hostinfo
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
+	"syscall"
 	"testing"
 	"time"
 
@@ -311,5 +314,46 @@ func TestParseStatusMem(t *testing.T) {
 	// double-counting back, silently.
 	if p, s := parseStatusMem([]byte("VmRSS:\t   90000 kB\n")); p != 0 || s != 0 {
 		t.Errorf("without the Rss* lines got (%d, %d), want (0, 0)", p, s)
+	}
+}
+
+// readFileLimit is pointed at /etc/passwd INSIDE a container image, so
+// what it opens is chosen by whatever is running there. Neither guard is
+// theoretical: os.Open on a fifo blocks until somebody opens the other
+// end, and this runs on the loop that walks every process.
+func TestReadFileLimitRefusesWhatIsNotAFile(t *testing.T) {
+	dir := t.TempDir()
+
+	ok := filepath.Join(dir, "passwd")
+	if err := os.WriteFile(ok, []byte("root:x:0:0::/root:/bin/sh\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := readFileLimit(ok, 1<<20); string(got) != "root:x:0:0::/root:/bin/sh\n" {
+		t.Errorf("regular file read as %q", got)
+	}
+
+	// Truncated, not refused: an oversize passwd is still worth its first
+	// entries, and the point of the cap is the allocation.
+	if got := readFileLimit(ok, 4); string(got) != "root" {
+		t.Errorf("limit not applied, got %q", got)
+	}
+
+	fifo := filepath.Join(dir, "fifo")
+	if err := syscall.Mkfifo(fifo, 0o644); err != nil {
+		t.Skipf("mkfifo: %v", err)
+	}
+	done := make(chan []byte, 1)
+	go func() { done <- readFileLimit(fifo, 1<<20) }()
+	select {
+	case got := <-done:
+		if got != nil {
+			t.Errorf("read %q from a fifo, want nothing", got)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("readFileLimit blocked on a fifo; one container could wedge the whole walk")
+	}
+
+	if got := readFileLimit(filepath.Join(dir, "nope"), 1<<20); got != nil {
+		t.Errorf("missing file read as %q", got)
 	}
 }

@@ -3,7 +3,6 @@
 package hostinfo
 
 import (
-	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -281,21 +280,6 @@ func listeningSockets(procDir string) map[uint64]procSocket {
 
 func readFileBytes(path string) []byte {
 	b, _ := os.ReadFile(path)
-	return b
-}
-
-// readFileLimit reads at most max bytes, for the files whose size is
-// chosen by something other than this machine's administrator.
-func readFileLimit(path string, max int64) []byte {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil
-	}
-	defer f.Close()
-	b, err := io.ReadAll(io.LimitReader(f, max))
-	if err != nil {
-		return nil
-	}
 	return b
 }
 
