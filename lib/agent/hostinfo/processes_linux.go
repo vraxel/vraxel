@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	agenttypes "vraxel.io/vraxel/lib/agent/types"
 )

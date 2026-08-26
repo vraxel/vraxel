@@ -335,6 +335,11 @@ func groupProcesses(seen map[groupKey]*agenttypes.ProcessGroup) []agenttypes.Pro
 // four, and everything under 4% of a core read exactly 0.0%.
 const cpuSampleStep = 15 * time.Second
 
+// cpuPrimeStep is the gap before the FIRST rate only, so an agent that
+// has just started has a coarse answer rather than a table of zeros. See
+// Run.
+const cpuPrimeStep = time.Second
+
 // clockTicks is USER_HZ, the unit /proc/pid/stat counts cpu time and
 // start time in.
 //
@@ -345,7 +350,7 @@ const cpuSampleStep = 15 * time.Second
 //
 // It also fixes the resolution of the cpu column: one tick is 10ms, so
 // the smallest non-zero reading a window of length W can produce is
-// 10ms/W. That is what sets statsSampleWindow.
+// 10ms/W. That is what sets cpuSampleStep.
 func clockTicks() int64 { return 100 }
 
 // cpuPercent turns two readings of the same counters into a percentage of
@@ -427,9 +432,23 @@ func NewCPUSampler() *CPUSampler { return &CPUSampler{} }
 
 // Run samples until ctx ends.
 func (s *CPUSampler) Run(ctx context.Context) {
+	s.round(time.Now())
+	// A second reading a second later, before settling into the real
+	// cadence. Without it a freshly started agent spends fifteen seconds
+	// reporting 0.0% for every process while still answering live -- and
+	// "everything is at zero" is indistinguishable from an idle machine,
+	// so the table would state something false rather than show a gap.
+	// One second resolves only 1%, but it is replaced by a full-step
+	// reading on the next tick.
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(cpuPrimeStep):
+	}
+	s.round(time.Now())
+
 	t := time.NewTicker(cpuSampleStep)
 	defer t.Stop()
-	s.round(time.Now())
 	for {
 		select {
 		case <-ctx.Done():
@@ -463,6 +482,10 @@ func (s *CPUSampler) observe(cur map[int64]int64, now time.Time) {
 // the caller asked for and it is only worth reading when somebody is
 // looking. Only the percentages are precomputed.
 func (s *CPUSampler) Live() agenttypes.HostProcesses {
+	// The map is read after the lock is released, which is safe only
+	// because observe REPLACES s.pct and never writes into it. Anything
+	// that starts mutating the published map in place is a data race the
+	// walk below would not survive.
 	s.mu.RLock()
 	pct := s.pct
 	s.mu.RUnlock()
