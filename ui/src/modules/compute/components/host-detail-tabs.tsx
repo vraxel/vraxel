@@ -150,6 +150,10 @@ export function HostOverviewTab({ host }: { host: Host }) {
   // asset tag.
   const physical = s.virtualization === "physical"
 
+  // Whether SMBIOS said anything at all. A host with no agent has none of
+  // these, and the asset card would be five rows of "-".
+  const dmi = !!(s.systemVendor || s.productName || s.boardName || s.biosVersion || s.biosDate)
+
   return (
     <div className="space-y-4">
       {/* The same three gauges the list sorts on, at the top of the page
@@ -195,7 +199,7 @@ export function HostOverviewTab({ host }: { host: Host }) {
         <Field label={t("compute.host.bootAt")} value={formatDateTime(s.bootAt)} />
         <Field label={t("compute.host.connectedAt")} value={formatDateTime(s.agentConnectedAt)} />
         <Field label={t("compute.host.agentVersion")} value={s.agentVersion} />
-        <Field label={t("compute.host.agentId")} value={s.agentId} mono />
+        <Field label={t("compute.host.agentId")} value={s.agentId} wide mono />
       </InfoCard>
 
       {/* Identity and where on the network it sits, and nothing else.
@@ -267,29 +271,39 @@ export function HostOverviewTab({ host }: { host: Host }) {
       </InfoCard>
 
       {/* On a guest this is which hypervisor and which machine type, which
-          is worth knowing. The identifiers below it are gated on bare
+          is worth knowing (a VMware guest fills all five: "VMware, Inc.",
+          "VMware Virtual Platform", "440BX Desktop Reference Platform",
+          "6.00", "02/17/2026"). The identifiers below it are gated on bare
           metal: a guest's serial re-encodes its SMBIOS UUID, its chassis
           type is whatever "Other" maps to, and its board serial belongs to
           a board that does not exist -- three plausible looking values
-          that identify nothing an operator can look up. */}
-      <InfoCard title={t("compute.host.assetSection")}>
-        <Field label={t("compute.host.systemVendor")} value={s.systemVendor} />
-        <Field label={t("compute.host.productName")} value={s.productName} wide />
-        <Field label={t("compute.host.boardName")} value={s.boardName} />
-        <Field label={t("compute.host.biosVersion")} value={s.biosVersion} />
-        <Field label={t("compute.host.biosDate")} value={s.biosDate} />
-        {physical && (
-          <>
-            <Field
-              label={t("compute.host.chassisType")}
-              value={s.chassisType ? <ChassisLabel value={s.chassisType} /> : undefined}
-            />
-            <Field label={t("compute.host.assetTag")} value={s.assetTag} mono />
-            <Field label={t("compute.host.serialNumber")} value={s.serialNumber} wide mono />
-            <Field label={t("compute.host.boardSerial")} value={s.boardSerial} wide mono />
-          </>
-        )}
-      </InfoCard>
+          that identify nothing an operator can look up.
+
+          Every field here comes from DMI, so a host with no agent has
+          none of them and the whole card would be five rows of "-". Gated
+          for that reason, like the kernel card above: splitting the old
+          hardware card in two would otherwise have added an empty card to
+          every agentless host. */}
+      {dmi && (
+        <InfoCard title={t("compute.host.assetSection")}>
+          <Field label={t("compute.host.systemVendor")} value={s.systemVendor} />
+          <Field label={t("compute.host.productName")} value={s.productName} wide />
+          <Field label={t("compute.host.boardName")} value={s.boardName} />
+          <Field label={t("compute.host.biosVersion")} value={s.biosVersion} />
+          <Field label={t("compute.host.biosDate")} value={s.biosDate} />
+          {physical && (
+            <>
+              <Field
+                label={t("compute.host.chassisType")}
+                value={s.chassisType ? <ChassisLabel value={s.chassisType} /> : undefined}
+              />
+              <Field label={t("compute.host.assetTag")} value={s.assetTag} mono />
+              <Field label={t("compute.host.serialNumber")} value={s.serialNumber} wide mono />
+              <Field label={t("compute.host.boardSerial")} value={s.boardSerial} wide mono />
+            </>
+          )}
+        </InfoCard>
+      )}
 
       {/* How this ROW came to exist, which is a fact about vraxel and not
           about the machine. Last because it is the only card here nobody
