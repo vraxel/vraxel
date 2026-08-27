@@ -93,16 +93,12 @@ function bytes(n?: number): string {
 // is the one that would tint the list's disk gauge.
 const warnPct = 75
 const hotPct = 90
-function barTone(pct: number): string {
-  if (pct >= hotPct) return "bg-destructive"
-  if (pct >= warnPct) return "bg-warning"
-  return "bg-primary"
-}
 
-// The same two thresholds as text, for the readings that are a number
-// rather than a bar.
-function textTone(pct: number): string {
-  return pct >= hotPct ? "text-destructive" : "text-warning"
+// Text only -- bars are magnitude, never status (see shared/ui/progress).
+function textTone(pct: number): string | undefined {
+  if (pct >= hotPct) return "text-destructive"
+  if (pct >= warnPct) return "text-warning"
+  return undefined
 }
 
 /**
@@ -623,7 +619,9 @@ export function HostStorageTab({ host }: { host: Host }) {
                               {bytes(f.usedBytes)} / {bytes(f.sizeBytes)}
                             </span>
                             {pct !== undefined && (
-                              <span className="text-muted-foreground text-xs">
+                              <span
+                                className={`text-xs ${textTone(pct) ?? "text-muted-foreground"}`}
+                              >
                                 ({Math.round(pct)}%)
                               </span>
                             )}
@@ -636,9 +634,6 @@ export function HostStorageTab({ host }: { host: Host }) {
                           <Progress
                             value={pct ?? 0}
                             className={pct === undefined ? "bg-muted/50 h-1.5" : "h-1.5"}
-                            indicatorClassName={
-                              pct === undefined ? "bg-muted-foreground/40" : barTone(pct)
-                            }
                           />
                         </div>
                       </TableCell>
@@ -651,7 +646,7 @@ export function HostStorageTab({ host }: { host: Host }) {
                           "-"
                         ) : (
                           <>
-                            <div className={inodePct >= warnPct ? textTone(inodePct) : undefined}>
+                            <div className={textTone(inodePct)}>
                               {Math.round(inodePct)}%
                             </div>
                             <div className="text-muted-foreground text-xs">

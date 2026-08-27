@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import { Clock } from "lucide-react"
 import { Progress } from "@/shared/ui/progress"
 import { useTranslation } from "@/i18n"
 import type { Host } from "@/modules/compute/api/types"
@@ -24,20 +25,24 @@ import type { Host } from "@/modules/compute/api/types"
 // see, as long as it stops looking current.
 const staleAfterMs = 60_000
 
-// Two thresholds, shared by the reading and its gauge so the colour is
-// one signal rather than two that can disagree. These are fixed and
-// generic on purpose: the alert rules own the per-host thresholds that
-// actually page someone, and a list cell cannot cheaply know them --
-// this is the "worth a second look while scanning" tier, not an alert.
+// Two thresholds for the reading. Fixed and generic on purpose: the alert
+// rules own the per-host thresholds that actually page someone, and a list
+// cell cannot cheaply know them -- this is the "worth a second look while
+// scanning" tier, not an alert.
+//
+// They tint the PERCENTAGE, never the bar. The bar's length already says
+// how full the thing is; colouring it too says the same fact twice and
+// leaves nothing to say the things length cannot -- which is why staleness
+// used to be a grey bar and got read as a rendering fault.
 const warnPct = 75
 const hotPct = 90
 
 // The tone for a live reading. Stale and unknown are handled by the
 // caller: both mean "do not read this as the current colour".
-function toneFor(value: number): { text: string; bar: string } {
-  if (value >= hotPct) return { text: "text-destructive", bar: "bg-destructive" }
-  if (value >= warnPct) return { text: "text-warning", bar: "bg-warning" }
-  return { text: "", bar: "bg-primary" }
+function toneFor(value: number): string {
+  if (value >= hotPct) return "text-destructive"
+  if (value >= warnPct) return "text-warning"
+  return ""
 }
 
 function isStale(sampledAt?: string): boolean {
@@ -59,6 +64,14 @@ function isStale(sampledAt?: string): boolean {
  * a dimmed rail -- never a 0% that would read as an idle machine. The
  * rail stays so rows with and without a reading keep the same height;
  * ragged row heights were what made this column group look broken.
+ *
+ * A stale reading keeps its bar at full colour and grows a clock instead.
+ * The bar is still true -- it is what the host last said -- and the clock
+ * is the part that is worth noticing, so it gets the marker. Staleness is
+ * usually not the agent being down (the row would say 离线); the case that
+ * produced this was a host whose own clock was nine hours behind, which is
+ * exactly the fault a timestamp comparison should surface and a grey bar
+ * cannot name.
  */
 function UtilGauge({
   amount,
@@ -77,18 +90,15 @@ function UtilGauge({
 }) {
   const { t } = useTranslation()
   const known = typeof value === "number"
-  const tone = known && !stale ? toneFor(value) : null
-  const pctTone = tone ? tone.text : "text-muted-foreground/60"
-  // A dimmed bar is a state, not a rendering fault, and without this it
-  // had no way to say so -- it was read as a colour bug on a host whose
-  // header said 在线 two inches above.
-  const why = tone ? undefined : t(known ? "compute.host.util.stale" : "compute.host.util.unknown")
+  const live = known && !stale
+  const pctTone = live ? toneFor(value) : "text-muted-foreground"
+  const why = live ? undefined : t(known ? "compute.host.util.stale" : "compute.host.util.unknown")
 
   return (
     <div className={`${wide ? "w-full" : "w-36"} space-y-1`} title={why}>
       <div className="flex items-baseline gap-1">
         {amount === undefined ? (
-          <span className={`text-sm tabular-nums ${known ? pctTone : "text-muted-foreground"}`}>
+          <span className={`text-sm tabular-nums ${pctTone}`}>
             {known ? `${Math.round(value)}%` : "-"}
           </span>
         ) : (
@@ -99,12 +109,11 @@ function UtilGauge({
             )}
           </>
         )}
+        {known && stale && (
+          <Clock className="text-muted-foreground size-3 shrink-0 self-center" aria-label={why} />
+        )}
       </div>
-      <Progress
-        value={known ? value : 0}
-        className={known ? "h-1.5" : "bg-muted/50 h-1.5"}
-        indicatorClassName={tone ? tone.bar : "bg-muted-foreground/40"}
-      />
+      <Progress value={known ? value : 0} className={known ? "h-1.5" : "bg-muted/50 h-1.5"} />
     </div>
   )
 }
