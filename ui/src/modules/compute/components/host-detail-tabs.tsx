@@ -646,9 +646,7 @@ export function HostStorageTab({ host }: { host: Host }) {
                           "-"
                         ) : (
                           <>
-                            <div className={textTone(inodePct)}>
-                              {Math.round(inodePct)}%
-                            </div>
+                            <div className={textTone(inodePct)}>{Math.round(inodePct)}%</div>
                             <div className="text-muted-foreground text-xs">
                               {count(f.inodesUsed ?? 0)} / {count(f.inodesTotal ?? 0)}
                             </div>
