@@ -154,7 +154,9 @@ const compute = {
 
   // host detail
   "compute.host.basicInfo": "基本信息",
-  "compute.host.agentSession": "Agent 会话",
+  "compute.host.agentAndTime": "上报与时钟",
+  "compute.host.assetSection": "资产标识",
+  "compute.host.recordSection": "记录信息",
   "compute.host.agentId": "Agent ID",
   "compute.host.connectedAt": "连接时间",
   "compute.host.lastSeenAt": "最近心跳",

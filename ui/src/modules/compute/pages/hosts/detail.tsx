@@ -24,12 +24,35 @@ import {
   HostStorageTab,
 } from "@/modules/compute/components/host-detail-tabs"
 import { HostAccountsTab, HostProcessesTab } from "@/modules/compute/components/host-runtime-tabs"
+import { hostFindings, type TabFinding } from "@/modules/compute/components/host-findings"
 import { AgentInstallDialog } from "@/modules/compute/components/agent-install-dialog"
 import { HostMergeDialog } from "@/modules/compute/components/host-merge-dialog"
 import { HostLogsDialog } from "@/modules/compute/components/host-logs-dialog"
 import { HostTerminalDialog } from "@/modules/compute/components/host-terminal-dialog"
 import { useHostWatch } from "@/modules/compute/use-host-watch"
 import { ConfirmDialog } from "@/shared/components/confirm-dialog"
+
+/**
+ * The count of findings behind a tab, drawn on the tab itself.
+ *
+ * A count rather than a dot: "3" and "1" are different amounts of work,
+ * and the number costs no more room than the dot would. Two tones only,
+ * matching every other threshold on this page -- destructive for
+ * something broken now, warning for something worth a look -- because a
+ * third tone would need a legend and the tab strip has no room for one.
+ */
+function FindingBadge({ finding }: { finding?: TabFinding }) {
+  if (!finding) return null
+  return (
+    <span
+      className={`rounded-full px-1.5 text-xs tabular-nums ${
+        finding.hot ? "bg-destructive/15 text-destructive" : "bg-warning/15 text-warning"
+      }`}
+    >
+      {finding.count}
+    </span>
+  )
+}
 
 export default function HostDetailPage() {
   const { hostId, workspaceId, namespaceId } = useParams()
@@ -82,6 +105,7 @@ export default function HostDetailPage() {
   })
   const host = query.data ?? null
   useHostWatch(scope)
+  const findings = host ? hostFindings(host) : {}
 
   const handleDelete = async () => {
     if (!host) return
@@ -234,15 +258,33 @@ export default function HostDetailPage() {
           inventory TABLES get their own, because a real server fills them
           with a dozen disks and twenty mounts; and metrics gets one
           because mounting it starts a polling query and a chart per
-          series. */}
+          series.
+
+          The badges are what makes that affordable. Splitting a page into
+          tabs hides five sixths of it, so a tab that holds a problem has
+          to say so from the outside -- otherwise the only way to learn
+          the host is healthy is to open all six. See host-findings.ts for
+          which findings qualify and why processes / accounts have none. */}
       <Tabs defaultValue="overview">
         <TabsList>
-          <TabsTrigger value="overview">{t("compute.host.tab.overview")}</TabsTrigger>
-          <TabsTrigger value="network">{t("compute.host.tab.network")}</TabsTrigger>
-          <TabsTrigger value="storage">{t("compute.host.tab.storage")}</TabsTrigger>
+          <TabsTrigger value="overview">
+            {t("compute.host.tab.overview")}
+            <FindingBadge finding={findings.overview} />
+          </TabsTrigger>
+          <TabsTrigger value="network">
+            {t("compute.host.tab.network")}
+            <FindingBadge finding={findings.network} />
+          </TabsTrigger>
+          <TabsTrigger value="storage">
+            {t("compute.host.tab.storage")}
+            <FindingBadge finding={findings.storage} />
+          </TabsTrigger>
           <TabsTrigger value="processes">{t("compute.host.tab.processes")}</TabsTrigger>
           <TabsTrigger value="accounts">{t("compute.host.tab.accounts")}</TabsTrigger>
-          <TabsTrigger value="metrics">{t("compute.host.tab.metrics")}</TabsTrigger>
+          <TabsTrigger value="metrics">
+            {t("compute.host.tab.metrics")}
+            <FindingBadge finding={findings.metrics} />
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-4">
