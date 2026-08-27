@@ -156,7 +156,9 @@ const compute = {
 
   // host detail
   "compute.host.basicInfo": "Basic information",
-  "compute.host.agentSession": "Agent session",
+  "compute.host.agentAndTime": "Reporting and clock",
+  "compute.host.assetSection": "Asset identity",
+  "compute.host.recordSection": "Record",
   "compute.host.agentId": "Agent ID",
   "compute.host.connectedAt": "Connected at",
   "compute.host.lastSeenAt": "Last heartbeat",

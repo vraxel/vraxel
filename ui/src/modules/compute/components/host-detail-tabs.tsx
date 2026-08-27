@@ -102,17 +102,31 @@ function textTone(pct: number): string | undefined {
 }
 
 /**
- * Overview: how loaded the machine is, then everything it IS.
+ * Overview: how loaded the machine is, whether that reading can be
+ * believed, what the machine is, and last how this row came to exist.
  *
- * Every scalar field on one tab, because they fit: four across on a
- * wide screen this is three cards and about one screen, and splitting
- * them earlier bought a second tab click in exchange for a panel that
- * used 349px of an 830px viewport. The asset fields below are gated on
- * bare metal, so a guest's card is shorter still. Tabs earn their place
- * here only for
- * the inventory TABLES, which a real server can fill with a dozen disks
- * and twenty mounts, and for the metrics panel, which is expensive to
- * mount.
+ * Every scalar field stays on one tab, because they fit: four across on
+ * a wide screen this is about one screen, and splitting them across tabs
+ * earlier bought a second tab click in exchange for a panel that used
+ * 349px of an 830px viewport. Tabs earn their place only for the
+ * inventory TABLES, which a real server can fill with a dozen disks and
+ * twenty mounts, and for the metrics panel, which is expensive to mount.
+ *
+ * The CARDS are what carry the ranking, and the order is by "why would
+ * somebody look", not by category:
+ *
+ *   gauges       how is it doing
+ *   agent+time   are those numbers current, are the timestamps sound
+ *   basic        what is it and where is it
+ *   kernel       (only when there is something to say)
+ *   hardware     what can it do
+ *   asset        which physical thing is it
+ *   record       how did this ROW get here -- a fact about vraxel
+ *
+ * This replaced an order that was roughly the order the fields were
+ * added: the agent card sat last, under fourteen rows of BIOS dates,
+ * even though it is the card that says whether everything above it is
+ * stale.
  */
 export function HostOverviewTab({ host }: { host: Host }) {
   const { t } = useTranslation()
@@ -154,37 +168,48 @@ export function HostOverviewTab({ host }: { host: Host }) {
         </GaugeCard>
       </div>
 
-      <InfoCard title={t("compute.host.basicInfo")}>
-        <Field label={t("compute.host.ip")} value={s.reportedPrimaryIp} mono />
-        <Field label={t("compute.host.hostname")} value={s.hostname} />
-        <Field label={t("compute.host.os")} value={s.os} wide />
-        <Field label={t("compute.host.kernel")} value={s.kernelVersion} mono />
-        <Field label={t("compute.host.arch")} value={s.arch} />
-        {/* Where on the network this machine sits, next to the address it
-            sits at. osId / osVersionId are deliberately not shown: they
-            are the same facts as os, split so a query can compare them,
-            and a row reading "debian" under one reading "Debian GNU/Linux
-            13" is a second spelling with nothing new in it. */}
-        <Field label={t("compute.host.defaultGateway")} value={s.defaultGateway} mono />
-        {/* Beside the timezone, because they are the two halves of "what
-            time does this machine think it is" -- and a clock nobody
-            disciplined makes every other reading on this page unreliable,
-            including our own judgement of whether they are fresh. */}
+      {/* Directly under the gauges, because it is the answer to the
+          question the gauges raise: are these numbers current, and can
+          the timestamps be believed. It used to sit at the bottom of the
+          tab, below fourteen rows of BIOS dates -- so the page put its
+          least perishable facts in front of the one card that says
+          whether the perishable ones are still good.
+
+          The clock rides here for the same reason. Every timestamp on
+          this page is the AGENT's, so a machine that has stopped
+          disciplining its clock invalidates lastSeenAt, the gauges'
+          freshness and the metrics window together. Beside the timezone,
+          which is the other half of "what time does this machine think it
+          is" and is otherwise a config row nobody reads. */}
+      <InfoCard title={t("compute.host.agentAndTime")}>
+        <Field label={t("compute.host.lastSeenAt")} value={formatDateTime(s.agentLastSeenAt)} />
+        <Field
+          label={t("compute.host.factsReportedAt")}
+          value={formatDateTime(s.factsReportedAt)}
+        />
         <Field label={t("compute.host.timezone")} value={s.timezone} />
         <Field
           label={t("compute.host.clockSync")}
           value={s.clockSync ? <ClockSyncBadge value={s.clockSync} /> : undefined}
         />
-        <Field
-          label={t("compute.host.origin")}
-          value={
-            s.origin === "agent" ? t("compute.host.originAgent") : t("compute.host.originManual")
-          }
-        />
         <Field label={t("compute.host.bootAt")} value={formatDateTime(s.bootAt)} />
-        <Field label={t("common.createdBy")} value={s.createdByName} />
-        <Field label={t("common.created")} value={formatDateTime(host.metadata.createdAt)} />
-        <Field label={t("common.description")} value={s.description} full />
+        <Field label={t("compute.host.connectedAt")} value={formatDateTime(s.agentConnectedAt)} />
+        <Field label={t("compute.host.agentVersion")} value={s.agentVersion} />
+        <Field label={t("compute.host.agentId")} value={s.agentId} mono />
+      </InfoCard>
+
+      {/* Identity and where on the network it sits, and nothing else.
+          osId / osVersionId are deliberately not shown: they are the same
+          facts as os, split so a query can compare them, and a row
+          reading "debian" under one reading "Debian GNU/Linux 13" is a
+          second spelling with nothing new in it. */}
+      <InfoCard title={t("compute.host.basicInfo")}>
+        <Field label={t("compute.host.ip")} value={s.reportedPrimaryIp} mono />
+        <Field label={t("compute.host.hostname")} value={s.hostname} />
+        <Field label={t("compute.host.defaultGateway")} value={s.defaultGateway} mono />
+        <Field label={t("compute.host.arch")} value={s.arch} />
+        <Field label={t("compute.host.os")} value={s.os} wide />
+        <Field label={t("compute.host.kernel")} value={s.kernelVersion} mono wide />
         {/* What an ssh client pins. Shown because the event worth catching
             is these CHANGING: a rebuilt or replaced machine has new ones,
             and every operator's client refuses to connect until somebody
@@ -219,13 +244,13 @@ export function HostOverviewTab({ host }: { host: Host }) {
         </InfoCard>
       )}
 
+      {/* Capacity: what this machine can do. Split from the asset card
+          below because the two answer different questions on different
+          days -- "will this workload fit" is capacity planning, "which
+          rack is this and who do I raise the RMA with" is asset
+          management -- and interleaving them made both harder to scan. */}
       <InfoCard title={t("compute.host.hardware")}>
         <Field label={t("compute.host.cpuModel")} value={s.cpuModel} wide />
-        <Field
-          label={t("compute.host.logicalCpus")}
-          value={s.cpuCores ? `${s.cpuCores}` : undefined}
-        />
-        <Field label={t("compute.host.cpuTopology")} value={topology} />
         <Field
           label={t("compute.host.memoryTotal")}
           value={s.memoryMb ? bytes(s.memoryMb * 1024 * 1024) : undefined}
@@ -234,38 +259,53 @@ export function HostOverviewTab({ host }: { host: Host }) {
           label={t("compute.host.virtualization")}
           value={s.virtualization ? <VirtBadge value={s.virtualization} /> : undefined}
         />
+        <Field
+          label={t("compute.host.logicalCpus")}
+          value={s.cpuCores ? `${s.cpuCores}` : undefined}
+        />
+        <Field label={t("compute.host.cpuTopology")} value={topology} />
+      </InfoCard>
+
+      {/* On a guest this is which hypervisor and which machine type, which
+          is worth knowing. The identifiers below it are gated on bare
+          metal: a guest's serial re-encodes its SMBIOS UUID, its chassis
+          type is whatever "Other" maps to, and its board serial belongs to
+          a board that does not exist -- three plausible looking values
+          that identify nothing an operator can look up. */}
+      <InfoCard title={t("compute.host.assetSection")}>
         <Field label={t("compute.host.systemVendor")} value={s.systemVendor} />
-        <Field label={t("compute.host.productName")} value={s.productName} />
+        <Field label={t("compute.host.productName")} value={s.productName} wide />
+        <Field label={t("compute.host.boardName")} value={s.boardName} />
         <Field label={t("compute.host.biosVersion")} value={s.biosVersion} />
         <Field label={t("compute.host.biosDate")} value={s.biosDate} />
-        <Field label={t("compute.host.boardName")} value={s.boardName} wide />
-        {/* The asset-management fields, and they only mean anything on
-            hardware. A guest's serial re-encodes its SMBIOS UUID, its
-            chassis type is whatever "Other" maps to, and its board serial
-            belongs to a board that does not exist -- three plausible
-            looking values that identify nothing an operator can look up. */}
         {physical && (
           <>
-            <Field label={t("compute.host.serialNumber")} value={s.serialNumber} wide mono />
-            <Field label={t("compute.host.assetTag")} value={s.assetTag} mono />
             <Field
               label={t("compute.host.chassisType")}
               value={s.chassisType ? <ChassisLabel value={s.chassisType} /> : undefined}
             />
+            <Field label={t("compute.host.assetTag")} value={s.assetTag} mono />
+            <Field label={t("compute.host.serialNumber")} value={s.serialNumber} wide mono />
             <Field label={t("compute.host.boardSerial")} value={s.boardSerial} wide mono />
           </>
         )}
       </InfoCard>
 
-      <InfoCard title={t("compute.host.agentSession")}>
-        <Field label={t("compute.host.agentVersion")} value={s.agentVersion} />
-        <Field label={t("compute.host.agentId")} value={s.agentId} wide mono />
-        <Field label={t("compute.host.connectedAt")} value={formatDateTime(s.agentConnectedAt)} />
-        <Field label={t("compute.host.lastSeenAt")} value={formatDateTime(s.agentLastSeenAt)} />
+      {/* How this ROW came to exist, which is a fact about vraxel and not
+          about the machine. Last because it is the only card here nobody
+          opens the page to read -- it was previously interleaved with the
+          host's own identity, where "created by" sat two rows under a
+          kernel version and read as if somebody had created the machine. */}
+      <InfoCard title={t("compute.host.recordSection")}>
         <Field
-          label={t("compute.host.factsReportedAt")}
-          value={formatDateTime(s.factsReportedAt)}
+          label={t("compute.host.origin")}
+          value={
+            s.origin === "agent" ? t("compute.host.originAgent") : t("compute.host.originManual")
+          }
         />
+        <Field label={t("common.createdBy")} value={s.createdByName} />
+        <Field label={t("common.created")} value={formatDateTime(host.metadata.createdAt)} />
+        <Field label={t("common.description")} value={s.description} full />
       </InfoCard>
     </div>
   )
